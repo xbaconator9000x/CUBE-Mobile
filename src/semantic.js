@@ -105,6 +105,121 @@ export function filterAnchors(anchors,search='',category='all',limit=180){
 }
 
 
+
+/**
+ * Read-only HMA [[List]] metadata. Upstream StoredMetadata supports numbered
+ * entries (including sparse indexes), inline arrays and multiline arrays.
+ * A list supplies its NUMBER OF ENTRIES to ArrayRun.ParseLengthFromAnchor only
+ * when no named anchor of that name exists. UnmappedConstant is not a length
+ * source: upstream uses MatchedWords / WordRun for ROM-backed constants.
+ * Unsupported list syntax is rejected instead of inventing a count.
+ */
+const maxListEntries=100000;
+function hmaListLine(text){
+  // Strip comments and find a closing array bracket only outside quoted strings.
+  let quote='',output='',close=false;
+  for(let i=0;i<text.length;i++){
+    if(quote){
+      if(text.startsWith(quote,i)){output+=quote;i+=quote.length-1;quote='';}
+      else output+=text[i];
+      continue;
+    }
+    if(text[i]==='#')break;
+    const triple=text.slice(i,i+3);
+    if(triple==="'''"||triple==='"""'){quote=triple;output+=triple;i+=2;continue;}
+    if(text[i]==="'"||text[i]==='"'){quote=text[i];output+=text[i];continue;}
+    if(text[i]===']'){
+      if(text.slice(i+1).trim()&&!/^\s*#/.test(text.slice(i+1)))throw Error('Unexpected text after HMA list array');
+      close=true;break;
+    }
+    output+=text[i];
+  }
+  return {content:output,close};
+}
+function hmaListItems(source){
+  const values=[];let text=source.trim();
+  while(text){
+    const m=/^(?:'''([^']*)'''|"""([^"]*)"""|'([^'\r\n]*)'|"([^"\r\n]*)")/.exec(text);
+    if(!m)throw Error('Unsupported HMA list item syntax');
+    values.push(m.slice(1).find(x=>x!==undefined));
+    if(values.length>maxListEntries)throw Error('HMA list exceeds entry limit');
+    text=text.slice(m[0].length).trimStart();
+    if(!text)break;
+    if(text[0]!==',')throw Error('HMA list entries must be comma separated');
+    text=text.slice(1).trimStart();
+  }
+  return values;
+}
+export function parseHmaLists(source){
+  if(typeof source!=='string'||source.length>maxMetadataSize)throw Error('Metadata must be TOML text under 4 MiB');
+  const lines=source.replace(/^\uFEFF/,'').split(/\r?\n/);
+  const records=[];let current=null;
+  const finish=()=>{
+    if(!current)return;
+    if(!current.name||!current.entries.length)throw Error('Incomplete HMA List at line '+current.line);
+    records.push(current);
+    if(records.length>maxRecords)throw Error('Too many HMA lists');
+    current=null;
+  };
+  for(let i=0;i<lines.length;i++){
+    const line=lines[i].trim();
+    if(/^\[\[/.test(line)){
+      finish();
+      const m=/^\[\[\s*([^\]]+?)\s*\]\]/.exec(line);
+      if(m?.[1]==='List')current={name:'',entries:[],line:i+1};
+      continue;
+    }
+    if(/^\[/.test(line)){finish();continue;}
+    if(!current||!line||line.startsWith('#'))continue;
+    const name=/^Name\s*=\s*(.+)$/.exec(line);
+    if(name){
+      const value=tomlString(name[1]);
+      if(!value||current.name)throw Error('Invalid HMA List name at line '+(i+1));
+      current.name=value;continue;
+    }
+    const entry=/^([0-9]+)\s*=\s*(.+)$/.exec(line);
+    if(!entry)continue;
+    const start=Number(entry[1]);
+    if(!Number.isSafeInteger(start)||start>maxListEntries)throw Error('HMA list index exceeds limit');
+    let value=entry[2].trim(),items;
+    if(value.startsWith('[')){
+      let part=hmaListLine(value.slice(1)),body=part.content;
+      while(!part.close){
+        if(++i>=lines.length)throw Error('Unterminated HMA list array');
+        part=hmaListLine(lines[i]);
+        body+='\n'+part.content;
+      }
+      items=hmaListItems(body);
+    }else{
+      const part=hmaListLine(value);
+      if(part.close)throw Error('Unexpected closing bracket in HMA list');
+      items=hmaListItems(part.content);
+      if(items.length!==1)throw Error('Expected one HMA list entry');
+    }
+    if(start+items.length>maxListEntries)throw Error('HMA list exceeds entry limit');
+    // Mirrors StoredMetadata's append semantics for numbered items: gaps are
+    // padded with null, existing positions are never overwritten.
+    while(current.entries.length<start)current.entries.push(null);
+    current.entries.push(...items);
+  }
+  finish();
+  return records;
+}
+export function collectHmaLists(sources){
+  if(!Array.isArray(sources)||sources.length>1000)throw Error('Invalid metadata source list');
+  const lists=[],byName=new Map(),conflictedNames=new Set();
+  for(const source of sources){
+    if(typeof source?.name!=='string'||!source.name.trim())throw Error('Unnamed metadata source');
+    for(const list of parseHmaLists(source.text)){
+      const prior=byName.get(list.name);
+      if(prior&&JSON.stringify(prior.entries)!==JSON.stringify(list.entries))
+        conflictedNames.add(list.name);
+      if(!prior){byName.set(list.name,list);lists.push({...list,source:source.name});}
+    }
+  }
+  return {lists,conflictedNames};
+}
+
 /**
  * Conservative, read-only subset of CUBHMA ArrayRun's fixed-length table grammar.
  * Source: kcradi/CUBHMA @ 3044393183e01af2ae1e907fb37e4a75eda6a8dc,
@@ -179,7 +294,16 @@ export function parseHmaParentLengthToken(token){
   const end=second!==null?second:Math.max(0,first);
   return {parent:match[1],beginningMargin:beginning,endMargin:end};
 }
-export function resolveHmaTableLayouts(anchors,{romSize=Infinity,maxOverlaps=128}={}){
+export function resolveHmaTableLayouts(anchors,{romSize=Infinity,maxOverlaps=128,lists=[],conflictingLists=new Set()}={}){
+  if(!Array.isArray(lists)||lists.length>50000||!(conflictingLists instanceof Set))throw Error('Invalid HMA list metadata');
+  const listByName=new Map(),listConflicts=new Set(conflictingLists);
+  for(const list of lists){
+    if(typeof list?.name!=='string'||!list.name||!Array.isArray(list.entries)||list.entries.length<1||list.entries.length>maxListEntries)
+      throw Error('Invalid HMA list metadata');
+    const previous=listByName.get(list.name);
+    if(previous&&JSON.stringify(previous.entries)!==JSON.stringify(list.entries))listConflicts.add(list.name);
+    if(!previous)listByName.set(list.name,list);
+  }
   if(!Array.isArray(anchors)||anchors.length>50000)throw Error('Invalid or excessive anchor metadata');
   if(!(romSize===Infinity||(Number.isSafeInteger(romSize)&&romSize>=0)))
     throw Error('Invalid ROM length');
@@ -216,6 +340,16 @@ export function resolveHmaTableLayouts(anchors,{romSize=Infinity,maxOverlaps=128
     const margins=parseHmaParentLengthToken(match[2]);
     if(!margins){unresolved.set(name,'unsupported-length-expression');continue;}
     const parent=margins.parent;
+    if(!entries.has(parent)&&listByName.has(parent)){
+      if(listConflicts.has(parent)){unresolved.set(name,'conflicting-list-name');continue;}
+      const count=listByName.get(parent).entries.length+margins.beginningMargin+margins.endMargin;
+      const layout=Number.isSafeInteger(count)&&count>=1&&count<=1000000
+        ?parseHmaFixedTableFormat('['+match[1]+']'+count):null;
+      accept(anchor,layout,'named-list-count',parent,{
+        beginning:margins.beginningMargin,end:margins.endMargin
+      });
+      continue;
+    }
     if(!entries.has(parent)){unresolved.set(name,'missing-length-anchor');continue;}
     waiting.set(name,{anchor,body:match[1],parent,margins});
     if(!children.has(parent))children.set(parent,[]);
@@ -252,6 +386,7 @@ export function resolveHmaTableLayouts(anchors,{romSize=Infinity,maxOverlaps=128
   return {byName,unresolved,conflicted,overlaps,overlapWitnesses,
     overlapTruncated:overlapWitnesses>overlaps.length,
     resolvedCount:byName.size,anchoredCount:[...byName.values()].filter(x=>x.kind==='anchored-count').length,
+    listCount:[...byName.values()].filter(x=>x.kind==='named-list-count').length,
     disclaimer:'Metadata-derived lengths and overlap witnesses are unverified. Unsupported grammar and conflicting spans are not safe to edit or repoint.'};
 }
 
@@ -393,7 +528,7 @@ export function checkHmaMetadataSources(sources,bytes){
  * never as authoritative owners or safe sources for repointing.
  */
 export function inspectHmaPointerReferences(bytes,target,anchors,{
-  maxTableSlots=120000,maxDeclared=32,maxCandidates=24,maxScanBytes=8*1024*1024,offsetPointers=[]
+  maxTableSlots=120000,maxDeclared=32,maxCandidates=24,maxScanBytes=8*1024*1024,offsetPointers=[],lists=[],conflictingLists=new Set()
 }={}){
   const read=bytes instanceof Uint8Array?i=>bytes[i]:typeof bytes?.read==='function'?i=>bytes.read(i):null;
   if(!read||!Number.isSafeInteger(bytes?.length)||bytes.length<1)throw Error('Invalid ROM for reference inspection');
@@ -419,7 +554,7 @@ export function inspectHmaPointerReferences(bytes,target,anchors,{
     offsetBySource.set(record.address,record.offset);
   }
   const declared=[],knownSlots=new Set();
-  const tableResolution=resolveHmaTableLayouts(anchors,{romSize:bytes.length,maxOverlaps:0});
+  const tableResolution=resolveHmaTableLayouts(anchors,{romSize:bytes.length,maxOverlaps:0,lists,conflictingLists});
   let examinedSlots=0,skippedTables=0,matchedDeclared=0,unsupportedFormats=0,conflictedTables=0;
   for(const anchor of anchors){
     if(!anchor||!Number.isSafeInteger(anchor.address))continue;
@@ -474,7 +609,7 @@ export function inspectHmaPointerReferences(bytes,target,anchors,{
   }
   return {
     target,declared,candidates,matchedDeclared,candidateHits,
-    examinedSlots,skippedTables,unsupportedFormats,conflictedTables,anchoredTables:tableResolution.anchoredCount,examinedOffsetPointers,skippedOffsetPointers,scannedBytes:span,
+    examinedSlots,skippedTables,unsupportedFormats,conflictedTables,anchoredTables:tableResolution.anchoredCount,listTables:tableResolution.listCount,examinedOffsetPointers,skippedOffsetPointers,scannedBytes:span,
     rawScanComplete:span===bytes.length,scanAlignment:4,
     declaredTruncated:matchedDeclared>declared.length,candidatesTruncated:candidateHits>candidates.length,
     disclaimer:'Fixed/anchor-length table and OffsetPointer matches rely on unverified metadata; overlapping table claims are excluded. Raw candidates are only aligned byte-pattern matches. Neither proves ownership or permits safe repointing.'
