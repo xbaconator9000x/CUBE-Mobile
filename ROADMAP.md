@@ -163,3 +163,12 @@
 - [x] Add an opt-in mobile workspace fingerprint action, standalone bundling and regression checks. Do not claim a digest alone authenticates ROM family/layout.
 - [ ] Acquire legally distributable, independently verified CUBE version/layout fingerprints and explicit metadata compatibility manifests; no ROM images or unverifiable hashes committed.
 - [ ] Validate CUBE/stock fingerprints against licensed fixtures, verify 128 MiB performance on Android hardware, and gate semantic metadata interpretation/writes by trusted version/layout evidence.
+
+
+## Watchdog checkpoint — exact ROM compatibility comparison (27 October 2026)
+- [x] Add an opt-in exact SHA-256 comparison against a separately obtained expected digest, with explicit match/mismatch and no layout-authentication claims.
+- [x] Add a strictly validated curated-profile registry interface requiring exact ROM digest/length, game code/revision, layout, metadata digest and source provenance. Leave the bundled registry empty until verified evidence exists.
+- [x] Fail closed on duplicate/malformed registry entries, stale fingerprints, header/profile conflicts and mismatching expected hashes; no semantic write permissions.
+- [x] Add synthetic ROM immutability, invalid-provenance, mobile integration and standalone-build regressions.
+- [ ] Obtain independently verified CUBE ROM and matching TOML SHA-256 digests with licensed provenance; do not invent or copy commercial ROM bytes.
+- [ ] Verify exact metadata bytes against curated metadata hashes and run authentic ROM/emulator and Android-device compatibility tests before trusting any layout.
