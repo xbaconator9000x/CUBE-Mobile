@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased — read-only HMA table inspection
+## Unreleased — ROM revision and metadata compatibility guards
+- Add header-validated exact-code/revision stock metadata resolution; unknown revisions fail closed.
+- Block incompatible pinned stock metadata imports before changing the current metadata set.
+- Keep custom metadata read-only and unauthenticated; CUBE-specific ROM identification remains future work.
+- Add eight identity/compatibility regression tests and bump cache/app version to v0.5.2.
+
+## v0.5.1 — read-only HMA table inspection
 - Parse conservative fixed-length `ArrayRun` formats directly from imported CUBHMA TOML.
 - Preview at most eight rows of unsigned numeric fields, range-checked ROM pointers and raw text bytes; no semantic writes.
 - Reject dynamic, unknown or out-of-bounds table formats rather than guessing.
