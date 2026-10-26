@@ -83,6 +83,13 @@
 - [ ] Verify legitimate upstream aliases and nested formats against licensed fixtures before relaxing conservative read-only suppression.
 - [ ] No semantic writes, repointing or allocation until full upstream ownership and ROM fingerprint gates pass.
 
+## Watchdog checkpoint — bounded text-byte UI inspection (27 October 2026)
+- [x] Add bounded, immutable fixed-width ROM text-byte inspection with explicit `0xFF` termination and ASCII-only hints (not PCS).
+- [x] Show termination status on supported, non-conflicted fixed-table text cells in the mobile UI and bundle the module in the offline build.
+- [x] Add synthetic regressions for zero-offset and nonzero-offset termination, invalid readers, and ROM immutability.
+- [ ] Verify actual upstream PCS mappings and CUBE-specific text encodings using legal fixtures; decode only after version and format checks.
+- [ ] Implement semantic ownership, authentic game fixtures, mobile device acceptance and non-destructive text editing before claiming parity.
+
 ## Milestone 1 — semantic read-only CUBHMA engine
 - [ ] Parse HMA metadata and format DSL, beyond named-anchor fields.
 - [ ] Recognise ROM game/version and CUBE-specific metadata without false positives.

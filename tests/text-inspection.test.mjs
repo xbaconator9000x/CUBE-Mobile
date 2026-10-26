@@ -25,3 +25,23 @@ test('text inspector supports immutable staged ROM byte-reader',()=>{
  const bytes={length:3,read:i=>[0x61,0xFF,0x42][i]};
  assert.equal(inspectFixedTextBytes(bytes,0,3).asciiHint,'a');
 });
+
+test('terminator at the first byte produces an empty hint, without consuming trailing bytes',()=>{
+ const result=inspectFixedTextBytes(Uint8Array.from([0xFF,0x41]),0,2);
+ assert.equal(result.terminatorOffset,0);
+ assert.equal(result.asciiHint,'');
+ assert.equal(result.hex,'FF 41');
+});
+test('nonzero ROM offsets are read precisely and no bytes are mutated',()=>{
+ const rom=Uint8Array.from([0x01,0x42,0xFF,0x80]);
+ const original=rom.slice();
+ const result=inspectFixedTextBytes(rom,1,2);
+ assert.equal(result.start,1);
+ assert.equal(result.hex,'42 FF');
+ assert.equal(result.terminatorOffset,1);
+ assert.deepEqual(rom,original);
+});
+test('invalid staged reader byte values fail closed',()=>{
+ assert.throws(()=>inspectFixedTextBytes({length:1,read:()=>undefined},0,1));
+ assert.throws(()=>inspectFixedTextBytes({length:1,read:()=>256},0,1));
+});
