@@ -1,3 +1,8 @@
+## Unreleased — exact metadata SHA-256 identity (27 October 2026)
+- Added read-only, bounded exact-byte TOML SHA-256 hashing and one-file binding to a matching ROM profile. No line-ending/BOM normalisation and no ROM mutation.
+- Fail closed for stale or unverified ROMs and multi-file overlays; metadata authentication and semantic writes remain disabled.
+- Added synthetic regression tests and a documented checkpoint. Mobile UI and offline standalone integration remain pending.
+
 ## Unreleased — exact ROM compatibility comparison (27 October 2026)
 - Add a local expected-SHA-256 comparison for current staged ROM bytes; report exact match/mismatch without treating user-supplied evidence as trusted CUBE provenance.
 - Introduce a strictly validated, deliberately empty curated ROM profile registry (ROM digest/length, header identity, layout, exact metadata digest, provenance). No unverified CUBE profiles are bundled.
