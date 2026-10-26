@@ -131,6 +131,7 @@
 - [x] Parse upstream's underscore-separated game scopes (`@!game(BPRE_BPGE)`, `@!game(AXVE_AXPE)`) without guessing or applying wrong-game colour macros.
 - [x] Preserve upstream's literal single-quote-mark glyph declaration (`0xFF = "`) while still rejecting malformed multi-character quoted ranges.
 - [x] Add authentic fixture regression tests for glyphs, control lengths, colour macros, read-only decoding and ROM immutability.
-- [ ] Validate all upstream macro alias precedence and custom CUBE text extensions before text writes.
+- [x] Verify upstream `PCSString.FindMacro` uses first-declared matching macro; preserve source order for alias spellings and prefix collisions, with authentic-fixture regression tests.
+- [ ] Validate custom CUBE text extensions and complete macro behavior across all supported ROM families before text writes.
 - [ ] Run Android hardware import/cancellation/offline/large-file checks; reference imports remain unauthenticated and read-only.
 
