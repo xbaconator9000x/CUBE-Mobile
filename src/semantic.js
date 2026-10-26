@@ -149,3 +149,51 @@ export function previewHmaFixedTable(bytes,anchor,{maxRows=8}={}){
   }
   return {...layout,rows,truncated:rows.length<layout.count};
 }
+
+
+/** Read-only ROM-version guard for stock HMA metadata.
+ * Source file names are pinned to kcradi/CUBHMA 3044393183e01af2.
+ * Header identification cannot prove that a ROM is stock or identify CUBE.
+ */
+const HMA_STOCK_PROFILES=Object.freeze({
+  BPEE:{0:['default.toml','default.axve.axpe.bpee.toml','default.bpee.toml']},
+  BPRE:{0:['default.toml','default.bpre.bpge.toml','default.bpre0.toml'],1:['default.toml','default.bpre.bpge.toml','default.bpre1.toml']},
+  BPGE:{0:['default.toml','default.bpre.bpge.toml','default.bpge0.toml'],1:['default.toml','default.bpre.bpge.toml','default.bpge1.toml']},
+  AXVE:{0:['default.toml','default.axve.axpe.toml','default.axve0.axpe0.toml'],1:['default.toml','default.axve.axpe.toml','default.axve1.axpe1.toml']},
+  AXPE:{0:['default.toml','default.axve.axpe.toml','default.axve0.axpe0.toml'],1:['default.toml','default.axve.axpe.toml','default.axve1.axpe1.toml']},
+});
+export function identifyHmaRom(bytes){
+  const read=bytes instanceof Uint8Array?i=>bytes[i]:typeof bytes?.read==='function'?i=>bytes.read(i):null;
+  if(!read||!Number.isSafeInteger(bytes.length)||bytes.length<0xC0)throw Error('Invalid GBA ROM for metadata identification');
+  const code=Array.from({length:4},(_,i)=>String.fromCharCode(read(0xAC+i))).join('');
+  const revision=read(0xBC);
+  let sum=0;for(let i=0xA0;i<=0xBC;i++)sum=(sum+read(i))&255;
+  const headerValid=read(0xB2)===0x96&&read(0xBD)===((0x19-sum)&255);
+  return {code,revision,headerValid,knownGame:/^[A-Z0-9]{4}$/.test(code)&&Object.hasOwn(HMA_STOCK_PROFILES,code)};
+}
+export function resolveHmaStockMetadata(bytes){
+  const identity=identifyHmaRom(bytes);
+  if(!identity.headerValid)throw Error('GBA header validation failed; refusing automatic stock metadata selection');
+  const files=HMA_STOCK_PROFILES[identity.code]?.[identity.revision];
+  if(!files)throw Error('No verified stock metadata profile for '+identity.code+' revision '+identity.revision);
+  return {identity,files:[...files],verifiedStock:false};
+}
+/** Detect a *known wrong* upstream stock TOML; unknown custom files stay read-only and unverified. */
+export function checkHmaMetadataSources(sources,bytes){
+  if(!Array.isArray(sources))throw Error('Expected metadata source list');
+  const identity=identifyHmaRom(bytes);
+  const expected=HMA_STOCK_PROFILES[identity.code]?.[identity.revision]||[];
+  const known=new Set([...Object.values(HMA_STOCK_PROFILES).flatMap(byRev=>Object.values(byRev).flat()),
+    'default.bpef.toml','default.bpei0.toml','default.bpri.toml','default.bprf0.toml']);
+  const checked=[];
+  for(const source of sources){
+    const filename=String(source?.name||'').split(/[\\/]/).pop().replace(/\s+\(upstream [^)]+\)$/i,'').toLowerCase();
+    if(!filename)throw Error('Unnamed metadata source');
+    if(known.has(filename)){
+      if(!identity.headerValid)throw Error('Cannot validate stock metadata '+filename+': invalid ROM header');
+      if(!expected.includes(filename))throw Error('Metadata '+filename+' is incompatible with '+identity.code+' revision '+identity.revision);
+      checked.push({filename,kind:'stock-reference'});
+    }else checked.push({filename,kind:'unverified-custom'});
+  }
+  return {identity,sources:checked,warning:'ROM header and filenames cannot authenticate edited ROM layouts or CUBE versions; semantic data is read-only.'};
+}
