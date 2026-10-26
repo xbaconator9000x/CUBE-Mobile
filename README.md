@@ -11,6 +11,7 @@
 - BPS/IPS import; BPS source, patch and output CRC validation; IPS export.
 - Read-only LZ77 4bpp graphics stream discovery and palette preview (not semantic graphics editing).
 - Load CUBHMA/HMA `[[NamedAnchors]]` TOML records, search formats/addresses and inspect named pointers.
+- **Experimental read-only fixed table previews:** decode a strictly bounded subset of CUBHMA `ArrayRun` formats (byte/word/dword integers, raw text bytes and ROM pointers), show up to eight rows, and jump to a row in hex. Unknown/dynamic layouts fail closed; metadata is not ROM-version authenticated.
 - Browser history-backed navigation on Android, including Back/Forward.
 - CRC-bound JSON sidecar project edits.
 
