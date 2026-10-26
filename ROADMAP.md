@@ -9,6 +9,12 @@
 - [ ] Import the remaining original browser/unit test cases from the archived ZIP; CI's initial suite was a smoke subset.
 - [ ] Import and audit exact upstream CUBHMA dependencies, license notices and test fixtures.
 
+## Watchdog checkpoint — version-aware metadata (26 October 2026)
+- [x] Exact game/revision stock metadata resolver for US Emerald/FireRed/LeafGreen and supported Ruby/Sapphire revisions.
+- [x] Refuse unknown revisions, invalid GBA headers and known cross-family stock metadata imports; allow clearly unverified custom TOML.
+- [ ] Verify CUBE-specific ROM signatures and version fingerprints independently; a valid header is not proof of stock ROM layout.
+- [ ] Build semantic pointer ownership graph, dynamic table grammar and safe format inheritance.
+
 ## Watchdog checkpoint — 26 October 2026
 - [x] Source-grounded, read-only fixed-length HMA `ArrayRun` field preview (subset only; no writes).
 - [x] Reject unsupported/dynamic formats, out-of-ROM tables and invalid pointers.
