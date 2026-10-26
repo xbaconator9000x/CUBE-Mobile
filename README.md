@@ -4,6 +4,10 @@
 
 > **Status: v0.5.9 — early foundation, NOT a complete port.** The working code today is an offline ROM inspection / patching workbench and a limited read-only CUBHMA TOML named-anchor inspector. The desktop editor's semantic engine, map/collision/event editors, scripts, sprites, trainers, Pokémon, sound and CUBE upgrades are **not yet ported**.
 
+## Development checkpoint — exact TOML bytes (not yet in UI)
+
+The new read-only `src/metadata-fingerprint.js` module computes SHA-256 of **raw imported TOML bytes** and compares a single metadata-file digest with a matching ROM profile. It rejects stale or unverified ROMs and refuses to treat multi-file overlays as one authenticated file. This API is **not yet wired into the mobile UI or standalone HTML**, no independently verified CUBE profiles exist, and semantic writes remain disabled. See [exact metadata binding checkpoint](docs/EXACT_METADATA_BINDING.md).
+
 ## Current working code
 
 - **Exact ROM comparison (unreleased):** after computing the local staged-ROM SHA-256, optionally paste a published expected SHA-256 to compare exact bytes. A matching user-provided digest does **not** authenticate its provenance, CUBE layout or TOML. The bundled curated-profile registry is intentionally **empty** until independently verified CUBE ROM and matching metadata digests exist; no semantic writes are unlocked. See [ROM fingerprint registry requirements](docs/ROM_FINGERPRINT_REGISTRY.md).
