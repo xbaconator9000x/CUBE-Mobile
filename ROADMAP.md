@@ -156,3 +156,10 @@
 - [x] Reject contradictory explicit layout declarations, preserve imported layout evidence in the mobile inspector, and add synthetic ROM immutability/regression tests.
 - [ ] **ROM fingerprinting is not done**: a valid stock game code or user-supplied TOML marker cannot prove a ROM is CUBE or that a particular table layout matches its bytes.
 - [ ] Implement authenticated CUBE version/layout signatures, upstream metadata overlay precedence and full run ownership before any semantic writes or relocation.
+
+## Watchdog checkpoint — exact-byte ROM SHA-256 identity (27 October 2026)
+- [x] Add a bounded, streaming SHA-256 implementation with NIST and independent Node crypto parity vectors, including block/padding boundaries.
+- [x] Hash stable captured base plus staged edits without copying the entire ROM; preserve source ROM, detect edits/patch changes while hashing, support cancellation and progress.
+- [x] Add an opt-in mobile workspace fingerprint action, standalone bundling and regression checks. Do not claim a digest alone authenticates ROM family/layout.
+- [ ] Acquire legally distributable, independently verified CUBE version/layout fingerprints and explicit metadata compatibility manifests; no ROM images or unverifiable hashes committed.
+- [ ] Validate CUBE/stock fingerprints against licensed fixtures, verify 128 MiB performance on Android hardware, and gate semantic metadata interpretation/writes by trusted version/layout evidence.
