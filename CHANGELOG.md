@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — CUBE expansion-layout TOML safety
+- Recognise upstream CUBHMA's `MetadataLayout` marker and legacy `tpte` trainer-party named-run evidence, without claiming these markers authenticate a ROM.
+- Refuse mixing stock-game reference TOMLs with declared expansion/custom layouts; detect contradictory explicit markers before mutating the active metadata state.
+- Display layout evidence and the no-ROM-authentication warning persistently in the mobile named-data inspector; add generated-ROM safety tests and regenerate offline HTML.
+- **Remaining:** independently verified CUBE ROM signatures, full metadata overlay semantics, dynamic table ownership, emulator and Android validation, safe semantic writes.
+
 ## Unreleased — conservative named-list enum preview
 - Preserve HMA integer field enum suffixes and show matching imported `[[List]]` names as explicitly unverified, read-only hints beside the raw numeric value.
 - Do not label conflicting, sparse, out-of-range or named-anchor-shadowed options; no ROM writes or ownership claims.
