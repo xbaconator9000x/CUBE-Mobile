@@ -398,12 +398,13 @@ function drawAnchorDetails(){
   // text is shown as bytes because PCS character conversion is not yet ported.
   if(a.format.startsWith('[')){
     try{
-      const table=previewHmaFixedTable(model,a,{maxRows:8,tableResolution:metadataResolution});
+      const table=previewHmaFixedTable(model,a,{maxRows:8,tableResolution:metadataResolution,
+        lists:metadataLists,conflictingLists:metadataListConflicts,anchors:metadata});
       if(!table){root.append(semanticChild('div','Complex/dynamic HMA table format: not interpreted by this build. Use the hex view; do not infer structure from raw bytes.','palette-note'));}
       else{
         const section=semanticChild('section','','semantic-table');
         section.append(semanticChild('h4',`Read-only table preview · ${table.count} row(s) · ${table.rowSize} bytes/row`));
-        section.append(semanticChild('p','Read-only unsigned scalars; pointer targets are range-checked. Text fields show raw bytes, escape-aware FF termination and an unverified Gen 3 PCS preview. Optional imported text references are not authenticated against the ROM. No semantic text edits or pointer writes.','palette-note'));
+        section.append(semanticChild('p','Read-only unsigned scalars; pointer targets are range-checked. Named-list enum labels are unverified hints and never replace raw values. Text fields show raw bytes, escape-aware FF termination and an unverified Gen 3 PCS preview. Optional imported text references are not authenticated against the ROM. No semantic text edits or pointer writes.','palette-note'));
         const scroller=semanticChild('div','','semantic-table-scroll');
         const grid=document.createElement('table');
         const head=document.createElement('thead'),headRow=document.createElement('tr');
@@ -417,6 +418,9 @@ function drawAnchorDetails(){
           for(const cell of row.cells){
             const col=document.createElement('td');col.textContent=String(cell.value);
             if(cell.type==='pointer'&&cell.target!==null)col.title=`In-ROM pointer to 0x${hex(cell.target)}`;
+            if(cell.enumLabel!==undefined){
+              col.append(semanticChild('div',`Unverified list ${cell.enumSource}: ${cell.enumLabel}`,'palette-note'));
+            }
             if(cell.type==='text-bytes'){
               const field=table.fields.find(f=>f.name===cell.name);
               // Read-only preview of an already-resolved, non-conflicted field.
