@@ -381,9 +381,14 @@ function drawAnchorDetails(){
   refsSection.append(semanticChild('p','Inspect typed pointer fields in supported fixed tables and a bounded aligned raw-byte search. Results are potential references, never proven ownership.','palette-note'));
   const scanButton=semanticChild('button','Find possible references','semantic-row-jump');
   scanButton.type='button';
+  if(a.address>=0x02000000){
+    scanButton.disabled=true;
+    refsSection.append(semanticChild('p','This anchor is above the 32 MiB GBA ROM pointer window; it cannot be targeted by a conventional 0x08/0x09 ROM pointer.','semantic-warning'));
+  }
   const results=semanticChild('div','','semantic-references');
   scanButton.addEventListener('click',()=>safeRun(()=>{
-    scanButton.disabled=true;scanButton.textContent='Scan completed';
+    scanButton.disabled=true;scanButton.textContent='Scanning…';
+    try {
     const refs=inspectHmaPointerReferences(model,a.address,metadata,{maxTableSlots:60000,maxDeclared:24,maxCandidates:20,maxScanBytes:2*1024*1024});
     results.replaceChildren();
     results.append(semanticChild('p',
@@ -403,6 +408,7 @@ function drawAnchorDetails(){
     if(!refs.rawScanComplete)results.append(semanticChild('p','Raw pattern search is incomplete: later ROM regions were NOT scanned.','semantic-warning'));
     if(refs.unsupportedFormats)results.append(semanticChild('p',refs.unsupportedFormats+' unsupported table formats were not interpreted.', 'palette-note'));
     if(!refs.matchedDeclared&&!refs.candidateHits)results.append(semanticChild('p','No matches in the inspected subset. This does not prove the anchor has no references.','palette-note'));
+    } finally { scanButton.disabled=a.address>=0x02000000;scanButton.textContent='Scan again'; }
   }));
   refsSection.append(scanButton,results);
   root.append(refsSection);
