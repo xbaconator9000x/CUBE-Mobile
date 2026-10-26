@@ -13,7 +13,7 @@ test('enum suffix is retained only as a read-only hint on integer fields',()=>{
 });
 test('named-list enum preview preserves raw numeric values and ROM bytes',()=>{
  const rom=new Uint8Array(80);
- rom.set([0,5,1,6,2,7],16);
+ rom.set([0,5,0,1,6,0,2,7,0],16);
  const before=rom.slice();
  const lists=list('weathertypes',['None','Sun','Rain']);
  const resolved=resolveHmaTableLayouts([anchor],{romSize:rom.length,lists});
