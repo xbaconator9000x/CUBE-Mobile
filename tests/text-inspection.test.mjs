@@ -25,3 +25,15 @@ test('text inspector supports immutable staged ROM byte-reader',()=>{
  const bytes={length:3,read:i=>[0x61,0xFF,0x42][i]};
  assert.equal(inspectFixedTextBytes(bytes,0,3).asciiHint,'a');
 });
+
+test('text inspection is limited to its requested span, not later FF bytes',()=>{
+ const rom=Uint8Array.from([0x41,0x42,0xFF]);
+ const result=inspectFixedTextBytes(rom,0,2);
+ assert.equal(result.terminated,false);
+ assert.equal(result.asciiHint,'AB');
+});
+test('text inspection accepts exactly the final ROM byte',()=>{
+ const result=inspectFixedTextBytes(Uint8Array.from([0,0xFF]),1,1);
+ assert.equal(result.terminatorOffset,0);
+ assert.equal(result.hex,'FF');
+});
