@@ -68,3 +68,30 @@ test('ROM model read method is supported without cloning the binary',()=>{
  const r=inspectHmaPointerReferences(proxy,128,[{name:'x',address:40,format:'[ptr<text>]1'}],{maxScanBytes:64});
  assert.equal(r.declared[0].source,40);
 });
+
+test('metadata-declared pointer slots may be unaligned while raw search remains aligned',()=>{
+ const b=new Uint8Array(256);put32(b,13,0x08000080);
+ const r=inspectHmaPointerReferences(b,128,[{name:'unaligned',address:13,format:'[ptr<text>]1'}],{maxScanBytes:64});
+ assert.deepEqual(r.declared.map(x=>x.source),[13]);
+ assert.equal(r.candidateHits,0);
+});
+test('dynamic or unsupported metadata is never interpreted as a typed owner',()=>{
+ const b=new Uint8Array(256);put32(b,40,0x08000080);
+ const r=inspectHmaPointerReferences(b,128,[{name:'dynamic',address:40,format:'[ptr<text>]data.pokemon.count'}],{maxScanBytes:64});
+ assert.equal(r.matchedDeclared,0);
+ assert.equal(r.unsupportedFormats,1);
+ assert.deepEqual(r.candidates.map(x=>x.source),[40]);
+});
+test('32 MiB ROM pointer ceiling remains enforced for larger expansion ROMs',()=>{
+ const fake={length:0x02000010,read:()=>0};
+ assert.throws(()=>inspectHmaPointerReferences(fake,0x02000000,[],{maxScanBytes:0}),/representable/);
+});
+test('declared results are capped but all inspected matching slots are counted',()=>{
+ const b=new Uint8Array(256);
+ for(const p of [20,24,28,32])put32(b,p,0x08000080);
+ const r=inspectHmaPointerReferences(b,128,[{name:'ptrs',address:20,format:'[ptr<text>]4'}],{maxDeclared:2,maxScanBytes:36});
+ assert.equal(r.matchedDeclared,4);
+ assert.deepEqual(r.declared.map(x=>x.source),[20,24]);
+ assert.equal(r.declaredTruncated,true);
+ assert.equal(r.candidateHits,0);
+});
