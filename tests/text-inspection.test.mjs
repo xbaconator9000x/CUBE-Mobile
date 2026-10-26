@@ -45,3 +45,16 @@ test('invalid staged reader byte values fail closed',()=>{
  assert.throws(()=>inspectFixedTextBytes({length:1,read:()=>undefined},0,1));
  assert.throws(()=>inspectFixedTextBytes({length:1,read:()=>256},0,1));
 });
+
+test('raw inspector does not mistake an escaped FF for a terminator',()=>{
+ const rom=Uint8Array.from([0xFD,0xFF,0xBB,0xFF]);
+ const result=inspectFixedTextBytes(rom,0,4);
+ assert.equal(result.terminatorOffset,3);
+ assert.equal(result.malformedEscape,false);
+});
+test('raw inspector reports incomplete function escapes rather than reading past field',()=>{
+ const rom=Uint8Array.from([0xFC,0x04,0x01,0xFF]);
+ const result=inspectFixedTextBytes(rom,0,4);
+ assert.equal(result.terminated,false);
+ assert.equal(result.malformedEscape,true);
+});

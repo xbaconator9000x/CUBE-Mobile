@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — upstream-default Gen 3 PCS preview (read only)
+- Add a bounded fallback PCS decoder based on the pinned upstream `PCSString.GetDefaultPCS` mapping and default control-code lengths, restricted to recognised Gen 3 game codes.
+- Display an explicitly unauthenticated PCS fallback preview in safe fixed-table text fields while retaining original raw bytes and ASCII hints.
+- Treat `0xFF` inside escape arguments as data, not an end-of-string marker; flag truncated controls and unknown glyphs without fabricating characters.
+- Add synthetic tests for glyphs, control lengths, end-exclusive boundaries, staged readers, and ROM immutability; regenerate offline HTML.
+- **Not complete:** reference-file PCS overrides, game macros, CUBE-specific text, authentic ROM fingerprints, semantic text editing and Android/device parity.
+
 ## Unreleased — unresolved-anchor byte-claim safety (read only)
 - Treat the start byte of each unresolved named anchor as an unsafe overlapping claim when it falls inside a resolved supported table; propagate conflicts to dependent tables and declared offset-pointer sources.
 - Preserve disjoint and end-exclusive boundary cases, report a bounded collision witness count and add generated-byte regression coverage.

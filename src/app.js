@@ -1,6 +1,7 @@
 import {RomModel, MAX_BYTES, hex, parseOffset, parseHexBytes, applyBps, applyIps, crc32, paletteAt, gba4bppTile, decodeLz10, scanLz10Graphics} from './core.js';
 import {parseHmaNamedAnchors,collectHmaNamedAnchors,readAnchorInspection,groupAnchors,filterAnchors,previewHmaFixedTable,resolveHmaStockMetadata,checkHmaMetadataSources,inspectHmaPointerReferences,parseHmaOffsetPointers,resolveHmaTableLayouts,collectHmaLists,collectHmaMatchedWords} from './semantic.js';
 import {inspectFixedTextBytes} from './text-inspection.js';
+import {decodeHmaPcsFallback} from './pcs-default.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
@@ -400,7 +401,7 @@ function drawAnchorDetails(){
       else{
         const section=semanticChild('section','','semantic-table');
         section.append(semanticChild('h4',`Read-only table preview · ${table.count} row(s) · ${table.rowSize} bytes/row`));
-        section.append(semanticChild('p','Read-only unsigned scalars; pointer targets are range-checked. Text fields show raw bytes and FF termination only; ASCII hover hints are NOT decoded Pokémon PCS. Metadata compatibility is unverified.','palette-note'));
+        section.append(semanticChild('p','Read-only unsigned scalars; pointer targets are range-checked. Text fields show raw bytes, escape-aware FF termination and an unverified upstream-default Gen 3 PCS preview when supported. Custom CUBE text mappings, macros and metadata authenticity are NOT verified; no semantic text edits.','palette-note'));
         const scroller=semanticChild('div','','semantic-table-scroll');
         const grid=document.createElement('table');
         const head=document.createElement('thead'),headRow=document.createElement('tr');
@@ -416,13 +417,22 @@ function drawAnchorDetails(){
             if(cell.type==='pointer'&&cell.target!==null)col.title=`In-ROM pointer to 0x${hex(cell.target)}`;
             if(cell.type==='text-bytes'){
               const field=table.fields.find(f=>f.name===cell.name);
-              // Read only the bounded, already-resolved field. The ASCII hint is
-              // NOT a Pokémon PCS decoder and must never be displayed as one.
+              // Read-only preview of an already-resolved, non-conflicted field.
+              // Upstream default PCS is a fallback, never a ROM-authenticated map.
               const text=inspectFixedTextBytes(model,row.offset+field.offset,field.size);
-              const status=text.terminated?`FF terminator at byte ${text.terminatorOffset}`:'No FF terminator within this field';
-              const badge=semanticChild('div',status,'palette-note');
-              col.append(badge);
-              col.title=`${status}. ASCII-only byte hint (not Pokémon PCS): ${text.asciiHint}`;
+              const status=text.malformedEscape?'Truncated PCS control escape in this field':
+                text.terminated?`FF terminator at byte ${text.terminatorOffset}`:'No FF terminator within this field';
+              col.append(semanticChild('div',status,'palette-note'));
+              const header=model.header();
+              if(header.fixedValid&&header.checksumValid){
+                const pcs=decodeHmaPcsFallback(model,row.offset+field.offset,field.size,{gameCode:header.code});
+                if(pcs.supported){
+                  const warning=pcs.truncatedEscape?' [truncated escape]':
+                    pcs.unknownByteCount?` [${pcs.unknownByteCount} unknown byte(s)]`:'';
+                  col.append(semanticChild('div','Unverified default PCS: '+pcs.text+warning,'palette-note'));
+                }
+              }
+              col.title=`${status}. ASCII-only raw byte hint (not PCS): ${text.asciiHint}`;
             }
             tr.append(col);
           }
