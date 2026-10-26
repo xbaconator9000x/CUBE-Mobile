@@ -1,2 +1,48 @@
-# CUBE-Mobile
-Port of CUBE to mobile
+# CUBE Mobile
+
+**Private development repository for a full mobile port of CUBHMA (Cradi's Unofficial Build of Hex Maniac Advance), targeting CUBE-aware Pokémon Emerald editing and the other ROM families supported by upstream.**
+
+> **Status: v0.5 — early foundation, NOT a complete port.** The working code today is an offline ROM inspection / patching workbench and a limited read-only CUBHMA TOML named-anchor inspector. The desktop editor's semantic engine, map/collision/event editors, scripts, sprites, trainers, Pokémon, sound and CUBE upgrades are **not yet ported**.
+
+## Current working code
+
+- Open GBA ROMs locally (no file uploading), header inspection, guarded hex editing, undo/redo.
+- GBA ROM pointers, byte search and safe Save As copies.
+- BPS/IPS import; BPS source, patch and output CRC validation; IPS export.
+- Read-only LZ77 4bpp graphics stream discovery and palette preview (not semantic graphics editing).
+- Load CUBHMA/HMA `[[NamedAnchors]]` TOML records, search formats/addresses and inspect named pointers.
+- Browser history-backed navigation on Android, including Back/Forward.
+- CRC-bound JSON sidecar project edits.
+
+The versioned runnable checkpoint is [app/CUBHMA_Mobile_Lab_Offline.html](app/CUBHMA_Mobile_Lab_Offline.html). This app remains local-first and does **not** contain game ROMs.
+
+## Development
+
+```bash
+npm test
+npm run build:standalone
+npm run start
+```
+
+Open `http://localhost:8000/` for the modular web app. The standalone builder regenerates `app/CUBHMA_Mobile_Lab_Offline.html` for a browser that accepts local HTML files. No npm dependencies are required for the code or unit tests.
+
+- App UI: `index.html` and `src/styles.css`
+- Browser logic: `src/app.js`
+- ROM manipulation and patches: `src/core.js`
+- Named-anchor TOML inspection: `src/semantic.js`
+- Unit tests: `tests/`
+- Full-port scope: `FULL_PORT_PLAN.md`
+- Development checkpoints: `ROADMAP.md` and `CHANGELOG.md`
+- CI: `.github/workflows/ci.yml`
+
+## Privacy, licence and ROM safety
+
+**This GitHub repository is private.** Do not enable GitHub Pages or copy a workflow that deploys the site unless you deliberately want that deployment: Pages visibility is not determined solely by repository privacy. The CI workflow only runs tests; it does not publish the app.
+
+Do not commit copyrighted game ROMs, extracted proprietary assets, user saves or user-specific project files. `.gitignore` excludes common formats as a guard, not an infallible blocker. Never force-push over working checkpoints. Preserve source originals and verify compiled output in an emulator before considering ROM edits reliable.
+
+The new mobile code is an independent MIT-licensed implementation; **it is not endorsed by upstream**. CUBHMA source: https://github.com/kcradi/CUBHMA ; Hex Maniac Advance: https://github.com/haven1433/HexManiacAdvance (MIT). When bringing upstream code into this repository, retain its copyright and licence notices and document the imported version.
+
+## Goal and contribution standards
+
+The objective is feature parity with the upstream desktop editor on a touchscreen. Do not substitute hex-level mockups for semantic map, script, sprite or Pokémon editors. A feature is complete only with round-trip ROM tests, pointer/allocation safety checks, compatibility evidence and a usable mobile workflow. See [FULL_PORT_PLAN.md](FULL_PORT_PLAN.md).

@@ -1,0 +1,23 @@
+name: Verify mobile source
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Unit tests
+        run: npm test
+      - name: Generate standalone offline HTML
+        run: npm run build:standalone
+      - name: Ensure checked-in offline checkpoint matches source
+        run: git diff --exit-code -- app/CUBHMA_Mobile_Lab_Offline.html
