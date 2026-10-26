@@ -73,3 +73,14 @@ test('ownership fixture: offset pointer conflicting with scalar field suppresses
   assert.ok(result.conflicted.has('scalar'));
   assert.ok(result.conflictedOffsetPointers.has(16));
 });
+
+test('ownership fixture: one long span conflicts with every contained table',()=>{
+  const result=resolve([
+    anchor('outer',8,'[value::]20'),
+    anchor('innerA',16,'[value::]2'),
+    anchor('innerB',40,'[value::]2'),
+    anchor('innerC',64,'[value::]2')
+  ]);
+  for(const name of ['outer','innerA','innerB','innerC'])
+    assert.ok(result.conflicted.has(name),name);
+});
