@@ -129,3 +129,25 @@ test('ownership fixture: unresolved anchor inside pointer field suppresses offse
   assert.ok(result.conflicted.has('pointers'));
   assert.ok(result.conflictedOffsetPointers.has(16));
 });
+
+test('ownership fixture: end-exclusive offset source adjacent to table stays safe',()=>{
+  const result=resolve([anchor('table',16,'[value::]2')],{
+    offsetPointers:[{address:24,offset:0}]
+  });
+  assert.equal(result.conflicted.has('table'),false);
+  assert.equal(result.conflictedOffsetPointers.has(24),false);
+});
+test('ownership fixture: overlapping offset source at final scalar byte fails closed',()=>{
+  const result=resolve([anchor('table',16,'[value::]2')],{
+    offsetPointers:[{address:23,offset:0}]
+  });
+  assert.ok(result.conflicted.has('table'));
+  assert.ok(result.conflictedOffsetPointers.has(23));
+});
+test('ownership fixture: unrelated unresolved run cannot invalidate distant table',()=>{
+  const result=resolve([
+    anchor('table',16,'[value::]2'),
+    anchor('unknown',128,'`lzs4x64x64`')
+  ]);
+  assert.equal(result.conflicted.has('table'),false);
+});
