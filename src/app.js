@@ -1,5 +1,5 @@
 import {RomModel, MAX_BYTES, hex, parseOffset, parseHexBytes, applyBps, applyIps, crc32, paletteAt, gba4bppTile, decodeLz10, scanLz10Graphics} from './core.js';
-import {parseHmaNamedAnchors,readAnchorInspection,groupAnchors,filterAnchors,previewHmaFixedTable} from './semantic.js';
+import {parseHmaNamedAnchors,readAnchorInspection,groupAnchors,filterAnchors,previewHmaFixedTable,resolveHmaStockMetadata,checkHmaMetadataSources} from './semantic.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],selectedAnchor=null;
@@ -307,6 +307,9 @@ const encodeHex=bytes=>Array.from(bytes).map((b,i)=>hex(b,2)+(i%16===15?'\n':' '
 function metadataReset(){metadata=[];metadataSources=[];selectedAnchor=null;selectedInspection=null;drawAnchors();}
 function metadataCommit(sources){
   ensureModel();
+  // Fail closed for known mismatched stock-game TOML before changing active metadata.
+  // Custom CUBE/project TOML remains manually importable but is never authenticated by header alone.
+  checkHmaMetadataSources(sources,model);
   const dedupe=new Map();
   let count=0;
   for(const source of sources){
@@ -318,7 +321,7 @@ function metadataCommit(sources){
   metadataSources=sources.map(({name})=>name);
   selectedAnchor=null;selectedInspection=null;
   drawAnchors();
-  toast(`Loaded ${metadata.length} named anchor(s) from ${sources.length} TOML file(s)`);
+  toast(`Loaded ${metadata.length} named anchor(s) from ${sources.length} TOML file(s) · ROM layout unverified`);
 }
 function semanticChild(tag,value,klass){const el=document.createElement(tag);el.textContent=value;if(klass)el.className=klass;return el;}
 function drawAnchorDetails(){
@@ -414,11 +417,10 @@ $('metadata-picker').addEventListener('change',async e=>{
 const upstreamPin='3044393183e01af2ae1e907fb37e4a75eda6a8dc';
 $('metadata-stock').addEventListener('click',async()=>{
   try{
-    ensureModel();const code=model.header().code,revision=model.read(0xBC);
-    const names=code==='BPEE'?['default.toml','default.axve.axpe.bpee.toml','default.bpee.toml']:
-      code==='BPRE'?['default.toml','default.bpre.bpge.toml',revision?'default.bpre1.toml':'default.bpre0.toml']:
-      code==='BPGE'?['default.toml','default.bpre.bpge.toml',revision?'default.bpge1.toml':'default.bpge0.toml']:null;
-    if(!names)throw Error('Stock metadata shortcut currently supports US Emerald, FireRed and LeafGreen only. Import a matching TOML for other versions.');
+    ensureModel();
+    // Select the upstream metadata by exact game code AND revision. Unknown revisions are not guessed.
+    const {identity,files:names}=resolveHmaStockMetadata(model);
+    const code=identity.code;
     if(!await confirmAction('Load stock-game metadata?',`Reference offsets are for stock ${code} ROMs, not necessarily your modified ROM or CUBE. This lookup is read-only. Continue?`))return;
     $('metadata-stock').disabled=true;
     const sources=[];
