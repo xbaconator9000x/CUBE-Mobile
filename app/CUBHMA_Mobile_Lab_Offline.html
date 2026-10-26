@@ -87,6 +87,10 @@
       <div class="input-row"><button type="button" class="subtle-button" id="rom-fingerprint" disabled>Compute SHA-256</button></div>
       <p class="palette-note">Hashes the current staged ROM bytes locally in bounded chunks. An exact hash can later be checked against a separately verified reference; it does not by itself prove stock/CUBE compatibility.</p>
       <output id="rom-fingerprint-status" class="palette-note" aria-live="polite">Open a ROM to compute its SHA-256 identity.</output>
+      <label for="rom-fingerprint-expected">Compare with an independently obtained SHA-256 (optional)</label>
+      <div class="input-row"><input id="rom-fingerprint-expected" type="text" inputmode="text" spellcheck="false" autocomplete="off" autocapitalize="off" maxlength="64" placeholder="Paste 64 hexadecimal characters"><button type="button" id="rom-fingerprint-check" class="subtle-button" disabled>Compare</button></div>
+      <output id="rom-fingerprint-compare-status" class="palette-note" aria-live="polite">Paste a reference digest after hashing to compare exact bytes. No layout authentication.</output>
+      <p class="palette-note">Matching a hash you supply does not authenticate its source, CUBE layout or compatible metadata. No verified CUBE fingerprints are bundled yet.</p>
     </div>
   </div>
   <div class="dashboard-grid">
@@ -1847,6 +1851,73 @@ async function fingerprintRomSha256(model,{chunkSize=65536,signal,onProgress,yie
   return {sha256:hasher.digestHex(),length:base.length,snapshot:{model,base,edits}};
 }
 
+/**
+ * Independently verified exact-ROM profiles belong here ONLY after provenance,
+ * ROM SHA-256, and exact compatible metadata SHA-256 are established.
+ * An empty registry is intentional: no CUBE binary has been authenticated.
+ * Never populate from a ROM header, filename, TOML marker or user-supplied hash.
+ */
+const CURATED_ROM_PROFILES=Object.freeze([]);
+const SHA256=/^[0-9a-f]{64}$/i;
+const COMMIT=/^[0-9a-f]{40}$/i;
+const GAME_CODE=/^[A-Z0-9]{4}$/;
+
+/** Validate the complete registry before using any record; duplicates fail closed. */
+function validateRomProfileRegistry(profiles){
+  if(!Array.isArray(profiles)||profiles.length>1024)
+    throw Error('Invalid ROM profile registry');
+  const seen=new Set();
+  return profiles.map((entry,index)=>{
+    if(!entry||typeof entry!=='object'||Array.isArray(entry)||
+       typeof entry.sha256!=='string'||!SHA256.test(entry.sha256)||
+       !Number.isSafeInteger(entry.length)||entry.length<0xC0||entry.length>128*1024*1024||
+       !GAME_CODE.test(entry.gameCode)||
+       !Number.isInteger(entry.revision)||entry.revision<0||entry.revision>255||
+       !['stock','expansion','custom'].includes(entry.layout)||
+       typeof entry.metadataSha256!=='string'||!SHA256.test(entry.metadataSha256)||
+       typeof entry.sourceCommit!=='string'||!COMMIT.test(entry.sourceCommit)||
+       typeof entry.evidenceUrl!=='string'||!/^https:\/\/[^\s/]+\/\S+$/.test(entry.evidenceUrl))
+      throw Error('Invalid exact ROM profile at index '+index);
+    const sha256=entry.sha256.toLowerCase(),metadataSha256=entry.metadataSha256.toLowerCase();
+    if(seen.has(sha256))throw Error('Duplicate exact ROM SHA-256 in profile registry');
+    seen.add(sha256);
+    return Object.freeze({sha256,length:entry.length,gameCode:entry.gameCode,
+      revision:entry.revision,layout:entry.layout,metadataSha256,
+      sourceCommit:entry.sourceCommit.toLowerCase(),evidenceUrl:entry.evidenceUrl});
+  });
+}
+
+/**
+ * Read-only identity comparison. A pasted expected digest is USER-SUPPLIED
+ * evidence, not proof of a trusted CUBE build. A caller-injected registry is
+ * also untrusted. Neither permits semantic writes or metadata relocation.
+ */
+function compareRomIdentity(model,fingerprint,{expectedSha256='',profiles=CURATED_ROM_PROFILES}={}){
+  const entries=validateRomProfileRegistry(profiles);
+  if(typeof expectedSha256!=='string')throw Error('Expected SHA-256 must be text');
+  const expected=expectedSha256.trim().toLowerCase();
+  if(expected&&!SHA256.test(expected))throw Error('Expected SHA-256 must be exactly 64 hexadecimal characters');
+  if(!fingerprintMatchesRom(model,fingerprint))
+    return {status:'stale',expectedMatch:null,profile:null,curated:false,
+      metadataAuthenticated:false,semanticWritesAllowed:false};
+  if(typeof fingerprint.sha256!=='string'||!SHA256.test(fingerprint.sha256)||
+     fingerprint.length!==model.length)
+    throw Error('Invalid ROM fingerprint result');
+  const sha256=fingerprint.sha256.toLowerCase();
+  const matched=entries.find(entry=>entry.sha256===sha256&&entry.length===model.length);
+  const gameCode=Array.from({length:4},(_,i)=>String.fromCharCode(model.read(0xAC+i))).join('');
+  const revision=model.read(0xBC);
+  const headerMatches=!!matched&&matched.gameCode===gameCode&&matched.revision===revision;
+  return {
+    status:matched?(headerMatches?'profile-match':'profile-conflict'):'unknown',
+    expectedMatch:expected?sha256===expected:null,
+    profile:headerMatches?matched:null,
+    curated:headerMatches&&profiles===CURATED_ROM_PROFILES,
+    metadataAuthenticated:false,
+    semanticWritesAllowed:false
+  };
+}
+
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let pcsReference=null,pcsReferenceName='';
@@ -1855,7 +1926,7 @@ let model=null, currentTab='home', page=0, selected=null, patchFile=null, palett
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
 ctx.imageSmoothingEnabled=false;
-const controls=['rom-fingerprint','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','save-rom','save-project','export-ips','discard-button','edit-unlock'];
+const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','save-rom','save-project','export-ips','discard-button','edit-unlock'];
 const tabs={home:['YOUR WORKSPACE','ROM Workbench'],hex:['BINARY INSPECTOR','Hex editor'],anchors:['ROM SEMANTICS','Named data'],graphics:['GBA GRAPHICS','Graphics explorer'],patches:['PATCH WORKFLOW','Patch tools'],changes:['REVIEW & EXPORT','Changes']};
 function toast(message,bad=false){const t=$('toast');t.textContent=message;t.classList.toggle('error',bad);t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),4300);}
 function safeRun(fn){try{const result=fn();if(result?.catch) result.catch(err=>toast(err.message||String(err),true));}catch(err){toast(err.message||String(err),true);}}
@@ -1912,9 +1983,11 @@ function updateIndicators(){
   if(fingerprintResult&&!fingerprintMatchesRom(model,fingerprintResult)){
     fingerprintResult=null;
     $('rom-fingerprint-status').textContent='ROM bytes changed since the last SHA-256. Compute a new fingerprint.';
+    $('rom-fingerprint-compare-status').textContent='Comparison cleared: ROM bytes changed.';
   }
   controls.forEach(id=>$(id).disabled=!active);
   $('rom-fingerprint').disabled=!active||!!fingerprintAbort;
+  $('rom-fingerprint-check').disabled=!active||!fingerprintResult||!!fingerprintAbort;
   $('edit-unlock').disabled=!active;$('write-byte').disabled=!active||!$('edit-unlock').checked||selected===null;
   $('selected-value').disabled=!active||!$('edit-unlock').checked;
   $('undo-button').disabled=!active||model.undoStack.length===0;
@@ -1932,7 +2005,7 @@ function updateIndicators(){
   $('changes-tab-count').hidden=!active||!model.dirty;$('changes-tab-count').textContent=active ? String(model.edits.size+(model.appliedPatch?1:0)):'0';
   if(active)showRomInfo();
 }
-function installModel(name,bytes){pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
+function installModel(name,bytes){pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
 $('rom-picker').addEventListener('change',async e=>{
   const file=e.target.files?.[0];e.target.value='';if(!file)return;
   if(file.size<0xC0 || file.size>MAX_BYTES)return toast('ROM must be 192 bytes to 128 MiB',true);
@@ -1959,8 +2032,12 @@ $('rom-fingerprint').addEventListener('click',async()=>{
       return;
     }
     fingerprintResult=result;
+    const comparison=compareRomIdentity(current,result);
     $('rom-fingerprint-status').textContent='SHA-256: '+result.sha256+
-      ' ('+formatSize(result.length)+', current staged bytes). Identity only — CUBE layout NOT verified.';
+      ' ('+formatSize(result.length)+', current staged bytes). '+
+      (comparison.status==='unknown'?'No independently verified CUBE fingerprint registered.':'Curated profile matched; metadata still unverified.')+
+      ' Identity only — semantic writes remain disabled.';
+    $('rom-fingerprint-compare-status').textContent='Paste a published expected SHA-256 to compare. A user-supplied hash cannot authenticate a CUBE layout.';
   }catch(err){
     if(model===current)$('rom-fingerprint-status').textContent='Fingerprint unavailable: '+err.message;
   }finally{
@@ -1968,6 +2045,18 @@ $('rom-fingerprint').addEventListener('click',async()=>{
     updateIndicators();
   }
 });
+$('rom-fingerprint-check').addEventListener('click',()=>safeRun(()=>{
+  ensureModel();
+  if(!fingerprintResult)throw Error('Compute the current ROM SHA-256 first');
+  const result=compareRomIdentity(model,fingerprintResult,{
+    expectedSha256:$('rom-fingerprint-expected').value
+  });
+  if(result.status==='stale')throw Error('ROM changed; compute SHA-256 again');
+  if(result.expectedMatch===null)throw Error('Paste an expected SHA-256 first');
+  $('rom-fingerprint-compare-status').textContent=result.expectedMatch?
+    'Exact SHA-256 MATCH with your supplied digest. Provenance, CUBE layout and metadata are NOT authenticated.':
+    'SHA-256 MISMATCH. These ROM bytes differ from your supplied digest; do not apply metadata intended for that build.';
+}));
 function clampPage(n){return Math.max(0,Math.min(Math.floor((model.length-1)/PER_PAGE),n));}
 function setPageForOffset(offset){ensureModel();if(offset<0||offset>=model.length)throw Error('Offset outside this ROM');page=clampPage(Math.floor(offset/PER_PAGE));selected=offset;$('hex-offset').value=hex(offset);drawHex();updateIndicators();}
 function drawHex(){
