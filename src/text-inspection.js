@@ -1,7 +1,8 @@
+import {scanPcsTerminator} from './pcs-default.js';
 /**
  * Conservative, read-only fixed-width GBA text-byte inspector.
  * This deliberately does NOT claim to decode Pokemon's proprietary PCS
- * alphabet. It exposes raw bytes, termination and printable ASCII hints
+ * alphabet. It exposes raw bytes, escape-aware termination and printable ASCII hints
  * for manual inspection without mutating ROM data.
  */
 export function inspectFixedTextBytes(bytes, start, length) {
@@ -15,13 +16,14 @@ export function inspectFixedTextBytes(bytes, start, length) {
   const raw = Array.from({length}, (_,i)=>read(start+i));
   if (raw.some(v=>!Number.isInteger(v)||v<0||v>255))
     throw Error('Invalid ROM byte');
-  const terminator = raw.indexOf(0xFF);
+  const {terminatorOffset:terminator,malformedEscape} = scanPcsTerminator(raw);
   const payload = terminator < 0 ? raw : raw.slice(0,terminator);
   return {
     start,length,
     hex: raw.map(v=>v.toString(16).toUpperCase().padStart(2,'0')).join(' '),
     terminated: terminator >= 0,
     terminatorOffset: terminator,
+    malformedEscape,
     asciiHint: payload.map(v=>v>=32&&v<=126?String.fromCharCode(v):'.').join(''),
     // This is NOT decoded PCS; glyph mappings are ROM/game-specific.
     encoding: 'unknown-gba-text'
