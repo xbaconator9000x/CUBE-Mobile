@@ -5,7 +5,8 @@
 - [x] Restore editable web modules from the standalone build.
 - [x] Private GitHub repository access confirmed.
 - [x] GitHub Actions automated unit checks on future pushes.
-- [ ] Import the complete original v0.5 browser/unit test suites from the archived ZIP; CI's initial suite is a smoke subset.
+- [x] Restore ten high-value original v0.5 binary safety regression cases (IPS/BPS CRC, boundaries, LZ10, sidecar atomicity).
+- [ ] Import the remaining original browser/unit test cases from the archived ZIP; CI's initial suite was a smoke subset.
 - [ ] Import and audit exact upstream CUBHMA dependencies, license notices and test fixtures.
 
 ## Watchdog checkpoint — 26 October 2026
