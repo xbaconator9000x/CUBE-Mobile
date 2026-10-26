@@ -17,7 +17,7 @@
 - **Read-only named-array count dependencies:** resolve supported table lengths from another resolved array, including forward/chained references and bounded CUBHMA `ParentOffset` beginning/end margins; reject invalid resulting counts, cycles, out-of-ROM spans and overlapping table claims. No write/repoint capability is implied.
 - **Read-only HMA named-list lengths:** parse bounded `[[List]]` entries (including multiline and sparse lists), resolve table counts from list sizes with ParentOffset margins, and reject contradictory list declarations. `UnmappedConstant` values are deliberately **not** used as table lengths.
 - **Read-only ROM-backed `[[MatchedWords]]` lengths:** parse HMA WordRun declarations, require every source of a name to decode to the same integer, resolve supported dependent tables and ParentOffset margins, and reject overlapping source claims. A documented upstream discrepancy between WordRun and ArrayRun offset/multiplier arithmetic is treated as ambiguous rather than guessed. Counts refresh after staged ROM edits; patch application clears potentially stale metadata. This is not authenticated ownership or safe repointing.
-- **Read-only fixed-table text-byte inspection (unreleased):** show bounded `0xFF` terminator status in supported table cells, with raw hex and an explicitly non-PCS ASCII byte hint. No text encoding or editing yet.
+- **Read-only fixed-table text and upstream-default PCS preview (unreleased):** show bounded raw hex, escape-aware `0xFF` termination, and a clearly **unverified** Gen 3 fallback character preview for recognised, header-valid games. Unknown bytes/control arguments remain visible. This does **not** authenticate CUBE-specific text mappings, game macros, metadata layouts or support text editing.
 - **Read-only byte-claim collision gate:** detects conflicts among supported table spans, all declared MatchedWords source bytes (including unresolved words), and OffsetPointer sources. Exact OffsetPointer overlays on complete pointer fields remain supported; scalar/partial/overlapping claims suppress typed reference results. Uses bounded indexed interval lookups, not an authoritative run ownership graph.
 - **Conservative unresolved-anchor collision gate:** if a named anchor with unsupported/unresolved format starts inside a supported table, suppress that table's typed interpretation and its dependent/offset-pointer claims. This only reserves a one-byte witness; unknown run extents remain unknown, not free space. Legitimate aliases may be conservatively rejected.
 - **Metadata conflict preservation:** retain contradictory named-anchor declarations from multiple TOML sources instead of silently accepting the last version. Conflicting names are visible but excluded from typed reads; actual CUBHMA overlay/precedence rules are not yet ported.
@@ -41,6 +41,7 @@ Open `http://localhost:8000/` for the modular web app. The standalone builder re
 - Browser logic: `src/app.js`
 - ROM manipulation and patches: `src/core.js`
 - Named-anchor TOML inspection: `src/semantic.js`
+- Bounded text inspection and upstream-default PCS preview: `src/text-inspection.js`, `src/pcs-default.js`
 - Unit tests: `tests/`
 - Full-port scope: `FULL_PORT_PLAN.md`
 - Development checkpoints: `ROADMAP.md` and `CHANGELOG.md`
