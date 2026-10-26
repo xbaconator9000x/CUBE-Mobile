@@ -1,6 +1,13 @@
 # Changelog
 
-## Unreleased — bounded pointer cross-reference inspection
+## v0.5.4 — OffsetPointer metadata and read-only references
+- Parse HMA `[[OffsetPointer]]` declarations, including signed decimal and two's-complement hex offsets, with bounds checks and fail-closed malformed record handling.
+- Resolve adjusted pointer references according to upstream `PokemonModel.ReadPointer` semantics; source precedence prevents false raw/table candidates.
+- Wire OffsetPointer sources into mobile Named Data inspector and reject conflicting declarations atomically.
+- Add eleven synthetic offset-pointer regression tests; no copyrighted ROM data and no semantic write support.
+- Still outstanding: dynamic table grammar, ROM-authenticated metadata, complete pointer ownership, safe relocation, map/collision/warps/scripts/sprites/audio and Android device testing.
+
+## v0.5.3 — bounded pointer cross-reference inspection
 - Added read-only typed table pointer field cross-references for supported fixed-array formats.
 - Added clearly unverified 4-byte aligned raw candidate search bounded to the first 2 MiB in the mobile UI.
 - Added per-anchor scan button, source offset navigation and transparent incomplete-coverage notices.

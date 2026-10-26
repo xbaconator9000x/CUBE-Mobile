@@ -151,6 +151,51 @@ export function previewHmaFixedTable(bytes,anchor,{maxRows=8}={}){
 }
 
 
+
+/**
+ * Read only [[OffsetPointer]] records from HMA TOML.
+ * Upstream PokemonModel.ReadPointer(source) subtracts the metadata Offset from
+ * the stored GBA pointer; this is NOT a byte location offset to scan.
+ * A missing/ambiguous record fails closed rather than silently guessing.
+ */
+export function parseHmaOffsetPointers(source,{romSize=Infinity}={}){
+  if(typeof source!=='string'||source.length>maxMetadataSize)throw Error('Metadata must be TOML text under 4 MiB');
+  if(!(Number.isSafeInteger(romSize)||romSize===Infinity)||romSize<0)throw Error('Invalid ROM length');
+  const lines=source.replace(/^\uFEFF/,'').split(/\r?\n/);
+  const records=[];let current=null;
+  const finish=()=>{
+    if(!current)return;
+    if(!Number.isSafeInteger(current.address)||current.address<0||
+       !Number.isSafeInteger(current.offset)||current.offset<-0x80000000||current.offset>0x7FFFFFFF)
+      throw Error('Malformed OffsetPointer record at TOML line '+current.line);
+    records.push({address:current.address,offset:current.offset,line:current.line,
+      valid:current.address<=romSize-4});
+    if(records.length>maxRecords)throw Error('Too many offset pointer records');
+    current=null;
+  };
+  for(let i=0;i<lines.length;i++){
+    const line=lines[i].trim();
+    if(/^\[\[/.test(line)){
+      finish();
+      const match=/^\[\[\s*([^\]]+)\s*\]\]/.exec(line);
+      if(match?.[1]?.trim()==='OffsetPointer')current={line:i+1,address:NaN,offset:NaN};
+      continue;
+    }
+    if(/^\[/.test(line)){finish();continue;}
+    if(!current||line.startsWith('#'))continue;
+    const match=/^(Address|Offset)\s*=\s*(.+)$/.exec(line);
+    if(!match)continue;
+    const raw=match[2].split(/\s+#/)[0].trim();
+    let value=tomlInt(raw);
+    if(match[1]==='Offset'&&/^0x[0-9a-f]{1,8}$/i.test(raw)&&value>=0x80000000)
+      value-=0x100000000;
+    if(match[1]==='Address')current.address=value;
+    else current.offset=value;
+  }
+  finish();
+  return records;
+}
+
 /** Read-only ROM-version guard for stock HMA metadata.
  * Source file names are pinned to kcradi/CUBHMA 3044393183e01af2.
  * Header identification cannot prove that a ROM is stock or identify CUBE.
@@ -207,19 +252,31 @@ export function checkHmaMetadataSources(sources,bytes){
  * never as authoritative owners or safe sources for repointing.
  */
 export function inspectHmaPointerReferences(bytes,target,anchors,{
-  maxTableSlots=120000,maxDeclared=32,maxCandidates=24,maxScanBytes=8*1024*1024
+  maxTableSlots=120000,maxDeclared=32,maxCandidates=24,maxScanBytes=8*1024*1024,offsetPointers=[]
 }={}){
   const read=bytes instanceof Uint8Array?i=>bytes[i]:typeof bytes?.read==='function'?i=>bytes.read(i):null;
   if(!read||!Number.isSafeInteger(bytes?.length)||bytes.length<1)throw Error('Invalid ROM for reference inspection');
   if(!Number.isSafeInteger(target)||target<0||target>=bytes.length||target>=0x02000000)
     throw Error('Target is not a representable in-ROM GBA pointer offset');
   if(!Array.isArray(anchors)||anchors.length>50000)throw Error('Invalid or excessive anchor metadata');
+  if(!Array.isArray(offsetPointers)||offsetPointers.length>50000)throw Error('Invalid or excessive offset pointer metadata');
   for(const [name,value,min,max] of [
     ['maxTableSlots',maxTableSlots,1,1000000],['maxDeclared',maxDeclared,1,128],
     ['maxCandidates',maxCandidates,0,128],['maxScanBytes',maxScanBytes,0,128*1024*1024]
   ])if(!Number.isSafeInteger(value)||value<min||value>max)throw Error('Invalid reference scan limit: '+name);
   const read32=at=>(read(at)|(read(at+1)<<8)|(read(at+2)<<16)|(read(at+3)<<24))>>>0;
   const needle=0x08000000+target;
+  const offsetBySource=new Map();
+  let skippedOffsetPointers=0,examinedOffsetPointers=0;
+  for(const record of offsetPointers){
+    if(!record||!Number.isSafeInteger(record.address)||
+       !Number.isSafeInteger(record.offset)||record.offset<-0x80000000||record.offset>0x7FFFFFFF)
+      throw Error('Malformed offset pointer metadata');
+    const old=offsetBySource.get(record.address);
+    if(old!==undefined&&old!==record.offset)
+      throw Error('Conflicting offset pointer metadata at 0x'+record.address.toString(16));
+    offsetBySource.set(record.address,record.offset);
+  }
   const declared=[],knownSlots=new Set();
   let examinedSlots=0,skippedTables=0,matchedDeclared=0,unsupportedFormats=0;
   for(const anchor of anchors){
@@ -236,6 +293,7 @@ export function inspectHmaPointerReferences(bytes,target,anchors,{
       const base=anchor.address+row*layout.rowSize;
       for(const field of pointerFields){
         const source=base+field.offset;
+        if(offsetBySource.has(source))continue; // explicit HMA OffsetPointer overrides generic table interpretation
         if(read32(source)!==needle)continue;
         // Overlapping/duplicate metadata can describe the same physical slot.
         if(knownSlots.has(source))continue;
@@ -245,20 +303,36 @@ export function inspectHmaPointerReferences(bytes,target,anchors,{
       }
     }
   }
+  // Explicit OffsetPointer sources: HMA decodes target as raw ROM pointer
+  // minus Offset. Conflicting declarations for the same source are ambiguous.
+  for(const [source,offset] of offsetBySource){
+    if(source<0||source>bytes.length-4){skippedOffsetPointers++;continue;}
+    if(examinedSlots+examinedOffsetPointers>=maxTableSlots){skippedOffsetPointers++;continue;}
+    examinedOffsetPointers++;
+    const raw=read32(source);
+    // HMA BaseModel.ReadPointer validates a conventional GBA pointer first.
+    if(raw<0x08000000||raw>=0x0A000000)continue;
+    const decoded=raw-0x08000000-offset;
+    if(decoded!==target)continue;
+    if(knownSlots.has(source))continue;
+    knownSlots.add(source);matchedDeclared++;
+    if(declared.length<maxDeclared)
+      declared.push({source,kind:'offset-pointer',offset});
+  }
   // Conventional four-byte aligned byte matches are not proven pointers.
   // Only the first bounded portion is scanned, explicitly reflected in output.
   const span=Math.min(bytes.length,maxScanBytes);
   const candidates=[];let candidateHits=0;
   for(let i=0;i+4<=span;i+=4){
-    if(knownSlots.has(i)||read32(i)!==needle)continue;
+    if(knownSlots.has(i)||offsetBySource.has(i)||read32(i)!==needle)continue;
     candidateHits++;
     if(candidates.length<maxCandidates)candidates.push({source:i,kind:'raw-candidate'});
   }
   return {
     target,declared,candidates,matchedDeclared,candidateHits,
-    examinedSlots,skippedTables,unsupportedFormats,scannedBytes:span,
+    examinedSlots,skippedTables,unsupportedFormats,examinedOffsetPointers,skippedOffsetPointers,scannedBytes:span,
     rawScanComplete:span===bytes.length,scanAlignment:4,
     declaredTruncated:matchedDeclared>declared.length,candidatesTruncated:candidateHits>candidates.length,
-    disclaimer:'Typed-table matches rely on unverified metadata; raw candidates are only aligned byte-pattern matches. Neither proves ownership or permits safe repointing.'
+    disclaimer:'Typed-table and OffsetPointer matches rely on unverified metadata; raw candidates are only aligned byte-pattern matches. Neither proves ownership or permits safe repointing.'
   };
 }

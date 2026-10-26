@@ -1,8 +1,8 @@
 import {RomModel, MAX_BYTES, hex, parseOffset, parseHexBytes, applyBps, applyIps, crc32, paletteAt, gba4bppTile, decodeLz10, scanLz10Graphics} from './core.js';
-import {parseHmaNamedAnchors,readAnchorInspection,groupAnchors,filterAnchors,previewHmaFixedTable,resolveHmaStockMetadata,checkHmaMetadataSources,inspectHmaPointerReferences} from './semantic.js';
+import {parseHmaNamedAnchors,readAnchorInspection,groupAnchors,filterAnchors,previewHmaFixedTable,resolveHmaStockMetadata,checkHmaMetadataSources,inspectHmaPointerReferences,parseHmaOffsetPointers} from './semantic.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
-let metadata=[],metadataSources=[],selectedAnchor=null;
+let metadata=[],metadataSources=[],metadataOffsetPointers=[],selectedAnchor=null;
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
@@ -79,7 +79,7 @@ function updateIndicators(){
   $('changes-tab-count').hidden=!active||!model.dirty;$('changes-tab-count').textContent=active ? String(model.edits.size+(model.appliedPatch?1:0)):'0';
   if(active)showRomInfo();
 }
-function installModel(name,bytes){metadata=[];metadataSources=[];selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
+function installModel(name,bytes){metadata=[];metadataSources=[];metadataOffsetPointers=[];selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
 $('rom-picker').addEventListener('change',async e=>{
   const file=e.target.files?.[0];e.target.value='';if(!file)return;
   if(file.size<0xC0 || file.size>MAX_BYTES)return toast('ROM must be 192 bytes to 128 MiB',true);
@@ -304,24 +304,31 @@ if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostn
 // engine, game fingerprints and pointer allocator have been ported and tested.
 let displayedAnchors=[], selectedInspection=null;
 const encodeHex=bytes=>Array.from(bytes).map((b,i)=>hex(b,2)+(i%16===15?'\n':' ')).join('').trim();
-function metadataReset(){metadata=[];metadataSources=[];selectedAnchor=null;selectedInspection=null;drawAnchors();}
+function metadataReset(){metadata=[];metadataSources=[];metadataOffsetPointers=[];selectedAnchor=null;selectedInspection=null;drawAnchors();}
 function metadataCommit(sources){
   ensureModel();
   // Fail closed for known mismatched stock-game TOML before changing active metadata.
   // Custom CUBE/project TOML remains manually importable but is never authenticated by header alone.
   checkHmaMetadataSources(sources,model);
-  const dedupe=new Map();
+  const dedupe=new Map(),offsets=new Map();
   let count=0;
   for(const source of sources){
     const parsed=parseHmaNamedAnchors(source.text,{romSize:model.length});
     count+=parsed.length;
     for(const anchor of parsed){dedupe.set(anchor.name,{...anchor,source:source.name});}
+    for(const offsetPointer of parseHmaOffsetPointers(source.text,{romSize:model.length})){
+      const existing=offsets.get(offsetPointer.address);
+      if(existing&&existing.offset!==offsetPointer.offset)
+        throw Error('Conflicting OffsetPointer at 0x'+hex(offsetPointer.address)+' across metadata files');
+      offsets.set(offsetPointer.address,{...offsetPointer,source:source.name});
+    }
   }
+  metadataOffsetPointers=[...offsets.values()];
   metadata=[...dedupe.values()].sort((a,b)=>a.name.localeCompare(b.name));
   metadataSources=sources.map(({name})=>name);
   selectedAnchor=null;selectedInspection=null;
   drawAnchors();
-  toast(`Loaded ${metadata.length} named anchor(s) from ${sources.length} TOML file(s) · ROM layout unverified`);
+  toast(`Loaded ${metadata.length} named anchor(s), ${metadataOffsetPointers.length} offset pointers from ${sources.length} TOML file(s) · ROM layout unverified`);
 }
 function semanticChild(tag,value,klass){const el=document.createElement(tag);el.textContent=value;if(klass)el.className=klass;return el;}
 function drawAnchorDetails(){
@@ -389,15 +396,17 @@ function drawAnchorDetails(){
   scanButton.addEventListener('click',()=>safeRun(()=>{
     scanButton.disabled=true;scanButton.textContent='Scanning…';
     try {
-    const refs=inspectHmaPointerReferences(model,a.address,metadata,{maxTableSlots:60000,maxDeclared:24,maxCandidates:20,maxScanBytes:2*1024*1024});
+    const refs=inspectHmaPointerReferences(model,a.address,metadata,{offsetPointers:metadataOffsetPointers,maxTableSlots:60000,maxDeclared:24,maxCandidates:20,maxScanBytes:2*1024*1024});
     results.replaceChildren();
     results.append(semanticChild('p',
-      'Typed table matches: '+refs.matchedDeclared+'; raw aligned candidates: '+refs.candidateHits+'. Scanned first '+formatSize(refs.scannedBytes)+' of '+formatSize(model.length)+' for raw candidates. '+refs.skippedTables+' tables skipped (bounds or budget).',
+      'Declared table/offset-pointer matches: '+refs.matchedDeclared+'; raw aligned candidates: '+refs.candidateHits+'. Scanned first '+formatSize(refs.scannedBytes)+' of '+formatSize(model.length)+' for raw candidates. '+refs.skippedTables+' tables and '+refs.skippedOffsetPointers+' offset sources skipped (bounds or budget).',
       'palette-note'));
     results.append(semanticChild('p',refs.disclaimer,'semantic-warning'));
     for(const ref of [...refs.declared,...refs.candidates]){
       const label=ref.kind==='typed-table'
         ? 'Typed-table match · '+ref.table+' #'+ref.row+' / '+ref.field+' · 0x'+hex(ref.source)
+        : ref.kind==='offset-pointer'
+        ? 'OffsetPointer match · displacement '+ref.offset+' · 0x'+hex(ref.source)
         : 'Unverified raw match · 0x'+hex(ref.source);
       const jump=semanticChild('button',label,'semantic-row-jump');
       jump.type='button';
@@ -423,7 +432,7 @@ function drawAnchors(){
   for(const [name,count] of groupAnchors(metadata))selector.add(new Option(`${name} (${count})`,name));
   selector.value=[...selector.options].some(x=>x.value===previous)?previous:'all';
   $('anchor-count').textContent=metadata.length?`${metadata.length} named anchors`:'No metadata';
-  $('metadata-status').textContent=metadataSources.length?`Loaded: ${metadataSources.join(', ')}. ROM metadata compatibility is not independently verified.`:'No metadata loaded. Import TOML produced for this ROM, or fetch a stock-game reference.';
+  $('metadata-status').textContent=metadataSources.length?`Loaded: ${metadataSources.join(', ')}. ${metadataOffsetPointers.length} OffsetPointer declarations. ROM metadata compatibility is not independently verified.`:'No metadata loaded. Import TOML produced for this ROM, or fetch a stock-game reference.';
   if(!model){root.append(semanticChild('div','Open a ROM first.','empty-state'));drawAnchorDetails();return;}
   if(!metadata.length){root.append(semanticChild('div','Import a CUBHMA .toml file to begin.','empty-state'));drawAnchorDetails();return;}
   displayedAnchors=filterAnchors(metadata,$('anchor-find').value,selector.value,180);
