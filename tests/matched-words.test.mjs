@@ -164,3 +164,29 @@ test('invalid read proxy, source metadata and ROM length mismatch are rejected',
  assert.throws(()=>collectHmaMatchedWords([{name:'',text:toml('COUNT',8)}]),/Unnamed/);
  assert.throws(()=>resolveHmaTableLayouts([],{romSize:100,rom:new Uint8Array(64),matchedWords:[word('COUNT',8)]}),/ROM length mismatch/);
 });
+
+test('MatchedWords source overlapping a table disables typed reads for that table and word-derived descendants',()=>{
+ const bytes=new Uint8Array(256);put(bytes,40,2);
+ put(bytes,100,0x08000080);put(bytes,104,0x08000080);
+ const words=[word('COUNT',40,4)];
+ const anchors=[
+  anchor('sourceTable',38,'[x.]8'),
+  anchor('pointers',100,'[ptr<text>]COUNT'),
+  anchor('grandchild',160,'[ptr<text>]pointers')
+ ];
+ const resolved=resolveHmaTableLayouts(anchors,{romSize:256,rom:bytes,matchedWords:words});
+ assert.equal(resolved.wordOverlapWitnesses,1);
+ assert.deepEqual([...resolved.conflicted].sort(),['grandchild','pointers','sourceTable']);
+ assert.throws(()=>previewHmaFixedTable(bytes,anchors[1],{tableResolution:resolved}),/Overlapping/);
+ const refs=inspectHmaPointerReferences(bytes,128,anchors,{matchedWords:words,maxScanBytes:120});
+ assert.equal(refs.matchedDeclared,0);
+ assert.deepEqual(refs.candidates.map(x=>x.source),[100,104]);
+});
+test('touching WordRun and table spans are not a collision',()=>{
+ const bytes=new Uint8Array(128);put(bytes,8,2,2);
+ const words=[word('COUNT',8,2)];
+ const anchors=[anchor('child',10,'[x.]COUNT')];
+ const resolved=resolveHmaTableLayouts(anchors,{romSize:128,rom:bytes,matchedWords:words});
+ assert.equal(resolved.wordOverlapWitnesses,0);
+ assert.equal(resolved.conflicted.size,0);
+});
