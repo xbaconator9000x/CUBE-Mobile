@@ -1,7 +1,7 @@
 # Changelog
 
 ## v0.5.7 — named-list-derived table lengths (read only)
-- Parse bounded CUBHMA `[[List]]` entries with inline/multiline arrays, sparse numeric indices and explicit metadata conflicts.
+- Parse bounded CUBHMA `[[List]]` entries with inline/multiline arrays, sparse decimal/hex numeric indices, triple-quoted labels containing apostrophes and explicit metadata conflicts. Smoke-checked against all 61 named lists in upstream `default.toml`.
 - Resolve table row counts from list cardinality, including ParentOffset margins and downstream dependent tables; named anchors retain upstream precedence.
 - Expose list-derived provenance in mobile inspection and include non-overlapping supported pointer fields in read-only reference scans.
 - Reject malformed list metadata atomically; keep unsupported `UnmappedConstant` and ROM-backed `MatchedWords` semantics distinct.
