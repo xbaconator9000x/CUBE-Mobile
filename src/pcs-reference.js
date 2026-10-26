@@ -42,7 +42,7 @@ export function parseHmaPcsReference(source) {
       if (!match) throw Error('Invalid PCS game directive at line '+lineNo);
       const codes=match[1].match(/[A-Z0-9]{4}/g)||[];
       if (!codes.length || codes.some(g=>!games.includes(g)) ||
-          match[1].replace(/[A-Z0-9]{4}|[\s,|]/g,'').length)
+          match[1].replace(/[A-Z0-9]{4}|[\s,_|]/g,'').length)
         throw Error('Unsupported PCS game directive at line '+lineNo);
       activeGames=[...new Set(codes)];
       continue;
@@ -52,7 +52,9 @@ export function parseHmaPcsReference(source) {
       if (!match) throw Error('Malformed PCS glyph at line '+lineNo);
       const start=parseInt(match[1],16),raw=match[2].trim();
       const quoted=raw.length>=2 && raw[0]==='"' && raw.at(-1)==='"';
-      if (raw.startsWith('"') && !quoted) throw Error('Malformed PCS quoted glyph at line '+lineNo);
+      // Upstream pcsReference.txt has `0xFF = "`: a literal one-character quote,
+      // not an unterminated quoted range. C# GetPCSFromReference treats it as a glyph.
+      if (raw.startsWith('"') && !quoted && raw!=='"') throw Error('Malformed PCS quoted glyph at line '+lineNo);
       const value=quoted?raw.slice(1,-1):raw;
       if (!value.length) throw Error('Empty PCS glyph at line '+lineNo);
       const chars=quoted?value.split(''):[value]; // C# reference uses UTF-16 char indexing

@@ -124,3 +124,13 @@
 - [ ] Verify authentic `pcsReference.txt` resource, precedence, macro ordering and CUBE-specific variants against upstream and licensed fixtures.
 - [x] Wire optional local reference import into mobile UI and standalone build with provenance warnings; no semantic writes/repointing enabled.
 - [ ] Verify the optional reference workflow on real Android devices, including file picker cancellation, offline operation and memory limits.
+
+
+## Watchdog checkpoint — authentic upstream PCS reference fixture (27 October 2026)
+- [x] Pin original `pcsReference.txt` from CUBHMA commit `30443931` as a **test-only** fixture with MIT licence and provenance.
+- [x] Parse upstream's underscore-separated game scopes (`@!game(BPRE_BPGE)`, `@!game(AXVE_AXPE)`) without guessing or applying wrong-game colour macros.
+- [x] Preserve upstream's literal single-quote-mark glyph declaration (`0xFF = "`) while still rejecting malformed multi-character quoted ranges.
+- [x] Add authentic fixture regression tests for glyphs, control lengths, colour macros, read-only decoding and ROM immutability.
+- [ ] Validate all upstream macro alias precedence and custom CUBE text extensions before text writes.
+- [ ] Run Android hardware import/cancellation/offline/large-file checks; reference imports remain unauthenticated and read-only.
+
