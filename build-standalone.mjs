@@ -1,10 +1,11 @@
 import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 const read=path=>readFileSync(new URL(path,import.meta.url),'utf8');
-const base=read('index.html'),styles=read('src/styles.css'),core=read('src/core.js'),app=read('src/app.js'),semantic=read('src/semantic.js');
+const base=read('index.html'),styles=read('src/styles.css'),core=read('src/core.js'),app=read('src/app.js'),semantic=read('src/semantic.js'),textInspection=read('src/text-inspection.js');
 const stripExports=core.replace(/\bexport (const|class|function)\b/g,'$1');
-const stripImports=app.replace(/^import \{.*?\} from '\.\/(?:core|semantic)\.js';\s*/gm,'');
+const stripImports=app.replace(/^import \{.*?\} from '\.\/(?:core|semantic|text-inspection)\.js';\s*/gm,'');
 const stripSemantic=semantic.replace(/\bexport (const|class|function)\b/g,'$1');
-const html=base.replace(/<link rel="icon"[^>]*>/,'').replace(/<link rel="manifest"[^>]*>/,'').replace(/<link rel="apple-touch-icon"[^>]*>/,'').replace(/<link rel="stylesheet" href="src\/styles.css">/,'<style>'+styles+'</style>').replace(/<script type="module" src="src\/app\.js"><\/script>/,"<script>\n'use strict';\n"+stripExports+"\n"+stripSemantic+"\n"+stripImports+"\n</script>");
+const stripTextInspection=textInspection.replace(/\bexport (const|class|function)\b/g,'$1');
+const html=base.replace(/<link rel="icon"[^>]*>/,'').replace(/<link rel="manifest"[^>]*>/,'').replace(/<link rel="apple-touch-icon"[^>]*>/,'').replace(/<link rel="stylesheet" href="src\/styles.css">/,'<style>'+styles+'</style>').replace(/<script type="module" src="src\/app\.js"><\/script>/,"<script>\n'use strict';\n"+stripExports+"\n"+stripSemantic+"\n"+stripTextInspection+"\n"+stripImports+"\n</script>");
 if(html.includes('src/app.js')||html.includes('src/styles.css'))throw Error('Standalone file still references source assets');
 mkdirSync(new URL('app/',import.meta.url),{recursive:true});
 writeFileSync(new URL('app/CUBHMA_Mobile_Lab_Offline.html',import.meta.url),html);
