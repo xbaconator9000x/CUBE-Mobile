@@ -305,9 +305,9 @@ if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostn
 let displayedAnchors=[], selectedInspection=null;
 const encodeHex=bytes=>Array.from(bytes).map((b,i)=>hex(b,2)+(i%16===15?'\n':' ')).join('').trim();
 function metadataReset(){metadata=[];metadataSources=[];metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
-function snapshotMatchedWords(){
+function snapshotMatchedWords(words=metadataMatchedWords){
   if(!model)return [];
-  return metadataMatchedWords.map(word=>{
+  return words.map(word=>{
     if(word.address<0||word.address>model.length-word.length)return null;
     let raw=0;
     for(let i=0;i<word.length;i++)raw+=model.read(word.address+i)*2**(8*i);
@@ -349,10 +349,11 @@ function metadataCommit(sources){
     romSize:model.length,rom:model,lists:namedLists.lists,conflictingLists:namedLists.conflictedNames,
     matchedWords:matched.words,conflictingWords:matched.conflictedNames
   });
+  const nextWordSnapshot=snapshotMatchedWords(matched.words);
   metadataOffsetPointers=[...offsets.values()];
   metadataLists=namedLists.lists;metadataListConflicts=namedLists.conflictedNames;
   metadataMatchedWords=matched.words;metadataWordConflicts=matched.conflictedNames;
-  metadataWordSnapshot=snapshotMatchedWords();
+  metadataWordSnapshot=nextWordSnapshot;
   metadata=nextMetadata;metadataResolution=nextResolution;
   metadataSources=sources.map(({name})=>name);
   selectedAnchor=null;selectedInspection=null;
