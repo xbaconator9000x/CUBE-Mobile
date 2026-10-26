@@ -25,6 +25,13 @@
   <div class="hero"><div class="hero-content"><div class="hero-kicker">YOUR ROM. YOUR DEVICE.</div><h2>A smarter way to<br><em>work on the go.</em></h2><p>Explore, inspect and safely edit GBA ROM data in your browser. No uploads. No installation required.</p><label for="rom-picker" class="primary-button">＋ Open a GBA ROM <span>›</span></label><div class="hero-note">Supports .gba files · up to 128 MiB</div></div><div class="hero-art" aria-hidden="true"><div class="art-frame"><div class="art-top"><span></span><span></span><span></span><b>ROM / INSPECTOR</b></div><div class="art-lines"><i>0001A0</i><strong>50 4F 4B 45 4D 4F 4E</strong><i>0001B0</i><strong>96 00 00 00 00 00 00</strong><i>0001C0</i><strong>FF FF <u>20 48</u> FF FF FF</strong></div><div class="art-bottom">DATA INTEGRITY <span>● PROTECTED</span></div></div></div></div>
   <div class="section-heading"><h3>Current session</h3><span id="session-state" class="muted">No ROM loaded</span></div>
   <div class="rom-panel" id="rom-panel"><div class="rom-placeholder"><div class="big-file-icon">◇</div><div><strong>No ROM loaded yet</strong><p>Choose a legally obtained GBA ROM to get started. Your file stays on this device.</p></div></div></div>
+  <div class="toolbar-card" aria-label="Local ROM identity">
+    <div class="input-wrap"><label>Exact ROM identity (read-only)</label>
+      <div class="input-row"><button type="button" class="subtle-button" id="rom-fingerprint" disabled>Compute SHA-256</button></div>
+      <p class="palette-note">Hashes the current staged ROM bytes locally in bounded chunks. An exact hash can later be checked against a separately verified reference; it does not by itself prove stock/CUBE compatibility.</p>
+      <output id="rom-fingerprint-status" class="palette-note" aria-live="polite">Open a ROM to compute its SHA-256 identity.</output>
+    </div>
+  </div>
   <div class="dashboard-grid">
     <button class="feature-card" data-go="hex"><div class="feature-icon violet">⌗</div><strong>Hex editor</strong><p>Browse bytes, search patterns, use pointers and stage edits.</p><span>Open tool ↗</span></button>
     <button class="feature-card" data-go="anchors"><div class="feature-icon green">⌕</div><strong>Named ROM data</strong><p>Import CUBHMA TOML metadata and inspect verified-offset anchors, pointers and formats.</p><span>Open tool ↗</span></button>
