@@ -197,3 +197,68 @@ export function checkHmaMetadataSources(sources,bytes){
   }
   return {identity,sources:checked,warning:'ROM header and filenames cannot authenticate edited ROM layouts or CUBE versions; semantic data is read-only.'};
 }
+
+
+/**
+ * Bounded read-only pointer cross-reference inspection.
+ * CUBHMA's actual run ownership needs full formatted-run tracking and metadata
+ * reconciliation. This identifies ONLY typed pointer slots in the supported
+ * fixed-table subset. Raw 4-byte matches are labeled unverified candidates,
+ * never as authoritative owners or safe sources for repointing.
+ */
+export function inspectHmaPointerReferences(bytes,target,anchors,{
+  maxTableSlots=120000,maxDeclared=32,maxCandidates=24,maxScanBytes=8*1024*1024
+}={}){
+  const read=bytes instanceof Uint8Array?i=>bytes[i]:typeof bytes?.read==='function'?i=>bytes.read(i):null;
+  if(!read||!Number.isSafeInteger(bytes?.length)||bytes.length<1)throw Error('Invalid ROM for reference inspection');
+  if(!Number.isSafeInteger(target)||target<0||target>=bytes.length||target>=0x02000000)
+    throw Error('Target is not a representable in-ROM GBA pointer offset');
+  if(!Array.isArray(anchors)||anchors.length>50000)throw Error('Invalid or excessive anchor metadata');
+  for(const [name,value,min,max] of [
+    ['maxTableSlots',maxTableSlots,1,1000000],['maxDeclared',maxDeclared,1,128],
+    ['maxCandidates',maxCandidates,0,128],['maxScanBytes',maxScanBytes,0,128*1024*1024]
+  ])if(!Number.isSafeInteger(value)||value<min||value>max)throw Error('Invalid reference scan limit: '+name);
+  const read32=at=>(read(at)|(read(at+1)<<8)|(read(at+2)<<16)|(read(at+3)<<24))>>>0;
+  const needle=0x08000000+target;
+  const declared=[],knownSlots=new Set();
+  let examinedSlots=0,skippedTables=0,matchedDeclared=0,unsupportedFormats=0;
+  for(const anchor of anchors){
+    if(!anchor||!Number.isSafeInteger(anchor.address))continue;
+    const layout=parseHmaFixedTableFormat(anchor.format);
+    if(!layout){if(typeof anchor.format==='string'&&anchor.format.startsWith('['))unsupportedFormats++;continue;}
+    const pointerFields=layout.fields.filter(field=>field.type==='pointer');
+    if(!pointerFields.length)continue;
+    if(anchor.address<0||anchor.address>bytes.length||layout.totalBytes>bytes.length-anchor.address){skippedTables++;continue;}
+    const slots=layout.count*pointerFields.length;
+    if(slots>maxTableSlots-examinedSlots){skippedTables++;continue;}
+    examinedSlots+=slots;
+    for(let row=0;row<layout.count;row++){
+      const base=anchor.address+row*layout.rowSize;
+      for(const field of pointerFields){
+        const source=base+field.offset;
+        if(read32(source)!==needle)continue;
+        // Overlapping/duplicate metadata can describe the same physical slot.
+        if(knownSlots.has(source))continue;
+        knownSlots.add(source);matchedDeclared++;
+        if(declared.length<maxDeclared)
+          declared.push({source,kind:'typed-table',table:anchor.name,row,field:field.name});
+      }
+    }
+  }
+  // Conventional four-byte aligned byte matches are not proven pointers.
+  // Only the first bounded portion is scanned, explicitly reflected in output.
+  const span=Math.min(bytes.length,maxScanBytes);
+  const candidates=[];let candidateHits=0;
+  for(let i=0;i+4<=span;i+=4){
+    if(knownSlots.has(i)||read32(i)!==needle)continue;
+    candidateHits++;
+    if(candidates.length<maxCandidates)candidates.push({source:i,kind:'raw-candidate'});
+  }
+  return {
+    target,declared,candidates,matchedDeclared,candidateHits,
+    examinedSlots,skippedTables,unsupportedFormats,scannedBytes:span,
+    rawScanComplete:span===bytes.length,scanAlignment:4,
+    declaredTruncated:matchedDeclared>declared.length,candidatesTruncated:candidateHits>candidates.length,
+    disclaimer:'Typed-table matches rely on unverified metadata; raw candidates are only aligned byte-pattern matches. Neither proves ownership or permits safe repointing.'
+  };
+}
