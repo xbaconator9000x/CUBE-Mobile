@@ -90,6 +90,14 @@
 - [ ] Verify actual upstream PCS mappings and CUBE-specific text encodings using legal fixtures; decode only after version and format checks.
 - [ ] Implement semantic ownership, authentic game fixtures, mobile device acceptance and non-destructive text editing before claiming parity.
 
+## Watchdog checkpoint — source-grounded Gen 3 PCS fallback (27 October 2026)
+- [x] Port upstream `PCSString.GetDefaultPCS` character table and default control-code lengths into a bounded, immutable, **read-only** JavaScript decoder.
+- [x] Restrict preview to known Gen 3 game codes with valid header checks; label it unauthenticated even when displayed, because CUBE/custom ROMs can override text mappings.
+- [x] Handle escaped `0xFF` as control payload rather than a false string terminator, detect truncated escapes and visibly escape unknown glyphs.
+- [x] Integrate a guarded default-PCS preview into resolved, non-conflicted mobile table text fields; preserve raw bytes and ASCII hints, update offline bundling and synthetic tests.
+- [ ] Verify actual upstream `resources/pcsReference.txt` overrides, per-game macros and CUBE-specific text mappings against licensed fixtures; add independent cross-language parity tests.
+- [ ] Complete ROM fingerprinting, semantic run ownership, non-destructive text edit transactions, emulator roundtrips and Android acceptance before permitting writes.
+
 ## Milestone 1 — semantic read-only CUBHMA engine
 - [ ] Parse HMA metadata and format DSL, beyond named-anchor fields.
 - [ ] Recognise ROM game/version and CUBE-specific metadata without false positives.
