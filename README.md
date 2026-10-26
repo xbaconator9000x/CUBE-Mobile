@@ -6,6 +6,7 @@
 
 ## Current working code
 
+- **Exact ROM comparison (unreleased):** after computing the local staged-ROM SHA-256, optionally paste a published expected SHA-256 to compare exact bytes. A matching user-provided digest does **not** authenticate its provenance, CUBE layout or TOML. The bundled curated-profile registry is intentionally **empty** until independently verified CUBE ROM and matching metadata digests exist; no semantic writes are unlocked. See [ROM fingerprint registry requirements](docs/ROM_FINGERPRINT_REGISTRY.md).
 - **Local exact-byte ROM SHA-256 identity (unreleased):** opt-in workspace action hashes the current base plus staged edits in bounded 64 KiB chunks without allocating a full ROM copy, reports progress, cancels on ROM replacement, and invalidates results when bytes change. This is a cryptographic **identity only**, not proof of stock or CUBE layout, provenance, or safe metadata compatibility. No trusted CUBE fingerprint allowlist has been established.
 
 

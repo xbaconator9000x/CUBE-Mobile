@@ -30,6 +30,10 @@
       <div class="input-row"><button type="button" class="subtle-button" id="rom-fingerprint" disabled>Compute SHA-256</button></div>
       <p class="palette-note">Hashes the current staged ROM bytes locally in bounded chunks. An exact hash can later be checked against a separately verified reference; it does not by itself prove stock/CUBE compatibility.</p>
       <output id="rom-fingerprint-status" class="palette-note" aria-live="polite">Open a ROM to compute its SHA-256 identity.</output>
+      <label for="rom-fingerprint-expected">Compare with an independently obtained SHA-256 (optional)</label>
+      <div class="input-row"><input id="rom-fingerprint-expected" type="text" inputmode="text" spellcheck="false" autocomplete="off" autocapitalize="off" maxlength="64" placeholder="Paste 64 hexadecimal characters"><button type="button" id="rom-fingerprint-check" class="subtle-button" disabled>Compare</button></div>
+      <output id="rom-fingerprint-compare-status" class="palette-note" aria-live="polite">Paste a reference digest after hashing to compare exact bytes. No layout authentication.</output>
+      <p class="palette-note">Matching a hash you supply does not authenticate its source, CUBE layout or compatible metadata. No verified CUBE fingerprints are bundled yet.</p>
     </div>
   </div>
   <div class="dashboard-grid">

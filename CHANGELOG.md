@@ -1,3 +1,9 @@
+## Unreleased — exact ROM compatibility comparison (27 October 2026)
+- Add a local expected-SHA-256 comparison for current staged ROM bytes; report exact match/mismatch without treating user-supplied evidence as trusted CUBE provenance.
+- Introduce a strictly validated, deliberately empty curated ROM profile registry (ROM digest/length, header identity, layout, exact metadata digest, provenance). No unverified CUBE profiles are bundled.
+- Fail closed on stale identity, duplicate/malformed profiles and header conflicts; no semantic writes, relocation or metadata authentication.
+- Add synthetic and mobile/standalone regression tests. Real CUBE fingerprints, metadata digest matching, emulator and Android acceptance remain outstanding.
+
 # Changelog
 
 ## Unreleased — exact ROM identity foundation (27 October 2026)
