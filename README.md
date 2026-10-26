@@ -2,7 +2,7 @@
 
 **Private development repository for a full mobile port of CUBHMA (Cradi's Unofficial Build of Hex Maniac Advance), targeting CUBE-aware Pokémon Emerald editing and the other ROM families supported by upstream.**
 
-> **Status: v0.5.4 — early foundation, NOT a complete port.** The working code today is an offline ROM inspection / patching workbench and a limited read-only CUBHMA TOML named-anchor inspector. The desktop editor's semantic engine, map/collision/event editors, scripts, sprites, trainers, Pokémon, sound and CUBE upgrades are **not yet ported**.
+> **Status: v0.5.5 — early foundation, NOT a complete port.** The working code today is an offline ROM inspection / patching workbench and a limited read-only CUBHMA TOML named-anchor inspector. The desktop editor's semantic engine, map/collision/event editors, scripts, sprites, trainers, Pokémon, sound and CUBE upgrades are **not yet ported**.
 
 ## Current working code
 
@@ -14,6 +14,7 @@
 - **Version-aware stock metadata safety:** validates GBA header code, header checksum and exact revision before fetching upstream reference TOML; refuses known mismatched stock TOML imports. Neither header nor TOML filenames authenticate CUBE/custom ROM layout.
 - **Experimental read-only fixed table previews:** decode a strictly bounded subset of CUBHMA `ArrayRun` formats (byte/word/dword integers, raw text bytes and ROM pointers), show up to eight rows, and jump to a row in hex. Unknown/dynamic layouts fail closed; metadata is not ROM-version authenticated.
 - **Read-only HMA `[[OffsetPointer]]` support:** parse signed displacements from TOML and inspect source locations using upstream-adjusted pointer semantics, without repointing or claiming metadata authenticity.
+- **Read-only named-array count dependencies:** resolve supported table lengths from the exact name of another resolved array (including forward and chained references), flag cycles/unresolved formats and out-of-ROM spans, and report overlapping table claims. Ambiguous overlapping tables are excluded from typed inspection; no write/repoint capability is implied.
 - **Opt-in read-only pointer reference inspection:** find exact-value matches in metadata-declared fixed-table pointer slots and separate unverified aligned-byte candidates, with scan limits and explicit incomplete coverage. This is **not** CUBHMA's full ownership model or safe repointing.
 - Browser history-backed navigation on Android, including Back/Forward.
 - CRC-bound JSON sidecar project edits.

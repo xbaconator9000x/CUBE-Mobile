@@ -55,10 +55,10 @@ test('invalid targets and scan parameters fail closed',()=>{
  assert.throws(()=>inspectHmaPointerReferences(b,1,[],{maxDeclared:0}),/limit/);
  assert.throws(()=>inspectHmaPointerReferences(b,1,new Array(50001).fill({})),/metadata/);
 });
-test('duplicate typed table descriptions point to the same physical slot once',()=>{
+test('identical duplicate typed table declarations point to one physical slot once',()=>{
  const b=new Uint8Array(256);put32(b,40,0x08000080);
  const a={name:'first',address:40,format:'[ptr<text>]1'};
- const r=inspectHmaPointerReferences(b,128,[a,{...a,name:'second'}],{maxScanBytes:44});
+ const r=inspectHmaPointerReferences(b,128,[a,{...a,name:'first'}],{maxScanBytes:44});
  assert.equal(r.declared.length,1);assert.equal(r.matchedDeclared,1);
  assert.equal(r.examinedSlots,2);
 });

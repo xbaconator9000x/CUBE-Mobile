@@ -1,8 +1,8 @@
 import {RomModel, MAX_BYTES, hex, parseOffset, parseHexBytes, applyBps, applyIps, crc32, paletteAt, gba4bppTile, decodeLz10, scanLz10Graphics} from './core.js';
-import {parseHmaNamedAnchors,readAnchorInspection,groupAnchors,filterAnchors,previewHmaFixedTable,resolveHmaStockMetadata,checkHmaMetadataSources,inspectHmaPointerReferences,parseHmaOffsetPointers} from './semantic.js';
+import {parseHmaNamedAnchors,readAnchorInspection,groupAnchors,filterAnchors,previewHmaFixedTable,resolveHmaStockMetadata,checkHmaMetadataSources,inspectHmaPointerReferences,parseHmaOffsetPointers,resolveHmaTableLayouts} from './semantic.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
-let metadata=[],metadataSources=[],metadataOffsetPointers=[],selectedAnchor=null;
+let metadata=[],metadataSources=[],metadataOffsetPointers=[],metadataResolution=null,selectedAnchor=null;
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
@@ -304,7 +304,7 @@ if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostn
 // engine, game fingerprints and pointer allocator have been ported and tested.
 let displayedAnchors=[], selectedInspection=null;
 const encodeHex=bytes=>Array.from(bytes).map((b,i)=>hex(b,2)+(i%16===15?'\n':' ')).join('').trim();
-function metadataReset(){metadata=[];metadataSources=[];metadataOffsetPointers=[];selectedAnchor=null;selectedInspection=null;drawAnchors();}
+function metadataReset(){metadata=[];metadataSources=[];metadataOffsetPointers=[];metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
 function metadataCommit(sources){
   ensureModel();
   // Fail closed for known mismatched stock-game TOML before changing active metadata.
@@ -323,12 +323,14 @@ function metadataCommit(sources){
       offsets.set(offsetPointer.address,{...offsetPointer,source:source.name});
     }
   }
+  const nextMetadata=[...dedupe.values()].sort((a,b)=>a.name.localeCompare(b.name));
+  const nextResolution=resolveHmaTableLayouts(nextMetadata,{romSize:model.length});
   metadataOffsetPointers=[...offsets.values()];
-  metadata=[...dedupe.values()].sort((a,b)=>a.name.localeCompare(b.name));
+  metadata=nextMetadata;metadataResolution=nextResolution;
   metadataSources=sources.map(({name})=>name);
   selectedAnchor=null;selectedInspection=null;
   drawAnchors();
-  toast(`Loaded ${metadata.length} named anchor(s), ${metadataOffsetPointers.length} offset pointers from ${sources.length} TOML file(s) · ROM layout unverified`);
+  toast(`Loaded ${metadata.length} named anchors; ${metadataResolution.anchoredCount} linked-length tables; ${metadataResolution.overlapWitnesses} overlap witnesses · ROM layout unverified`);
 }
 function semanticChild(tag,value,klass){const el=document.createElement(tag);el.textContent=value;if(klass)el.className=klass;return el;}
 function drawAnchorDetails(){
@@ -339,6 +341,11 @@ function drawAnchorDetails(){
   root.append(semanticChild('h3',a.name));
   root.append(semanticChild('div',`Source: ${a.source} · TOML line ${a.line}`,'palette-note'));
   root.append(semanticChild('div',`Offset: 0x${hex(a.address)} · Format: ${a.format||'unspecified'}`,'semantic-code'));
+  const resolved=metadataResolution?.byName.get(a.name);
+  if(resolved?.kind==='anchored-count')root.append(semanticChild('div',`Linked table length: ${resolved.layout.count} rows, derived from ${resolved.lengthFrom} (metadata only).`,'palette-note'));
+  if(metadataResolution?.conflicted.has(a.name))root.append(semanticChild('div','Overlapping named-table claims detected. Typed interpretation is disabled for this table.','semantic-warning'));
+  const unresolvedReason=metadataResolution?.unresolved.get(a.name);
+  if(unresolvedReason)root.append(semanticChild('div',`Table format not resolved: ${unresolvedReason}.`,'palette-note'));
   if(!a.valid){root.append(semanticChild('div','This anchor is outside the selected ROM. It cannot be read.','semantic-warning'));return;}
   let inspection;
   try{inspection=readAnchorInspection(model,a);}catch(error){root.append(semanticChild('div',error.message,'semantic-warning'));return;}
@@ -352,11 +359,11 @@ function drawAnchorDetails(){
   // text is shown as bytes because PCS character conversion is not yet ported.
   if(a.format.startsWith('[')){
     try{
-      const table=previewHmaFixedTable(model,a,{maxRows:8});
+      const table=previewHmaFixedTable(model,a,{maxRows:8,tableResolution:metadataResolution});
       if(!table){root.append(semanticChild('div','Complex/dynamic HMA table format: not interpreted by this build. Use the hex view; do not infer structure from raw bytes.','palette-note'));}
       else{
         const section=semanticChild('section','','semantic-table');
-        section.append(semanticChild('h4',`Fixed table preview · ${table.count} row(s) · ${table.rowSize} bytes/row`));
+        section.append(semanticChild('h4',`Read-only table preview · ${table.count} row(s) · ${table.rowSize} bytes/row`));
         section.append(semanticChild('p','Read-only unsigned scalars; pointer targets are range-checked. Text fields show raw bytes, not decoded PCS. Metadata compatibility is unverified.','palette-note'));
         const scroller=semanticChild('div','','semantic-table-scroll');
         const grid=document.createElement('table');
@@ -385,7 +392,7 @@ function drawAnchorDetails(){
   // Matches from this incomplete semantic subset do NOT establish safe repointing.
   const refsSection=semanticChild('section','','semantic-table');
   refsSection.append(semanticChild('h4','Pointer references (read only)'));
-  refsSection.append(semanticChild('p','Inspect typed pointer fields in supported fixed tables and a bounded aligned raw-byte search. Results are potential references, never proven ownership.','palette-note'));
+  refsSection.append(semanticChild('p','Inspect pointer fields in supported fixed and linked-length tables plus a bounded aligned raw-byte search. Overlapping tables are excluded. These are potential references, not proven ownership.','palette-note'));
   const scanButton=semanticChild('button','Find possible references','semantic-row-jump');
   scanButton.type='button';
   if(a.address>=0x02000000){
@@ -415,7 +422,8 @@ function drawAnchorDetails(){
     }
     if(refs.declaredTruncated||refs.candidatesTruncated)results.append(semanticChild('p','Result list truncated to keep the interface responsive.','palette-note'));
     if(!refs.rawScanComplete)results.append(semanticChild('p','Raw pattern search is incomplete: later ROM regions were NOT scanned.','semantic-warning'));
-    if(refs.unsupportedFormats)results.append(semanticChild('p',refs.unsupportedFormats+' unsupported table formats were not interpreted.', 'palette-note'));
+    if(refs.unsupportedFormats)results.append(semanticChild('p',refs.unsupportedFormats+' unsupported or unresolved table formats were not interpreted.', 'palette-note'));
+    if(refs.conflictedTables)results.append(semanticChild('p',refs.conflictedTables+' overlapping table claims were excluded from typed reference results.', 'semantic-warning'));
     if(!refs.matchedDeclared&&!refs.candidateHits)results.append(semanticChild('p','No matches in the inspected subset. This does not prove the anchor has no references.','palette-note'));
     } finally { scanButton.disabled=a.address>=0x02000000;scanButton.textContent='Scan again'; }
   }));
@@ -432,7 +440,7 @@ function drawAnchors(){
   for(const [name,count] of groupAnchors(metadata))selector.add(new Option(`${name} (${count})`,name));
   selector.value=[...selector.options].some(x=>x.value===previous)?previous:'all';
   $('anchor-count').textContent=metadata.length?`${metadata.length} named anchors`:'No metadata';
-  $('metadata-status').textContent=metadataSources.length?`Loaded: ${metadataSources.join(', ')}. ${metadataOffsetPointers.length} OffsetPointer declarations. ROM metadata compatibility is not independently verified.`:'No metadata loaded. Import TOML produced for this ROM, or fetch a stock-game reference.';
+  $('metadata-status').textContent=metadataSources.length?`Loaded: ${metadataSources.join(', ')}. ${metadataOffsetPointers.length} OffsetPointer declarations; ${metadataResolution?.anchoredCount||0} linked-length tables; ${metadataResolution?.overlapWitnesses||0} overlap witnesses (not exhaustive). ROM metadata compatibility is not independently verified.`:'No metadata loaded. Import TOML produced for this ROM, or fetch a stock-game reference.';
   if(!model){root.append(semanticChild('div','Open a ROM first.','empty-state'));drawAnchorDetails();return;}
   if(!metadata.length){root.append(semanticChild('div','Import a CUBHMA .toml file to begin.','empty-state'));drawAnchorDetails();return;}
   displayedAnchors=filterAnchors(metadata,$('anchor-find').value,selector.value,180);

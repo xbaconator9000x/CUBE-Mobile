@@ -36,6 +36,14 @@
 - [x] Prioritize explicitly declared offset pointers over generic table/raw interpretations at the same source.
 - [ ] Full CUBHMA pointer ownership graph, dynamic tables, code pointers and safe repointing remain blocked on semantic completeness and ROM fingerprints.
 
+## Watchdog checkpoint — anchored table lengths and overlap witnesses (26 October 2026)
+- [x] Resolve exact-name `ArrayRun.LengthFromAnchor` dependencies when the parent is a uniquely declared, supported, fully bounded table; forward references and chains supported without recursion.
+- [x] Detect cyclic/missing/unresolved parents, duplicate-name contradictions, out-of-ROM tables and overlapping resolved table spans (bounded overlap witnesses).
+- [x] Preview supported linked-length tables read-only and include their typed pointer fields in cross-reference inspection; suppress typed interpretations for overlapping table claims.
+- [x] Add synthetic regression tests for dependency chains, conflicts, bounds, overlap and ROM immutability.
+- [ ] Upstream parent-length margins, dynamic/streaming table lengths, constants, enum/PCS/tuple/record grammar, authentic ROM fingerprints and full formatted-run ownership remain unsupported.
+- [ ] Audit overlapping ROM-native structures and editor interoperability before semantic writes.
+
 ## Milestone 1 — semantic read-only CUBHMA engine
 - [ ] Parse HMA metadata and format DSL, beyond named-anchor fields.
 - [ ] Recognise ROM game/version and CUBE-specific metadata without false positives.

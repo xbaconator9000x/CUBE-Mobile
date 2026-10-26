@@ -120,9 +120,98 @@ export function parseHmaFixedTableFormat(format){
   return {fields,rowSize,count,totalBytes:rowSize*count};
 }
 
+
+/**
+ * Conservative named-array length resolution, inspired by upstream ArrayRun's
+ * LengthFromAnchor and ParentOffset (kcradi/CUBHMA pinned at 3044393183e0).
+ *
+ * Only the EXACT name of another uniquely declared, fully resolved array is
+ * supported as a count. Upstream also handles margins, constants, variable
+ * length runs, parent field counts, and other grammar: those remain unresolved.
+ * These are METADATA CLAIMS, not ROM-authenticated ownership or write access.
+ *
+ * The dependency queue is linear in anchor count (no recursive stack or
+ * quadratic dependency walks). The overlap sweep reports a witness per
+ * overlapping interval, NOT an exhaustive list of all overlapping pairs.
+ */
+export function resolveHmaTableLayouts(anchors,{romSize=Infinity,maxOverlaps=128}={}){
+  if(!Array.isArray(anchors)||anchors.length>50000)throw Error('Invalid or excessive anchor metadata');
+  if(!(romSize===Infinity||(Number.isSafeInteger(romSize)&&romSize>=0)))
+    throw Error('Invalid ROM length');
+  if(!Number.isSafeInteger(maxOverlaps)||maxOverlaps<0||maxOverlaps>1000)
+    throw Error('Invalid overlap reporting limit');
+  const entries=new Map(),duplicateNames=new Set();
+  for(const anchor of anchors){
+    if(!anchor||typeof anchor.name!=='string'||!anchor.name||
+       !Number.isSafeInteger(anchor.address)||anchor.address<0||
+       typeof anchor.format!=='string')continue;
+    const previous=entries.get(anchor.name);
+    if(previous&&(previous.address!==anchor.address||previous.format!==anchor.format))
+      duplicateNames.add(anchor.name);
+    else if(!previous)entries.set(anchor.name,anchor);
+  }
+  const byName=new Map(),unresolved=new Map(),children=new Map(),waiting=new Map(),queue=[];
+  const accept=(anchor,layout,kind,lengthFrom=null)=>{
+    if(!layout||layout.totalBytes>romSize-anchor.address){
+      unresolved.set(anchor.name,'out-of-bounds');return;
+    }
+    byName.set(anchor.name,{anchor,layout,kind,lengthFrom});
+    queue.push(anchor.name);
+  };
+  for(const [name,anchor] of entries){
+    if(duplicateNames.has(name)){unresolved.set(name,'conflicting-duplicate-name');continue;}
+    const fixed=parseHmaFixedTableFormat(anchor.format);
+    if(fixed){accept(anchor,fixed,'fixed');continue;}
+    const match=/^\[([^\[\]]+)\]([A-Za-z_][A-Za-z_0-9.]*)$/.exec(anchor.format.trim());
+    if(!match){if(anchor.format.startsWith('['))unresolved.set(name,'unsupported-format');continue;}
+    if(!parseHmaFixedTableFormat('['+match[1]+']1')){
+      unresolved.set(name,'unsupported-fields');continue;
+    }
+    const parent=match[2];
+    if(!entries.has(parent)){unresolved.set(name,'missing-length-anchor');continue;}
+    waiting.set(name,{anchor,body:match[1],parent});
+    if(!children.has(parent))children.set(parent,[]);
+    children.get(parent).push(name);
+  }
+  for(let i=0;i<queue.length;i++){
+    const name=queue[i],parent=byName.get(name);
+    for(const childName of children.get(name)||[]){
+      const child=waiting.get(childName);
+      if(!child)continue;
+      waiting.delete(childName);
+      const layout=parseHmaFixedTableFormat('['+child.body+']'+parent.layout.count);
+      accept(child.anchor,layout,'anchored-count',name);
+    }
+  }
+  for(const name of waiting.keys())unresolved.set(name,'unresolved-or-cyclic-length-anchor');
+  // This is only a conservative overlap witness audit, not a run graph.
+  const spans=[...byName.values()].map(x=>({
+    name:x.anchor.name,start:x.anchor.address,end:x.anchor.address+x.layout.totalBytes
+  })).sort((a,b)=>a.start-b.start||b.end-a.end||a.name.localeCompare(b.name));
+  const overlaps=[],conflicted=new Set();let overlapWitnesses=0,maxSpan=null;
+  for(const span of spans){
+    if(maxSpan&&span.start<maxSpan.end){
+      overlapWitnesses++;conflicted.add(span.name);conflicted.add(maxSpan.name);
+      if(overlaps.length<maxOverlaps)
+        overlaps.push({first:maxSpan.name,second:span.name,start:span.start,end:Math.min(span.end,maxSpan.end)});
+    }
+    if(!maxSpan||span.end>maxSpan.end)maxSpan=span;
+  }
+  return {byName,unresolved,conflicted,overlaps,overlapWitnesses,
+    overlapTruncated:overlapWitnesses>overlaps.length,
+    resolvedCount:byName.size,anchoredCount:[...byName.values()].filter(x=>x.kind==='anchored-count').length,
+    disclaimer:'Metadata-derived lengths and overlap witnesses are unverified. Unsupported grammar and conflicting spans are not safe to edit or repoint.'};
+}
+
 /** Read at most a few rows; never materialize or copy the entire ROM. */
-export function previewHmaFixedTable(bytes,anchor,{maxRows=8}={}){
-  const layout=parseHmaFixedTableFormat(anchor?.format);
+export function previewHmaFixedTable(bytes,anchor,{maxRows=8,tableResolution=null}={}){
+  let layout=parseHmaFixedTableFormat(anchor?.format);
+  if(tableResolution){
+    const resolved=tableResolution.byName?.get(anchor?.name);
+    if(!resolved||resolved.anchor.address!==anchor.address||resolved.anchor.format!==anchor.format)return null;
+    if(tableResolution.conflicted?.has(anchor.name))throw Error('Overlapping metadata claims: table preview refused');
+    layout=resolved.layout;
+  }
   if(!layout)return null;
   const read=bytes instanceof Uint8Array ? i=>bytes[i] : (typeof bytes?.read==='function'?i=>bytes.read(i):null);
   if(!read||!Number.isSafeInteger(bytes?.length)||!Number.isSafeInteger(anchor?.address))throw Error('Invalid ROM/anchor');
@@ -278,11 +367,14 @@ export function inspectHmaPointerReferences(bytes,target,anchors,{
     offsetBySource.set(record.address,record.offset);
   }
   const declared=[],knownSlots=new Set();
-  let examinedSlots=0,skippedTables=0,matchedDeclared=0,unsupportedFormats=0;
+  const tableResolution=resolveHmaTableLayouts(anchors,{romSize:bytes.length,maxOverlaps:0});
+  let examinedSlots=0,skippedTables=0,matchedDeclared=0,unsupportedFormats=0,conflictedTables=0;
   for(const anchor of anchors){
     if(!anchor||!Number.isSafeInteger(anchor.address))continue;
-    const layout=parseHmaFixedTableFormat(anchor.format);
+    const resolved=tableResolution.byName.get(anchor.name);
+    const layout=resolved?.anchor.address===anchor.address&&resolved?.anchor.format===anchor.format?resolved.layout:null;
     if(!layout){if(typeof anchor.format==='string'&&anchor.format.startsWith('['))unsupportedFormats++;continue;}
+    if(tableResolution.conflicted.has(anchor.name)){conflictedTables++;continue;}
     const pointerFields=layout.fields.filter(field=>field.type==='pointer');
     if(!pointerFields.length)continue;
     if(anchor.address<0||anchor.address>bytes.length||layout.totalBytes>bytes.length-anchor.address){skippedTables++;continue;}
@@ -330,9 +422,9 @@ export function inspectHmaPointerReferences(bytes,target,anchors,{
   }
   return {
     target,declared,candidates,matchedDeclared,candidateHits,
-    examinedSlots,skippedTables,unsupportedFormats,examinedOffsetPointers,skippedOffsetPointers,scannedBytes:span,
+    examinedSlots,skippedTables,unsupportedFormats,conflictedTables,anchoredTables:tableResolution.anchoredCount,examinedOffsetPointers,skippedOffsetPointers,scannedBytes:span,
     rawScanComplete:span===bytes.length,scanAlignment:4,
     declaredTruncated:matchedDeclared>declared.length,candidatesTruncated:candidateHits>candidates.length,
-    disclaimer:'Typed-table and OffsetPointer matches rely on unverified metadata; raw candidates are only aligned byte-pattern matches. Neither proves ownership or permits safe repointing.'
+    disclaimer:'Fixed/anchor-length table and OffsetPointer matches rely on unverified metadata; overlapping table claims are excluded. Raw candidates are only aligned byte-pattern matches. Neither proves ownership or permits safe repointing.'
   };
 }

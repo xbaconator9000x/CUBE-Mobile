@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.5.5 — conservative named-array lengths and overlap audit
+- Resolve read-only table lengths linked by an exact named-array reference, including forward and chained dependencies, without recursive traversal.
+- Refuse unsupported margin/stream/record formats, missing/cyclic parents, conflicting duplicate names and out-of-ROM layouts.
+- Audit overlaps between resolved named table spans, report bounded witnesses and exclude conflicted tables from typed pointer matching and preview.
+- Display linked-length provenance and overlap warnings in the mobile inspector; no semantic writes or ownership claims.
+- Add synthetic dependency, overlap and ROM-immutability tests; update the offline build and service worker cache.
+- **Remaining:** full CUBHMA format grammar and ownership, CUBE fingerprinting, safe relocation, maps/collision/warps, scripts, graphics, audio, Pokémon/trainer editing and Android acceptance testing.
+
 ## v0.5.4 — OffsetPointer metadata and read-only references
 - Parse HMA `[[OffsetPointer]]` declarations, including signed decimal and two's-complement hex offsets, with bounds checks and fail-closed malformed record handling.
 - Resolve adjusted pointer references according to upstream `PokemonModel.ReadPointer` semantics; source precedence prevents false raw/table candidates.
