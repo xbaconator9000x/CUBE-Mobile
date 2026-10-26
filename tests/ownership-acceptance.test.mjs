@@ -84,3 +84,48 @@ test('ownership fixture: one long span conflicts with every contained table',()=
   for(const name of ['outer','innerA','innerB','innerC'])
     assert.ok(result.conflicted.has(name),name);
 });
+
+test('ownership fixture: unresolved named anchor inside table suppresses typed claim',()=>{
+  const result=resolve([
+    anchor('supported',16,'[value::]4'),
+    anchor('unparsed',20,'[nested.[value.]2]4'),
+    anchor('dependent',64,'[value.]supported')
+  ]);
+  assert.ok(result.unresolved.has('unparsed'));
+  assert.equal(result.unresolvedAnchorCollisionCount,1);
+  assert.ok(result.conflicted.has('supported'));
+  assert.ok(result.conflicted.has('dependent'));
+});
+test('ownership fixture: disjoint unresolved anchor does not invalidate a table',()=>{
+  const result=resolve([
+    anchor('supported',16,'[value::]4'),
+    anchor('unparsed',80,'[nested.[value.]2]4')
+  ]);
+  assert.equal(result.unresolvedAnchorCollisionCount,0);
+  assert.equal(result.conflicted.has('supported'),false);
+});
+test('ownership fixture: unsupported anchored run at table start is not treated as a safe alias',()=>{
+  const result=resolve([
+    anchor('supported',16,'[value::]2'),
+    anchor('unknownAlias',16,'\`lzs4x64x64\`')
+  ]);
+  assert.ok(result.conflicted.has('supported'));
+  assert.equal(result.unresolvedAnchorCollisionCount,1);
+});
+
+test('ownership fixture: unresolved anchor on end-exclusive boundary stays disjoint',()=>{
+  const result=resolve([
+    anchor('supported',16,'[value::]2'),
+    anchor('unknownNext',24,'\`lzs4x64x64\`')
+  ]);
+  assert.equal(result.unresolvedAnchorCollisionCount,0);
+  assert.equal(result.conflicted.has('supported'),false);
+});
+test('ownership fixture: unresolved anchor inside pointer field suppresses offset source',()=>{
+  const result=resolve([
+    anchor('pointers',16,'[destination<text>]2'),
+    anchor('unknownInside',17,'\`lzs4x64x64\`')
+  ],{offsetPointers:[{address:16,offset:0}]});
+  assert.ok(result.conflicted.has('pointers'));
+  assert.ok(result.conflictedOffsetPointers.has(16));
+});

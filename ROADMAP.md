@@ -76,6 +76,13 @@
 - [ ] Full upstream run ownership including dynamic/nested tables, code/script pointers, alias resolution, relocation and authenticated metadata overlays.
 - [ ] On-device performance, native map/collision/warp and editor interoperability tests before semantic writes.
 
+## Watchdog checkpoint — unresolved named-anchor byte claims (27 October 2026)
+- [x] Add conservative read-only collision suppression when an unresolved named anchor starts inside a supported table; propagate conflict to dependent tables and explicit offset-pointer sources.
+- [x] Add generated-ROM regressions for colliding unresolved anchors, dependent tables, disjoint unknown anchors and same-start unknown formats.
+- [ ] Treat unknown run extents as **unknown**, not free space; this one-byte witness is a lower bound, not a full ownership graph.
+- [ ] Verify legitimate upstream aliases and nested formats against licensed fixtures before relaxing conservative read-only suppression.
+- [ ] No semantic writes, repointing or allocation until full upstream ownership and ROM fingerprint gates pass.
+
 ## Milestone 1 — semantic read-only CUBHMA engine
 - [ ] Parse HMA metadata and format DSL, beyond named-anchor fields.
 - [ ] Recognise ROM game/version and CUBE-specific metadata without false positives.

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — unresolved-anchor byte-claim safety (read only)
+- Treat the start byte of each unresolved named anchor as an unsafe overlapping claim when it falls inside a resolved supported table; propagate conflicts to dependent tables and declared offset-pointer sources.
+- Preserve disjoint and end-exclusive boundary cases, report a bounded collision witness count and add generated-byte regression coverage.
+- This is deliberately conservative; aliases and the full extent of unsupported run formats require upstream verification. No ROM writes or relocation are enabled.
+
 ## v0.5.9 — conservative ROM byte-claim collision gates (read only)
 - Audit supported table, MatchedWords and OffsetPointer byte claims with indexed interval witnesses, including unresolved MatchedWords sources.
 - Mark every colliding word source in a table rather than only the first; propagate ambiguity to word-derived and chained tables.
