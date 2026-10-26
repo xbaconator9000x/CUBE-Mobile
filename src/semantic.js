@@ -652,6 +652,22 @@ export function resolveHmaTableLayouts(anchors,{romSize=Infinity,maxOverlaps=128
   for(const table of spans)
     if(invalidOffsetIndex.find(table.start,table.end))conflicted.add(table.name);
 
+  // An unresolved named anchor may still describe real occupied ROM bytes.
+  // Its full extent is unknown, so reserve at least its declared start byte:
+  // never certify a supported table as an independent typed claim over it.
+  // This is intentionally conservative (aliases may be legitimate upstream).
+  let unresolvedAnchorCollisionCount=0;
+  for(const anchor of anchors){
+    if(!anchor||!Number.isSafeInteger(anchor.address)||anchor.address<0||
+       !Number.isSafeInteger(romSize)&&romSize!==Infinity||
+       anchor.address>=romSize||byName.has(anchor.name))continue;
+    const table=tableIndex.find(anchor.address,anchor.address+1);
+    if(!table)continue;
+    conflicted.add(table.name);
+    unresolvedAnchorCollisionCount++;
+    witness('UnresolvedAnchor:'+anchor.name,table.name,anchor.address,anchor.address+1);
+  }
+
   for(const name of queue){
     const table=byName.get(name);
     if(table.kind==='matched-word-count'&&ambiguousWordNames.has(table.lengthFrom))
@@ -666,8 +682,8 @@ export function resolveHmaTableLayouts(anchors,{romSize=Infinity,maxOverlaps=128
     if(unsafeTableIndex.find(pointer.start,pointer.end))
       conflictedOffsetPointers.add(pointer.source);
   return {byName,unresolved,conflicted,overlaps,overlapWitnesses,
-    overlapTruncated:overlapWitnesses+wordOverlapWitnesses>overlaps.length,
-    wordOverlapWitnesses,
+    overlapTruncated:overlapWitnesses+wordOverlapWitnesses+unresolvedAnchorCollisionCount>overlaps.length,
+    wordOverlapWitnesses,unresolvedAnchorCollisionCount,
     conflictedOffsetPointers,invalidOffsetPointers,
     offsetCollisionSources:conflictedOffsetPointers.size,
     resolvedCount:byName.size,anchoredCount:[...byName.values()].filter(x=>x.kind==='anchored-count').length,
