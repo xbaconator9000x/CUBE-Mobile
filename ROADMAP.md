@@ -68,6 +68,14 @@
 - [ ] Verify upstream CUBHMA's divergent `WordRun.Read` vs `ArrayRun.ParseLengthFromAnchor` offset/multiplier arithmetic on real licensed fixtures before relaxing conservative rejection.
 - [ ] Implement authenticated metadata overlay, full run ownership, nested grammar, safe writes, ROM/emulator and Android device tests.
 
+## Watchdog checkpoint — conservative run byte-claim collisions (26 October 2026)
+- [x] Index supported table spans, all MatchedWords source bytes (including unresolved words), and explicit OffsetPointer source spans using bounded prefix-max interval lookups.
+- [x] Reject scalar/partial/cross-row OffsetPointer overlays, offset/offset overlaps and word/offset overlaps; allow exact complete pointer-field overlays only.
+- [x] Suppress typed pointer results for unsafe OffsetPointer sources and propagate conflicting WordRun sources through dependent table lengths.
+- [x] Add synthetic regressions for multiple word sources, overlapping offset sources, adjacent tables, immutable ROM bytes and a 2,000-table scan.
+- [ ] Full upstream run ownership including dynamic/nested tables, code/script pointers, alias resolution, relocation and authenticated metadata overlays.
+- [ ] On-device performance, native map/collision/warp and editor interoperability tests before semantic writes.
+
 ## Milestone 1 — semantic read-only CUBHMA engine
 - [ ] Parse HMA metadata and format DSL, beyond named-anchor fields.
 - [ ] Recognise ROM game/version and CUBE-specific metadata without false positives.
