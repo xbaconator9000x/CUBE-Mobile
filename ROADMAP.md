@@ -122,4 +122,5 @@
 - [x] Decode with explicit imported reference and game code; never consume bytes beyond selected field or mutate staged ROM data.
 - [x] Add synthetic regression tests for game-specific macros, control escapes, FF termination, malformed declarations, bounds and unknown bytes.
 - [ ] Verify authentic `pcsReference.txt` resource, precedence, macro ordering and CUBE-specific variants against upstream and licensed fixtures.
-- [ ] Wire optional local reference import into mobile UI and standalone build with provenance warnings; no semantic writes/repointing yet.
+- [x] Wire optional local reference import into mobile UI and standalone build with provenance warnings; no semantic writes/repointing enabled.
+- [ ] Verify the optional reference workflow on real Android devices, including file picker cancellation, offline operation and memory limits.
