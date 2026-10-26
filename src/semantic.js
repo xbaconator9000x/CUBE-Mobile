@@ -49,6 +49,33 @@ export function parseHmaNamedAnchors(source,{romSize=Infinity}={}){
   flush();
   return list;
 }
+
+/**
+ * Merge TOML anchor records without hiding contradictory declarations.
+ * Identical declarations may be de-duplicated; differing address/format for
+ * one name remain visible so resolveHmaTableLayouts can reject that name.
+ * CUBHMA's metadata overlay precedence is not implemented or authenticated.
+ */
+export function collectHmaNamedAnchors(sources,{romSize=Infinity}={}){
+  if(!Array.isArray(sources)||sources.length>1000)throw Error('Invalid metadata source list');
+  const anchors=[],seen=new Map(),conflictedNames=new Set();
+  for(const source of sources){
+    if(typeof source?.name!=='string'||!source.name.trim())throw Error('Unnamed metadata source');
+    const parsed=parseHmaNamedAnchors(source.text,{romSize});
+    for(const anchor of parsed){
+      const signature=JSON.stringify([anchor.address,anchor.format]);
+      let signatures=seen.get(anchor.name);
+      if(!signatures){signatures=new Set();seen.set(anchor.name,signatures);}
+      if(signatures.has(signature))continue;
+      if(signatures.size)conflictedNames.add(anchor.name);
+      signatures.add(signature);
+      anchors.push({...anchor,source:source.name});
+      if(anchors.length>maxRecords)throw Error('Too many distinct named anchor declarations');
+    }
+  }
+  anchors.sort((a,b)=>a.name.localeCompare(b.name)||a.address-b.address||a.format.localeCompare(b.format));
+  return {anchors,conflictedNames};
+}
 export function readAnchorInspection(bytes,anchor){
   const readable=bytes instanceof Uint8Array ? i=>bytes[i] : (typeof bytes?.read==='function' ? i=>bytes.read(i) : null);
   if(!readable||!anchor||!Number.isInteger(anchor.address))throw Error('Invalid ROM/anchor');
@@ -125,15 +152,33 @@ export function parseHmaFixedTableFormat(format){
  * Conservative named-array length resolution, inspired by upstream ArrayRun's
  * LengthFromAnchor and ParentOffset (kcradi/CUBHMA pinned at 3044393183e0).
  *
- * Only the EXACT name of another uniquely declared, fully resolved array is
- * supported as a count. Upstream also handles margins, constants, variable
- * length runs, parent field counts, and other grammar: those remain unresolved.
+ * Supports exact named-array counts and the two bounded ParentOffset margins
+ * (parent count + BeginningMargin + EndMargin). Constants, lists, streaming
+ * lengths, parent field counts and other grammar remain unresolved.
  * These are METADATA CLAIMS, not ROM-authenticated ownership or write access.
  *
  * The dependency queue is linear in anchor count (no recursive stack or
  * quadratic dependency walks). The overlap sweep reports a witness per
  * overlapping interval, NOT an exhaustive list of all overlapping pairs.
  */
+/**
+ * ArrayRun.ParentOffset.Parse: one positive margin adds rows at the end,
+ * one negative margin removes rows at the beginning. Two signed margins
+ * explicitly describe beginning and end. This deliberately accepts only
+ * unambiguous bounded decimal forms, not the upstream permissive fallback.
+ */
+export function parseHmaParentLengthToken(token){
+  if(typeof token!=='string')return null;
+  const match=/^([A-Za-z_][A-Za-z_0-9.]*)([+-][0-9]+)?([+-][0-9]+)?$/.exec(token);
+  if(!match)return null;
+  const first=match[2]===undefined?0:Number(match[2]);
+  const second=match[3]===undefined?null:Number(match[3]);
+  if(!Number.isSafeInteger(first)||Math.abs(first)>1000000||
+     (second!==null&&(!Number.isSafeInteger(second)||Math.abs(second)>1000000)))return null;
+  const beginning=second!==null?first:Math.min(0,first);
+  const end=second!==null?second:Math.max(0,first);
+  return {parent:match[1],beginningMargin:beginning,endMargin:end};
+}
 export function resolveHmaTableLayouts(anchors,{romSize=Infinity,maxOverlaps=128}={}){
   if(!Array.isArray(anchors)||anchors.length>50000)throw Error('Invalid or excessive anchor metadata');
   if(!(romSize===Infinity||(Number.isSafeInteger(romSize)&&romSize>=0)))
@@ -151,25 +196,28 @@ export function resolveHmaTableLayouts(anchors,{romSize=Infinity,maxOverlaps=128
     else if(!previous)entries.set(anchor.name,anchor);
   }
   const byName=new Map(),unresolved=new Map(),children=new Map(),waiting=new Map(),queue=[];
-  const accept=(anchor,layout,kind,lengthFrom=null)=>{
-    if(!layout||layout.totalBytes>romSize-anchor.address){
+  const accept=(anchor,layout,kind,lengthFrom=null,parentMargins=null)=>{
+    if(!layout){unresolved.set(anchor.name,'invalid-adjusted-length');return;}
+    if(layout.totalBytes>romSize-anchor.address){
       unresolved.set(anchor.name,'out-of-bounds');return;
     }
-    byName.set(anchor.name,{anchor,layout,kind,lengthFrom});
+    byName.set(anchor.name,{anchor,layout,kind,lengthFrom,parentMargins});
     queue.push(anchor.name);
   };
   for(const [name,anchor] of entries){
     if(duplicateNames.has(name)){unresolved.set(name,'conflicting-duplicate-name');continue;}
     const fixed=parseHmaFixedTableFormat(anchor.format);
     if(fixed){accept(anchor,fixed,'fixed');continue;}
-    const match=/^\[([^\[\]]+)\]([A-Za-z_][A-Za-z_0-9.]*)$/.exec(anchor.format.trim());
+    const match=/^\[([^\[\]]+)\](.+)$/.exec(anchor.format.trim());
     if(!match){if(anchor.format.startsWith('['))unresolved.set(name,'unsupported-format');continue;}
     if(!parseHmaFixedTableFormat('['+match[1]+']1')){
       unresolved.set(name,'unsupported-fields');continue;
     }
-    const parent=match[2];
+    const margins=parseHmaParentLengthToken(match[2]);
+    if(!margins){unresolved.set(name,'unsupported-length-expression');continue;}
+    const parent=margins.parent;
     if(!entries.has(parent)){unresolved.set(name,'missing-length-anchor');continue;}
-    waiting.set(name,{anchor,body:match[1],parent});
+    waiting.set(name,{anchor,body:match[1],parent,margins});
     if(!children.has(parent))children.set(parent,[]);
     children.get(parent).push(name);
   }
@@ -179,8 +227,12 @@ export function resolveHmaTableLayouts(anchors,{romSize=Infinity,maxOverlaps=128
       const child=waiting.get(childName);
       if(!child)continue;
       waiting.delete(childName);
-      const layout=parseHmaFixedTableFormat('['+child.body+']'+parent.layout.count);
-      accept(child.anchor,layout,'anchored-count',name);
+      const count=parent.layout.count+child.margins.beginningMargin+child.margins.endMargin;
+      const layout=Number.isSafeInteger(count)&&count>=1&&count<=1000000
+        ?parseHmaFixedTableFormat('['+child.body+']'+count):null;
+      accept(child.anchor,layout,'anchored-count',name,{
+        beginning:child.margins.beginningMargin,end:child.margins.endMargin
+      });
     }
   }
   for(const name of waiting.keys())unresolved.set(name,'unresolved-or-cyclic-length-anchor');
