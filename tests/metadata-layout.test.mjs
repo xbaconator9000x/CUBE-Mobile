@@ -76,3 +76,12 @@ test('empty marker and case-insensitive expansion marker match upstream semantic
 test('metadata layout parser enforces bounded input',()=>{
   assert.throws(()=>inspectHmaMetadataLayout('a'.repeat(4*1024*1024+1)),/4 MiB/);
 });
+
+test('filename-only guard remains compatible but provides no expansion evidence',()=>{
+ const result=checkHmaMetadataSources([{name:'default.bpee.toml'}],syntheticEmerald());
+ assert.equal(result.layout.kind,'unspecified');
+ assert.equal(result.sources[0].kind,'stock-reference');
+});
+test('supplied non-text metadata still fails closed',()=>{
+ assert.throws(()=>checkHmaMetadataSources([{name:'custom.toml',text:42}],syntheticEmerald()),/TOML text/);
+});
