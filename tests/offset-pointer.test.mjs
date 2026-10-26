@@ -88,3 +88,14 @@ test('typed-table and offset pointer descriptions do not double-count one source
  });
  assert.equal(r.matchedDeclared,1);
 });
+
+test('explicit displacement overrides generic table and raw pattern for the wrong target',()=>{
+ const b=new Uint8Array(256);put32(b,64,0x08000084);
+ const anchor={name:'overlap',address:64,format:'[ptr<text>]1'};
+ const offsets=[{address:64,offset:4}];
+ const wrong=inspectHmaPointerReferences(b,132,[anchor],{offsetPointers:offsets,maxScanBytes:128});
+ assert.equal(wrong.matchedDeclared,0);
+ assert.equal(wrong.candidateHits,0);
+ const right=inspectHmaPointerReferences(b,128,[anchor],{offsetPointers:offsets,maxScanBytes:128});
+ assert.deepEqual(right.declared.map(x=>x.kind),['offset-pointer']);
+});
