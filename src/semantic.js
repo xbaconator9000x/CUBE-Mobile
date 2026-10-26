@@ -225,6 +225,150 @@ export function collectHmaLists(sources){
   return {lists,conflictedNames};
 }
 
+
+/**
+ * Read-only HMA [[MatchedWords]] records (StoredMetadata.cs / WordRun.cs).
+ * A name may legitimately have several ROM-backed word locations. Each must
+ * agree on its decoded value before the name can supply a table row count.
+ * UnmappedConstant is deliberately not a substitute for a ROM-backed word.
+ */
+export function parseHmaMatchedWords(source,{romSize=Infinity}={}){
+  if(typeof source!=='string'||source.length>maxMetadataSize)throw Error('Metadata must be TOML text under 4 MiB');
+  if(!(romSize===Infinity||(Number.isSafeInteger(romSize)&&romSize>=0)))throw Error('Invalid ROM length');
+  const records=[],lines=source.replace(/^\uFEFF/,'').split(/\r?\n/);
+  let current=null;
+  const finish=()=>{
+    if(!current)return;
+    const {name,address,length,offset,multOffset,note,line}=current;
+    if(!name||!Number.isSafeInteger(address)||address<0||
+       ![1,2,4].includes(length)||!Number.isSafeInteger(offset)||
+       offset< -0x80000000||offset>0x7FFFFFFF||
+       !Number.isSafeInteger(multOffset)||multOffset<1||multOffset>0x7FFFFFFF)
+      throw Error('Malformed MatchedWords record at TOML line '+line);
+    records.push({name,address,length,offset,multOffset,note,line,
+      valid:address<=romSize-length});
+    if(records.length>maxRecords)throw Error('Too many MatchedWords records');
+    current=null;
+  };
+  for(let i=0;i<lines.length;i++){
+    const line=lines[i].trim();
+    if(/^\[\[/.test(line)){
+      finish();
+      const section=/^\[\[\s*([^\]]+?)\s*\]\]/.exec(line);
+      if(section?.[1]==='MatchedWords')
+        current={name:'',address:NaN,length:4,offset:0,multOffset:1,note:null,line:i+1,seen:new Set()};
+      continue;
+    }
+    if(/^\[/.test(line)){finish();continue;}
+    if(!current||!line||line.startsWith('#'))continue;
+    const match=/^(Name|Address|Length|Offset|MultOffset|Note)\s*=\s*(.+)$/.exec(line);
+    if(!match)continue;
+    const [,key,value]=match;
+    if(current.seen.has(key))throw Error('Duplicate MatchedWords '+key+' at TOML line '+(i+1));
+    current.seen.add(key);
+    if(key==='Name'||key==='Note'){
+      const decoded=tomlString(value);
+      if(decoded===null||key==='Name'&&!decoded)throw Error('Invalid MatchedWords '+key+' at TOML line '+(i+1));
+      if(key==='Name')current.name=decoded;
+      else current.note=decoded;
+      continue;
+    }
+    const raw=value.split(/\s+#/)[0].trim();
+    let number=tomlInt(raw);
+    if(key==='Offset'&&/^0x[0-9a-f]{1,8}$/i.test(raw)&&number>=0x80000000)
+      number-=0x100000000;
+    if(!Number.isSafeInteger(number))throw Error('Invalid MatchedWords '+key+' at TOML line '+(i+1));
+    if(key==='Address')current.address=number;
+    if(key==='Length')current.length=number;
+    if(key==='Offset')current.offset=number;
+    if(key==='MultOffset')current.multOffset=number;
+  }
+  finish();
+  return records;
+}
+export function collectHmaMatchedWords(sources,{romSize=Infinity}={}){
+  if(!Array.isArray(sources)||sources.length>1000)throw Error('Invalid metadata source list');
+  const words=[],atSource=new Map(),conflictedNames=new Set();
+  for(const source of sources){
+    if(typeof source?.name!=='string'||!source.name.trim())throw Error('Unnamed metadata source');
+    for(const word of parseHmaMatchedWords(source.text,{romSize})){
+      const signature=JSON.stringify([word.name,word.length,word.offset,word.multOffset]);
+      const prior=atSource.get(word.address);
+      if(prior){
+        if(prior.signature===signature)continue;
+        conflictedNames.add(prior.name);
+        conflictedNames.add(word.name);
+      }else atSource.set(word.address,{signature,name:word.name});
+      words.push({...word,source:source.name});
+      if(words.length>maxRecords)throw Error('Too many distinct MatchedWords declarations');
+    }
+  }
+  return {words,conflictedNames};
+}
+/**
+ * WordRun.Read decodes (raw - ValueOffset) / MultOffset, while the pinned
+ * ArrayRun.ParseLengthFromAnchor constant path uses raw / MultOffset -
+ * ValueOffset. When those differ, interpretation is ambiguous: fail closed
+ * rather than use a plausible but wrong row count.
+ */
+export function resolveHmaMatchedWordCounts(words,bytes,{conflictingWords=new Set()}={}){
+  if(!Array.isArray(words)||words.length>maxRecords||!(conflictingWords instanceof Set))
+    throw Error('Invalid MatchedWords metadata');
+  const byName=new Map(),unresolved=new Map(),groups=new Map(),seen=new Map();
+  const read=bytes instanceof Uint8Array?i=>bytes[i]:typeof bytes?.read==='function'?i=>bytes.read(i):null;
+  const validRom=read&&Number.isSafeInteger(bytes.length)&&bytes.length>=0;
+  const spans=[];
+  for(const word of words){
+    if(!word||typeof word.name!=='string'||!word.name||
+       !Number.isSafeInteger(word.address)||word.address<0||
+       ![1,2,4].includes(word.length)||
+       !Number.isSafeInteger(word.offset)||word.offset< -0x80000000||word.offset>0x7FFFFFFF||
+       !Number.isSafeInteger(word.multOffset)||word.multOffset<1||word.multOffset>0x7FFFFFFF)
+      throw Error('Malformed MatchedWords metadata');
+    if(!groups.has(word.name))groups.set(word.name,[]);
+    const signature=JSON.stringify([word.name,word.length,word.offset,word.multOffset]);
+    const old=seen.get(word.address);
+    if(old){
+      if(old.signature===signature)continue;
+      unresolved.set(old.name,'conflicting-matched-word-location');
+      unresolved.set(word.name,'conflicting-matched-word-location');
+    }else seen.set(word.address,{signature,name:word.name});
+    groups.get(word.name).push(word);
+    spans.push({name:word.name,start:word.address,end:word.address+word.length});
+  }
+  spans.sort((a,b)=>a.start-b.start||b.end-a.end);
+  let longest=null;
+  for(const span of spans){
+    if(longest&&span.start<longest.end){
+      unresolved.set(span.name,'overlapping-matched-word-sources');
+      unresolved.set(longest.name,'overlapping-matched-word-sources');
+    }
+    if(!longest||span.end>longest.end)longest=span;
+  }
+  for(const [name,group] of groups){
+    if(conflictingWords.has(name)){unresolved.set(name,'conflicting-matched-word-location');continue;}
+    if(unresolved.has(name))continue;
+    if(!validRom){unresolved.set(name,'matched-word-rom-required');continue;}
+    let count=null,reason=null;
+    for(const word of group){
+      if(word.address>bytes.length-word.length){reason='matched-word-out-of-bounds';break;}
+      let raw=0;
+      for(let i=0;i<word.length;i++)raw+=read(word.address+i)*2**(i*8);
+      if(!Number.isSafeInteger(raw)||raw<0){reason='invalid-matched-word-value';break;}
+      const wordRun=(raw-word.offset)/word.multOffset;
+      const arrayRun=raw/word.multOffset-word.offset;
+      if(!Number.isSafeInteger(wordRun)||!Number.isSafeInteger(arrayRun)||wordRun!==arrayRun){
+        reason='ambiguous-matched-word-arithmetic';break;
+      }
+      if(count!==null&&count!==wordRun){reason='disagreeing-matched-word-values';break;}
+      count=wordRun;
+    }
+    if(reason)unresolved.set(name,reason);
+    else byName.set(name,{count,words:group.map(w=>({address:w.address,length:w.length,offset:w.offset,multOffset:w.multOffset}))});
+  }
+  return {byName,unresolved,sourceCount:spans.length};
+}
+
 /**
  * Conservative, read-only subset of CUBHMA ArrayRun's fixed-length table grammar.
  * Source: kcradi/CUBHMA @ 3044393183e01af2ae1e907fb37e4a75eda6a8dc,
@@ -299,7 +443,9 @@ export function parseHmaParentLengthToken(token){
   const end=second!==null?second:Math.max(0,first);
   return {parent:match[1],beginningMargin:beginning,endMargin:end};
 }
-export function resolveHmaTableLayouts(anchors,{romSize=Infinity,maxOverlaps=128,lists=[],conflictingLists=new Set()}={}){
+export function resolveHmaTableLayouts(anchors,{romSize=Infinity,maxOverlaps=128,lists=[],conflictingLists=new Set(),matchedWords=[],conflictingWords=new Set(),rom=null}={}){
+  const wordResolution=resolveHmaMatchedWordCounts(matchedWords,rom,{conflictingWords});
+  if(rom&&romSize!==Infinity&&rom.length!==romSize)throw Error('MatchedWords ROM length mismatch');
   if(!Array.isArray(lists)||lists.length>50000||!(conflictingLists instanceof Set))throw Error('Invalid HMA list metadata');
   const listByName=new Map(),listConflicts=new Set(conflictingLists);
   for(const list of lists){
@@ -355,7 +501,19 @@ export function resolveHmaTableLayouts(anchors,{romSize=Infinity,maxOverlaps=128
       });
       continue;
     }
-    if(!entries.has(parent)){unresolved.set(name,'missing-length-anchor');continue;}
+    if(!entries.has(parent)&&wordResolution.byName.has(parent)){
+      const count=wordResolution.byName.get(parent).count+margins.beginningMargin+margins.endMargin;
+      const layout=Number.isSafeInteger(count)&&count>=1&&count<=1000000
+        ?parseHmaFixedTableFormat('['+match[1]+']'+count):null;
+      accept(anchor,layout,'matched-word-count',parent,{
+        beginning:margins.beginningMargin,end:margins.endMargin
+      });
+      continue;
+    }
+    if(!entries.has(parent)){
+      unresolved.set(name,wordResolution.unresolved.get(parent)||'missing-length-anchor');
+      continue;
+    }
     waiting.set(name,{anchor,body:match[1],parent,margins});
     if(!children.has(parent))children.set(parent,[]);
     children.get(parent).push(name);
@@ -388,10 +546,48 @@ export function resolveHmaTableLayouts(anchors,{romSize=Infinity,maxOverlaps=128
     }
     if(!maxSpan||span.end>maxSpan.end)maxSpan=span;
   }
+  // A WordRun source cannot safely be treated as an independent constant
+  // when another metadata table claims those same bytes. Keep the count
+  // visible for diagnostics, but exclude affected tables and descendants
+  // from typed previews/reference ownership. Binary-search starts because
+  // WordRun width is bounded to at most four bytes.
+  const wordSpans=[...wordResolution.byName].flatMap(([name,data])=>
+    data.words.map(w=>({name,start:w.address,end:w.address+w.length}))
+  ).sort((a,b)=>a.start-b.start);
+  const ambiguousWordNames=new Set();
+  let wordOverlapWitnesses=0;
+  for(const table of spans){
+    let low=0,high=wordSpans.length;
+    while(low<high){
+      const mid=(low+high)>>>1;
+      if(wordSpans[mid].start<table.start-3)low=mid+1;else high=mid;
+    }
+    for(let i=low;i<wordSpans.length&&wordSpans[i].start<table.end;i++){
+      const word=wordSpans[i];
+      if(word.end<=table.start)continue;
+      conflicted.add(table.name);
+      ambiguousWordNames.add(word.name);
+      wordOverlapWitnesses++;
+      if(overlaps.length<maxOverlaps)
+        overlaps.push({first:'MatchedWords:'+word.name,second:table.name,
+          start:Math.max(word.start,table.start),end:Math.min(word.end,table.end)});
+      break; // One witness per table is enough to disable typed reads.
+    }
+  }
+  for(const name of queue){
+    const table=byName.get(name);
+    if(table.kind==='matched-word-count'&&ambiguousWordNames.has(table.lengthFrom))
+      conflicted.add(name);
+    if(table.kind==='anchored-count'&&conflicted.has(table.lengthFrom))
+      conflicted.add(name);
+  }
   return {byName,unresolved,conflicted,overlaps,overlapWitnesses,
-    overlapTruncated:overlapWitnesses>overlaps.length,
+    overlapTruncated:overlapWitnesses+wordOverlapWitnesses>overlaps.length,
+    wordOverlapWitnesses,
     resolvedCount:byName.size,anchoredCount:[...byName.values()].filter(x=>x.kind==='anchored-count').length,
     listCount:[...byName.values()].filter(x=>x.kind==='named-list-count').length,
+    matchedCount:[...byName.values()].filter(x=>x.kind==='matched-word-count').length,
+    wordResolution,
     disclaimer:'Metadata-derived lengths and overlap witnesses are unverified. Unsupported grammar and conflicting spans are not safe to edit or repoint.'};
 }
 
@@ -533,7 +729,7 @@ export function checkHmaMetadataSources(sources,bytes){
  * never as authoritative owners or safe sources for repointing.
  */
 export function inspectHmaPointerReferences(bytes,target,anchors,{
-  maxTableSlots=120000,maxDeclared=32,maxCandidates=24,maxScanBytes=8*1024*1024,offsetPointers=[],lists=[],conflictingLists=new Set()
+  maxTableSlots=120000,maxDeclared=32,maxCandidates=24,maxScanBytes=8*1024*1024,offsetPointers=[],lists=[],conflictingLists=new Set(),matchedWords=[],conflictingWords=new Set()
 }={}){
   const read=bytes instanceof Uint8Array?i=>bytes[i]:typeof bytes?.read==='function'?i=>bytes.read(i):null;
   if(!read||!Number.isSafeInteger(bytes?.length)||bytes.length<1)throw Error('Invalid ROM for reference inspection');
@@ -559,7 +755,7 @@ export function inspectHmaPointerReferences(bytes,target,anchors,{
     offsetBySource.set(record.address,record.offset);
   }
   const declared=[],knownSlots=new Set();
-  const tableResolution=resolveHmaTableLayouts(anchors,{romSize:bytes.length,maxOverlaps:0,lists,conflictingLists});
+  const tableResolution=resolveHmaTableLayouts(anchors,{romSize:bytes.length,maxOverlaps:0,lists,conflictingLists,matchedWords,conflictingWords,rom:bytes});
   let examinedSlots=0,skippedTables=0,matchedDeclared=0,unsupportedFormats=0,conflictedTables=0;
   for(const anchor of anchors){
     if(!anchor||!Number.isSafeInteger(anchor.address))continue;
@@ -614,9 +810,9 @@ export function inspectHmaPointerReferences(bytes,target,anchors,{
   }
   return {
     target,declared,candidates,matchedDeclared,candidateHits,
-    examinedSlots,skippedTables,unsupportedFormats,conflictedTables,anchoredTables:tableResolution.anchoredCount,listTables:tableResolution.listCount,examinedOffsetPointers,skippedOffsetPointers,scannedBytes:span,
+    examinedSlots,skippedTables,unsupportedFormats,conflictedTables,anchoredTables:tableResolution.anchoredCount,listTables:tableResolution.listCount,matchedTables:tableResolution.matchedCount,examinedOffsetPointers,skippedOffsetPointers,scannedBytes:span,
     rawScanComplete:span===bytes.length,scanAlignment:4,
     declaredTruncated:matchedDeclared>declared.length,candidatesTruncated:candidateHits>candidates.length,
-    disclaimer:'Fixed/anchor-length table and OffsetPointer matches rely on unverified metadata; overlapping table claims are excluded. Raw candidates are only aligned byte-pattern matches. Neither proves ownership or permits safe repointing.'
+    disclaimer:'Fixed/linked/list/MatchedWords table and OffsetPointer matches rely on unverified metadata; overlapping table claims are excluded. Raw candidates are only aligned byte-pattern matches. Neither proves ownership or permits safe repointing.'
   };
 }

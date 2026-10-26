@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.5.8 — ROM-backed MatchedWords table lengths (read only)
+- Parse CUBHMA `[[MatchedWords]]` metadata, including byte/halfword/word lengths, signed offsets, multipliers and source provenance; duplicate declarations are checked without hiding conflicts.
+- Derive supported table lengths from the current staged ROM bytes only when every word source agrees. Preserve anchor > list > matched-word precedence; resolve ParentOffset margins and downstream linked tables.
+- Reject ambiguous arithmetic where pinned upstream `WordRun.Read` and `ArrayRun.ParseLengthFromAnchor` disagree, nonintegral values, invalid ROM bounds, conflicting/overlapping word sources and word/table ownership collisions. No inferred fallback lengths.
+- Refresh ROM-backed counts after raw edits/undo; applying IPS/BPS patches clears stale metadata. Include supported tables in read-only previews and typed reference scans.
+- Add synthetic regression tests for parsing, precedence, offsets, disagreement, overlap, pointer scans and ROM immutability. Regenerate standalone HTML.
+- **Still outstanding:** authenticated metadata overlays, full formatted-run graph, safe writes/repointing, maps/collision/events/scripts/Pokémon/trainers/sprites/audio/CUBE extensions and Android acceptance.
+
+
 ## v0.5.7 — named-list-derived table lengths (read only)
 - Parse bounded CUBHMA `[[List]]` entries with inline/multiline arrays, sparse decimal/hex numeric indices, triple-quoted labels containing apostrophes and explicit metadata conflicts. Smoke-checked against all 61 named lists in upstream `default.toml`.
 - Resolve table row counts from list cardinality, including ParentOffset margins and downstream dependent tables; named anchors retain upstream precedence.

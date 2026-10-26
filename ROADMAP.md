@@ -60,6 +60,14 @@
 - [ ] Implement ROM-backed `[[MatchedWords]]`/`WordRun` constant-derived counts and validate precedence/overlay against upstream.
 - [ ] Full CUBHMA metadata grammar, nested records, ROM-authenticated ownership, safe writes and Android device acceptance remain outstanding.
 
+## Watchdog checkpoint — ROM-backed MatchedWords (26 October 2026)
+- [x] Parse bounded `[[MatchedWords]]` declarations (1/2/4-byte sources, signed offsets, positive multipliers, optional notes) and retain all source locations per name.
+- [x] Read values from the active staged ROM, require agreement across all sources, reject conflicting source claims, out-of-ROM reads, fractional values and ambiguous offset/multiplier arithmetic.
+- [x] Resolve matched-word-derived table lengths and chained ParentOffset dependencies, with named anchors and lists retaining precedence; suppress typed previews when WordRun source spans collide with table spans.
+- [x] Surface ROM-backed provenance, refresh counts after staged byte edits, clear metadata after applying a patch, and add synthetic ROM immutability/undo tests.
+- [ ] Verify upstream CUBHMA's divergent `WordRun.Read` vs `ArrayRun.ParseLengthFromAnchor` offset/multiplier arithmetic on real licensed fixtures before relaxing conservative rejection.
+- [ ] Implement authenticated metadata overlay, full run ownership, nested grammar, safe writes, ROM/emulator and Android device tests.
+
 ## Milestone 1 — semantic read-only CUBHMA engine
 - [ ] Parse HMA metadata and format DSL, beyond named-anchor fields.
 - [ ] Recognise ROM game/version and CUBE-specific metadata without false positives.
