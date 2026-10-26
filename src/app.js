@@ -1,5 +1,5 @@
 import {RomModel, MAX_BYTES, hex, parseOffset, parseHexBytes, applyBps, applyIps, crc32, paletteAt, gba4bppTile, decodeLz10, scanLz10Graphics} from './core.js';
-import {parseHmaNamedAnchors,readAnchorInspection,groupAnchors,filterAnchors,previewHmaFixedTable,resolveHmaStockMetadata,checkHmaMetadataSources,inspectHmaPointerReferences,parseHmaOffsetPointers,resolveHmaTableLayouts} from './semantic.js';
+import {parseHmaNamedAnchors,collectHmaNamedAnchors,readAnchorInspection,groupAnchors,filterAnchors,previewHmaFixedTable,resolveHmaStockMetadata,checkHmaMetadataSources,inspectHmaPointerReferences,parseHmaOffsetPointers,resolveHmaTableLayouts} from './semantic.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataOffsetPointers=[],metadataResolution=null,selectedAnchor=null;
@@ -310,12 +310,12 @@ function metadataCommit(sources){
   // Fail closed for known mismatched stock-game TOML before changing active metadata.
   // Custom CUBE/project TOML remains manually importable but is never authenticated by header alone.
   checkHmaMetadataSources(sources,model);
-  const dedupe=new Map(),offsets=new Map();
-  let count=0;
+  // Preserve contradictory named declarations instead of silently replacing
+  // them; the semantic resolver will exclude conflicting names from typed reads.
+  const merged=collectHmaNamedAnchors(sources,{romSize:model.length});
+  const nextMetadata=merged.anchors;
+  const offsets=new Map();
   for(const source of sources){
-    const parsed=parseHmaNamedAnchors(source.text,{romSize:model.length});
-    count+=parsed.length;
-    for(const anchor of parsed){dedupe.set(anchor.name,{...anchor,source:source.name});}
     for(const offsetPointer of parseHmaOffsetPointers(source.text,{romSize:model.length})){
       const existing=offsets.get(offsetPointer.address);
       if(existing&&existing.offset!==offsetPointer.offset)
@@ -323,14 +323,13 @@ function metadataCommit(sources){
       offsets.set(offsetPointer.address,{...offsetPointer,source:source.name});
     }
   }
-  const nextMetadata=[...dedupe.values()].sort((a,b)=>a.name.localeCompare(b.name));
   const nextResolution=resolveHmaTableLayouts(nextMetadata,{romSize:model.length});
   metadataOffsetPointers=[...offsets.values()];
   metadata=nextMetadata;metadataResolution=nextResolution;
   metadataSources=sources.map(({name})=>name);
   selectedAnchor=null;selectedInspection=null;
   drawAnchors();
-  toast(`Loaded ${metadata.length} named anchors; ${metadataResolution.anchoredCount} linked-length tables; ${metadataResolution.overlapWitnesses} overlap witnesses · ROM layout unverified`);
+  toast(`Loaded ${metadata.length} distinct anchor declarations; ${merged.conflictedNames.size} conflicting names; ${metadataResolution.anchoredCount} linked-length tables · ROM layout unverified`);
 }
 function semanticChild(tag,value,klass){const el=document.createElement(tag);el.textContent=value;if(klass)el.className=klass;return el;}
 function drawAnchorDetails(){
@@ -342,10 +341,10 @@ function drawAnchorDetails(){
   root.append(semanticChild('div',`Source: ${a.source} · TOML line ${a.line}`,'palette-note'));
   root.append(semanticChild('div',`Offset: 0x${hex(a.address)} · Format: ${a.format||'unspecified'}`,'semantic-code'));
   const resolved=metadataResolution?.byName.get(a.name);
-  if(resolved?.kind==='anchored-count')root.append(semanticChild('div',`Linked table length: ${resolved.layout.count} rows, derived from ${resolved.lengthFrom} (metadata only).`,'palette-note'));
+  if(resolved?.kind==='anchored-count')root.append(semanticChild('div',`Linked table length: ${resolved.layout.count} rows, derived from ${resolved.lengthFrom} (beginning ${resolved.parentMargins?.beginning||0}, end ${resolved.parentMargins?.end||0}; metadata only).`,'palette-note'));
   if(metadataResolution?.conflicted.has(a.name))root.append(semanticChild('div','Overlapping named-table claims detected. Typed interpretation is disabled for this table.','semantic-warning'));
   const unresolvedReason=metadataResolution?.unresolved.get(a.name);
-  if(unresolvedReason)root.append(semanticChild('div',`Table format not resolved: ${unresolvedReason}.`,'palette-note'));
+  if(unresolvedReason)root.append(semanticChild('div',`Table format not resolved: ${unresolvedReason}. No typed interpretation of this anchor is permitted.`,'semantic-warning'));
   if(!a.valid){root.append(semanticChild('div','This anchor is outside the selected ROM. It cannot be read.','semantic-warning'));return;}
   let inspection;
   try{inspection=readAnchorInspection(model,a);}catch(error){root.append(semanticChild('div',error.message,'semantic-warning'));return;}
@@ -440,7 +439,7 @@ function drawAnchors(){
   for(const [name,count] of groupAnchors(metadata))selector.add(new Option(`${name} (${count})`,name));
   selector.value=[...selector.options].some(x=>x.value===previous)?previous:'all';
   $('anchor-count').textContent=metadata.length?`${metadata.length} named anchors`:'No metadata';
-  $('metadata-status').textContent=metadataSources.length?`Loaded: ${metadataSources.join(', ')}. ${metadataOffsetPointers.length} OffsetPointer declarations; ${metadataResolution?.anchoredCount||0} linked-length tables; ${metadataResolution?.overlapWitnesses||0} overlap witnesses (not exhaustive). ROM metadata compatibility is not independently verified.`:'No metadata loaded. Import TOML produced for this ROM, or fetch a stock-game reference.';
+  $('metadata-status').textContent=metadataSources.length?`Loaded: ${metadataSources.join(', ')}. ${metadataOffsetPointers.length} OffsetPointer declarations; ${metadataResolution?.anchoredCount||0} linked-length tables; ${metadataResolution?.overlapWitnesses||0} overlap witnesses (not exhaustive); ${[...metadataResolution?.unresolved.values()||[]].filter(x=>x==='conflicting-duplicate-name').length} conflicting named anchors excluded. ROM metadata compatibility is not independently verified.`:'No metadata loaded. Import TOML produced for this ROM, or fetch a stock-game reference.';
   if(!model){root.append(semanticChild('div','Open a ROM first.','empty-state'));drawAnchorDetails();return;}
   if(!metadata.length){root.append(semanticChild('div','Import a CUBHMA .toml file to begin.','empty-state'));drawAnchorDetails();return;}
   displayedAnchors=filterAnchors(metadata,$('anchor-find').value,selector.value,180);
