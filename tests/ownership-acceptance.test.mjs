@@ -84,3 +84,31 @@ test('ownership fixture: one long span conflicts with every contained table',()=
   for(const name of ['outer','innerA','innerB','innerC'])
     assert.ok(result.conflicted.has(name),name);
 });
+
+test('ownership fixture: unresolved named anchor inside table suppresses typed claim',()=>{
+  const result=resolve([
+    anchor('supported',16,'[value::]4'),
+    anchor('unparsed',20,'[nested.[value.]2]4'),
+    anchor('dependent',64,'[value.]supported')
+  ]);
+  assert.ok(result.unresolved.has('unparsed'));
+  assert.equal(result.unresolvedAnchorCollisionCount,1);
+  assert.ok(result.conflicted.has('supported'));
+  assert.ok(result.conflicted.has('dependent'));
+});
+test('ownership fixture: disjoint unresolved anchor does not invalidate a table',()=>{
+  const result=resolve([
+    anchor('supported',16,'[value::]4'),
+    anchor('unparsed',80,'[nested.[value.]2]4')
+  ]);
+  assert.equal(result.unresolvedAnchorCollisionCount,0);
+  assert.equal(result.conflicted.has('supported'),false);
+});
+test('ownership fixture: unsupported anchored run at table start is not treated as a safe alias',()=>{
+  const result=resolve([
+    anchor('supported',16,'[value::]2'),
+    anchor('unknownAlias',16,'\`lzs4x64x64\`')
+  ]);
+  assert.ok(result.conflicted.has('supported'));
+  assert.equal(result.unresolvedAnchorCollisionCount,1);
+});
