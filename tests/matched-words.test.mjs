@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {RomModel} from '../src/core.js';
 import {
  parseHmaMatchedWords,collectHmaMatchedWords,resolveHmaMatchedWordCounts,
  resolveHmaTableLayouts,previewHmaFixedTable,inspectHmaPointerReferences,parseHmaLists
@@ -189,4 +190,18 @@ test('touching WordRun and table spans are not a collision',()=>{
  const resolved=resolveHmaTableLayouts(anchors,{romSize:128,rom:bytes,matchedWords:words});
  assert.equal(resolved.wordOverlapWitnesses,0);
  assert.equal(resolved.conflicted.size,0);
+});
+
+test('staged ROM byte edits and undo change matched-word-derived counts without mutating original',()=>{
+ const bytes=new Uint8Array(128);put(bytes,8,2);
+ const before=bytes.slice(),model=new RomModel('synthetic.gba',bytes);
+ const words=[word('COUNT',8)];
+ const anchors=[anchor('child',40,'[x.]COUNT')];
+ const resolve=()=>resolveHmaTableLayouts(anchors,{romSize:model.length,rom:model,matchedWords:words});
+ assert.equal(resolve().byName.get('child').layout.count,2);
+ model.write(8,3);
+ assert.equal(resolve().byName.get('child').layout.count,3);
+ model.undo();
+ assert.equal(resolve().byName.get('child').layout.count,2);
+ assert.deepEqual(bytes,before);
 });
