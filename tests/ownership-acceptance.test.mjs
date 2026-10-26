@@ -55,3 +55,21 @@ test('ownership fixture: inspection never changes original ROM bytes',()=>{
   });
   assert.deepEqual(rom,before);
 });
+
+test('ownership fixture: dependent table conflicts propagate from overlapping parent',()=>{
+  const result=resolve([
+    anchor('parent',16,'[value::]4'),
+    anchor('overlap',20,'[value::]2'),
+    anchor('child',96,'[value.]parent')
+  ]);
+  assert.ok(result.conflicted.has('parent'));
+  assert.ok(result.conflicted.has('overlap'));
+  assert.ok(result.conflicted.has('child'));
+});
+test('ownership fixture: offset pointer conflicting with scalar field suppresses typed table',()=>{
+  const result=resolve([anchor('scalar',16,'[value::]2')],{
+    offsetPointers:[{address:16,offset:0}]
+  });
+  assert.ok(result.conflicted.has('scalar'));
+  assert.ok(result.conflictedOffsetPointers.has(16));
+});
