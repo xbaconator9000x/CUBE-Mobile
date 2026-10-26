@@ -124,7 +124,7 @@ $('rom-fingerprint').addEventListener('click',async()=>{
     $('rom-fingerprint-status').textContent='SHA-256: '+result.sha256+
       ' ('+formatSize(result.length)+', current staged bytes). '+
       (comparison.status==='unknown'?'No independently verified CUBE fingerprint registered.':'Curated profile matched; metadata still unverified.')+
-      ' Identity only — semantic writes remain disabled.';
+      ' Identity only — CUBE layout NOT verified; semantic writes remain disabled.';
     $('rom-fingerprint-compare-status').textContent='Paste a published expected SHA-256 to compare. A user-supplied hash cannot authenticate a CUBE layout.';
   }catch(err){
     if(model===current)$('rom-fingerprint-status').textContent='Fingerprint unavailable: '+err.message;
