@@ -652,21 +652,43 @@ export function resolveHmaTableLayouts(anchors,{romSize=Infinity,maxOverlaps=128
   for(const table of spans)
     if(invalidOffsetIndex.find(table.start,table.end))conflicted.add(table.name);
 
-  // An unresolved named anchor may still describe real occupied ROM bytes.
-  // Its full extent is unknown, so reserve at least its declared start byte:
-  // never certify a supported table as an independent typed claim over it.
-  // This is intentionally conservative (aliases may be legitimate upstream).
+  // An unresolved anchor is a one-byte *minimum* occupied claim, not a
+  // free-space marker. Check it against EVERY supported claim class, including
+  // standalone WordRuns and OffsetPointers with no containing table.
+  // A sorted-start binary search visits each claimed span once, rather than
+  // walking every unknown anchor against every WordRun/OffsetPointer.
+  const unresolvedStarts=[...new Map(anchors.filter(anchor=>
+    anchor&&typeof anchor.name==='string'&&
+    Number.isSafeInteger(anchor.address)&&anchor.address>=0&&
+    anchor.address<romSize&&!byName.has(anchor.name)
+  ).map(anchor=>[anchor.name+'@'+anchor.address,anchor])).values()]
+    .sort((a,b)=>a.address-b.address||a.name.localeCompare(b.name));
+  const unknownLowerBound=address=>{
+    let lo=0,hi=unresolvedStarts.length;
+    while(lo<hi){
+      const mid=(lo+hi)>>>1;
+      if(unresolvedStarts[mid].address<address)lo=mid+1;else hi=mid;
+    }
+    return lo;
+  };
   let unresolvedAnchorCollisionCount=0;
-  for(const anchor of anchors){
-    if(!anchor||!Number.isSafeInteger(anchor.address)||anchor.address<0||
-       !Number.isSafeInteger(romSize)&&romSize!==Infinity||
-       anchor.address>=romSize||byName.has(anchor.name))continue;
-    const table=tableIndex.find(anchor.address,anchor.address+1);
-    if(!table)continue;
-    conflicted.add(table.name);
-    unresolvedAnchorCollisionCount++;
-    witness('UnresolvedAnchor:'+anchor.name,table.name,anchor.address,anchor.address+1);
-  }
+  const reserveUnknownStart=(span,label)=>{
+    const first=unknownLowerBound(span.start);
+    const after=unknownLowerBound(span.end); // half-open; adjacent is safe
+    if(after===first)return false;
+    unresolvedAnchorCollisionCount+=after-first;
+    const anchor=unresolvedStarts[first];
+    witness('UnresolvedAnchor:'+anchor.name,label,anchor.address,anchor.address+1);
+    return true;
+  };
+  for(const table of spans)
+    if(reserveUnknownStart(table,table.name))conflicted.add(table.name);
+  for(const word of wordSpans)
+    if(reserveUnknownStart(word,'MatchedWords:'+word.name))
+      ambiguousWordNames.add(word.name);
+  for(const pointer of offsetSpans)
+    if(reserveUnknownStart(pointer,'OffsetPointer:0x'+pointer.source.toString(16)))
+      conflictedOffsetPointers.add(pointer.source);
 
   for(const name of queue){
     const table=byName.get(name);
