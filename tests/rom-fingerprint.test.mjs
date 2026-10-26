@@ -65,3 +65,16 @@ test('fingerprint refuses invalid inputs and honours cancellation',async()=>{
  rom.edits.set(rom.length,1);
  await assert.rejects(fingerprintRomSha256(rom),/Invalid staged/);
 });
+
+test('mobile workspace and offline builder wire local fingerprint without layout authentication',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ const app=readFileSync(new URL('../src/app.js',import.meta.url),'utf8');
+ const build=readFileSync(new URL('../build-standalone.mjs',import.meta.url),'utf8');
+ assert.match(html,/id="rom-fingerprint"/);
+ assert.match(html,/id="rom-fingerprint-status"/);
+ assert.match(app,/fingerprintRomSha256\(current/);
+ assert.match(app,/fingerprintMatchesRom\(current,result\)/);
+ assert.match(app,/CUBE layout NOT verified/);
+ assert.match(build,/stripRomFingerprint/);
+});
