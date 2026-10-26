@@ -2,7 +2,7 @@
 
 **Private development repository for a full mobile port of CUBHMA (Cradi's Unofficial Build of Hex Maniac Advance), targeting CUBE-aware Pokémon Emerald editing and the other ROM families supported by upstream.**
 
-> **Status: v0.5.6 — early foundation, NOT a complete port.** The working code today is an offline ROM inspection / patching workbench and a limited read-only CUBHMA TOML named-anchor inspector. The desktop editor's semantic engine, map/collision/event editors, scripts, sprites, trainers, Pokémon, sound and CUBE upgrades are **not yet ported**.
+> **Status: v0.5.7 — early foundation, NOT a complete port.** The working code today is an offline ROM inspection / patching workbench and a limited read-only CUBHMA TOML named-anchor inspector. The desktop editor's semantic engine, map/collision/event editors, scripts, sprites, trainers, Pokémon, sound and CUBE upgrades are **not yet ported**.
 
 ## Current working code
 
@@ -15,6 +15,7 @@
 - **Experimental read-only fixed table previews:** decode a strictly bounded subset of CUBHMA `ArrayRun` formats (byte/word/dword integers, raw text bytes and ROM pointers), show up to eight rows, and jump to a row in hex. Unknown/dynamic layouts fail closed; metadata is not ROM-version authenticated.
 - **Read-only HMA `[[OffsetPointer]]` support:** parse signed displacements from TOML and inspect source locations using upstream-adjusted pointer semantics, without repointing or claiming metadata authenticity.
 - **Read-only named-array count dependencies:** resolve supported table lengths from another resolved array, including forward/chained references and bounded CUBHMA `ParentOffset` beginning/end margins; reject invalid resulting counts, cycles, out-of-ROM spans and overlapping table claims. No write/repoint capability is implied.
+- **Read-only HMA named-list lengths:** parse bounded `[[List]]` entries (including multiline and sparse lists), resolve table counts from list sizes with ParentOffset margins, and reject contradictory list declarations. `UnmappedConstant` values are deliberately **not** used as table lengths: upstream resolves ROM-backed counts through `MatchedWords`/`WordRun` semantics, which remain unported.
 - **Metadata conflict preservation:** retain contradictory named-anchor declarations from multiple TOML sources instead of silently accepting the last version. Conflicting names are visible but excluded from typed reads; actual CUBHMA overlay/precedence rules are not yet ported.
 - **Opt-in read-only pointer reference inspection:** find exact-value matches in metadata-declared fixed-table pointer slots and separate unverified aligned-byte candidates, with scan limits and explicit incomplete coverage. This is **not** CUBHMA's full ownership model or safe repointing.
 - Browser history-backed navigation on Android, including Back/Forward.

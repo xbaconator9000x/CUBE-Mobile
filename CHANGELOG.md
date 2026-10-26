@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.5.7 — named-list-derived table lengths (read only)
+- Parse bounded CUBHMA `[[List]]` entries with inline/multiline arrays, sparse numeric indices and explicit metadata conflicts.
+- Resolve table row counts from list cardinality, including ParentOffset margins and downstream dependent tables; named anchors retain upstream precedence.
+- Expose list-derived provenance in mobile inspection and include non-overlapping supported pointer fields in read-only reference scans.
+- Reject malformed list metadata atomically; keep unsupported `UnmappedConstant` and ROM-backed `MatchedWords` semantics distinct.
+- Add synthetic regression coverage; regenerate offline HTML and update service worker version.
+- **Outstanding:** matched-word constants, metadata overlay/authentication, full semantic ownership, map/collision/warps, scripts, sprites, audio, Pokémon/trainer editing and Android tests.
+
+
 ## v0.5.6 — ParentOffset margins and metadata conflict safety
 - Support a conservative, source-grounded subset of `ArrayRun.ParentOffset`: one positive margin adds rows at the end; one negative margin removes from the beginning; two signed margins adjust beginning and end separately.
 - Resolve bounded margin-adjusted counts through linked table chains and reject zero, excessive, unsupported and out-of-ROM results without falling back to guessed rows.

@@ -503,6 +503,126 @@ function filterAnchors(anchors,search='',category='all',limit=180){
 }
 
 
+
+/**
+ * Read-only HMA [[List]] metadata. Upstream StoredMetadata supports numbered
+ * entries (including sparse indexes), inline arrays and multiline arrays.
+ * A list supplies its NUMBER OF ENTRIES to ArrayRun.ParseLengthFromAnchor only
+ * when no named anchor of that name exists. UnmappedConstant is not a length
+ * source: upstream uses MatchedWords / WordRun for ROM-backed constants.
+ * Unsupported list syntax is rejected instead of inventing a count.
+ */
+const maxListEntries=100000;
+function hmaListLine(text){
+  // Strip comments and find a closing array bracket only outside quoted strings.
+  let quote='',output='',close=false;
+  for(let i=0;i<text.length;i++){
+    if(quote){
+      if(text.startsWith(quote,i)){output+=quote;i+=quote.length-1;quote='';}
+      else output+=text[i];
+      continue;
+    }
+    if(text[i]==='#')break;
+    const triple=text.slice(i,i+3);
+    if(triple==="'''"||triple==='"""'){quote=triple;output+=triple;i+=2;continue;}
+    if(text[i]==="'"||text[i]==='"'){quote=text[i];output+=text[i];continue;}
+    if(text[i]===']'){
+      if(text.slice(i+1).trim()&&!/^\s*#/.test(text.slice(i+1)))throw Error('Unexpected text after HMA list array');
+      close=true;break;
+    }
+    output+=text[i];
+  }
+  return {content:output,close};
+}
+function hmaListItems(source){
+  const values=[];let text=source.trim();
+  while(text){
+    const m=/^(?:'''([^']*)'''|"""([^"]*)"""|'([^'\r\n]*)'|"([^"\r\n]*)")/.exec(text);
+    if(!m)throw Error('Unsupported HMA list item syntax');
+    values.push(m.slice(1).find(x=>x!==undefined));
+    if(values.length>maxListEntries)throw Error('HMA list exceeds entry limit');
+    text=text.slice(m[0].length).trimStart();
+    if(!text)break;
+    if(text[0]!==',')throw Error('HMA list entries must be comma separated');
+    text=text.slice(1).trimStart();
+  }
+  return values;
+}
+function parseHmaLists(source){
+  if(typeof source!=='string'||source.length>maxMetadataSize)throw Error('Metadata must be TOML text under 4 MiB');
+  const lines=source.replace(/^\uFEFF/,'').split(/\r?\n/);
+  const records=[];let current=null;
+  const finish=()=>{
+    if(!current)return;
+    if(!current.name||!current.entries.length)throw Error('Incomplete HMA List at line '+current.line);
+    records.push(current);
+    if(records.length>maxRecords)throw Error('Too many HMA lists');
+    current=null;
+  };
+  for(let i=0;i<lines.length;i++){
+    const line=lines[i].trim();
+    if(/^\[\[/.test(line)){
+      finish();
+      const m=/^\[\[\s*([^\]]+?)\s*\]\]/.exec(line);
+      if(m?.[1]==='List')current={name:'',entries:[],line:i+1};
+      continue;
+    }
+    if(/^\[/.test(line)){finish();continue;}
+    if(!current||!line||line.startsWith('#'))continue;
+    const name=/^Name\s*=\s*(.+)$/.exec(line);
+    if(name){
+      const value=tomlString(name[1]);
+      if(!value||current.name)throw Error('Invalid HMA List name at line '+(i+1));
+      current.name=value;continue;
+    }
+    const entry=/^(0x[0-9a-f]+|[0-9]+)\s*=\s*(.+)$/i.exec(line);
+    if(!entry){
+      // A malformed index must never be silently skipped: doing so could
+      // produce a believable but incorrect list-derived table length.
+      if(/^(?:0x|[0-9])[^=]*=/.test(line))throw Error('Unsupported HMA list index at line '+(i+1));
+      continue;
+    }
+    const start=tomlInt(entry[1]);
+    if(!Number.isSafeInteger(start)||start>maxListEntries)throw Error('HMA list index exceeds limit');
+    let value=entry[2].trim(),items;
+    if(value.startsWith('[')){
+      let part=hmaListLine(value.slice(1)),body=part.content;
+      while(!part.close){
+        if(++i>=lines.length)throw Error('Unterminated HMA list array');
+        part=hmaListLine(lines[i]);
+        body+='\n'+part.content;
+      }
+      items=hmaListItems(body);
+    }else{
+      const part=hmaListLine(value);
+      if(part.close)throw Error('Unexpected closing bracket in HMA list');
+      items=hmaListItems(part.content);
+      if(items.length!==1)throw Error('Expected one HMA list entry');
+    }
+    if(start+items.length>maxListEntries)throw Error('HMA list exceeds entry limit');
+    // Mirrors StoredMetadata's append semantics for numbered items: gaps are
+    // padded with null, existing positions are never overwritten.
+    while(current.entries.length<start)current.entries.push(null);
+    for(const item of items)current.entries.push(item);
+  }
+  finish();
+  return records;
+}
+function collectHmaLists(sources){
+  if(!Array.isArray(sources)||sources.length>1000)throw Error('Invalid metadata source list');
+  const lists=[],byName=new Map(),conflictedNames=new Set();
+  for(const source of sources){
+    if(typeof source?.name!=='string'||!source.name.trim())throw Error('Unnamed metadata source');
+    for(const list of parseHmaLists(source.text)){
+      const prior=byName.get(list.name);
+      if(prior&&JSON.stringify(prior.entries)!==JSON.stringify(list.entries))
+        conflictedNames.add(list.name);
+      if(!prior){byName.set(list.name,list);lists.push({...list,source:source.name});}
+    }
+  }
+  return {lists,conflictedNames};
+}
+
 /**
  * Conservative, read-only subset of CUBHMA ArrayRun's fixed-length table grammar.
  * Source: kcradi/CUBHMA @ 3044393183e01af2ae1e907fb37e4a75eda6a8dc,
@@ -577,7 +697,16 @@ function parseHmaParentLengthToken(token){
   const end=second!==null?second:Math.max(0,first);
   return {parent:match[1],beginningMargin:beginning,endMargin:end};
 }
-function resolveHmaTableLayouts(anchors,{romSize=Infinity,maxOverlaps=128}={}){
+function resolveHmaTableLayouts(anchors,{romSize=Infinity,maxOverlaps=128,lists=[],conflictingLists=new Set()}={}){
+  if(!Array.isArray(lists)||lists.length>50000||!(conflictingLists instanceof Set))throw Error('Invalid HMA list metadata');
+  const listByName=new Map(),listConflicts=new Set(conflictingLists);
+  for(const list of lists){
+    if(typeof list?.name!=='string'||!list.name||!Array.isArray(list.entries)||list.entries.length<1||list.entries.length>maxListEntries)
+      throw Error('Invalid HMA list metadata');
+    const previous=listByName.get(list.name);
+    if(previous&&JSON.stringify(previous.entries)!==JSON.stringify(list.entries))listConflicts.add(list.name);
+    if(!previous)listByName.set(list.name,list);
+  }
   if(!Array.isArray(anchors)||anchors.length>50000)throw Error('Invalid or excessive anchor metadata');
   if(!(romSize===Infinity||(Number.isSafeInteger(romSize)&&romSize>=0)))
     throw Error('Invalid ROM length');
@@ -614,6 +743,16 @@ function resolveHmaTableLayouts(anchors,{romSize=Infinity,maxOverlaps=128}={}){
     const margins=parseHmaParentLengthToken(match[2]);
     if(!margins){unresolved.set(name,'unsupported-length-expression');continue;}
     const parent=margins.parent;
+    if(!entries.has(parent)&&listByName.has(parent)){
+      if(listConflicts.has(parent)){unresolved.set(name,'conflicting-list-name');continue;}
+      const count=listByName.get(parent).entries.length+margins.beginningMargin+margins.endMargin;
+      const layout=Number.isSafeInteger(count)&&count>=1&&count<=1000000
+        ?parseHmaFixedTableFormat('['+match[1]+']'+count):null;
+      accept(anchor,layout,'named-list-count',parent,{
+        beginning:margins.beginningMargin,end:margins.endMargin
+      });
+      continue;
+    }
     if(!entries.has(parent)){unresolved.set(name,'missing-length-anchor');continue;}
     waiting.set(name,{anchor,body:match[1],parent,margins});
     if(!children.has(parent))children.set(parent,[]);
@@ -650,6 +789,7 @@ function resolveHmaTableLayouts(anchors,{romSize=Infinity,maxOverlaps=128}={}){
   return {byName,unresolved,conflicted,overlaps,overlapWitnesses,
     overlapTruncated:overlapWitnesses>overlaps.length,
     resolvedCount:byName.size,anchoredCount:[...byName.values()].filter(x=>x.kind==='anchored-count').length,
+    listCount:[...byName.values()].filter(x=>x.kind==='named-list-count').length,
     disclaimer:'Metadata-derived lengths and overlap witnesses are unverified. Unsupported grammar and conflicting spans are not safe to edit or repoint.'};
 }
 
@@ -791,7 +931,7 @@ function checkHmaMetadataSources(sources,bytes){
  * never as authoritative owners or safe sources for repointing.
  */
 function inspectHmaPointerReferences(bytes,target,anchors,{
-  maxTableSlots=120000,maxDeclared=32,maxCandidates=24,maxScanBytes=8*1024*1024,offsetPointers=[]
+  maxTableSlots=120000,maxDeclared=32,maxCandidates=24,maxScanBytes=8*1024*1024,offsetPointers=[],lists=[],conflictingLists=new Set()
 }={}){
   const read=bytes instanceof Uint8Array?i=>bytes[i]:typeof bytes?.read==='function'?i=>bytes.read(i):null;
   if(!read||!Number.isSafeInteger(bytes?.length)||bytes.length<1)throw Error('Invalid ROM for reference inspection');
@@ -817,7 +957,7 @@ function inspectHmaPointerReferences(bytes,target,anchors,{
     offsetBySource.set(record.address,record.offset);
   }
   const declared=[],knownSlots=new Set();
-  const tableResolution=resolveHmaTableLayouts(anchors,{romSize:bytes.length,maxOverlaps:0});
+  const tableResolution=resolveHmaTableLayouts(anchors,{romSize:bytes.length,maxOverlaps:0,lists,conflictingLists});
   let examinedSlots=0,skippedTables=0,matchedDeclared=0,unsupportedFormats=0,conflictedTables=0;
   for(const anchor of anchors){
     if(!anchor||!Number.isSafeInteger(anchor.address))continue;
@@ -872,7 +1012,7 @@ function inspectHmaPointerReferences(bytes,target,anchors,{
   }
   return {
     target,declared,candidates,matchedDeclared,candidateHits,
-    examinedSlots,skippedTables,unsupportedFormats,conflictedTables,anchoredTables:tableResolution.anchoredCount,examinedOffsetPointers,skippedOffsetPointers,scannedBytes:span,
+    examinedSlots,skippedTables,unsupportedFormats,conflictedTables,anchoredTables:tableResolution.anchoredCount,listTables:tableResolution.listCount,examinedOffsetPointers,skippedOffsetPointers,scannedBytes:span,
     rawScanComplete:span===bytes.length,scanAlignment:4,
     declaredTruncated:matchedDeclared>declared.length,candidatesTruncated:candidateHits>candidates.length,
     disclaimer:'Fixed/anchor-length table and OffsetPointer matches rely on unverified metadata; overlapping table claims are excluded. Raw candidates are only aligned byte-pattern matches. Neither proves ownership or permits safe repointing.'
@@ -880,7 +1020,7 @@ function inspectHmaPointerReferences(bytes,target,anchors,{
 }
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
-let metadata=[],metadataSources=[],metadataOffsetPointers=[],metadataResolution=null,selectedAnchor=null;
+let metadata=[],metadataSources=[],metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataResolution=null,selectedAnchor=null;
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
@@ -957,7 +1097,7 @@ function updateIndicators(){
   $('changes-tab-count').hidden=!active||!model.dirty;$('changes-tab-count').textContent=active ? String(model.edits.size+(model.appliedPatch?1:0)):'0';
   if(active)showRomInfo();
 }
-function installModel(name,bytes){metadata=[];metadataSources=[];metadataOffsetPointers=[];selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
+function installModel(name,bytes){metadata=[];metadataSources=[];metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
 $('rom-picker').addEventListener('change',async e=>{
   const file=e.target.files?.[0];e.target.value='';if(!file)return;
   if(file.size<0xC0 || file.size>MAX_BYTES)return toast('ROM must be 192 bytes to 128 MiB',true);
@@ -1182,7 +1322,7 @@ if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostn
 // engine, game fingerprints and pointer allocator have been ported and tested.
 let displayedAnchors=[], selectedInspection=null;
 const encodeHex=bytes=>Array.from(bytes).map((b,i)=>hex(b,2)+(i%16===15?'\n':' ')).join('').trim();
-function metadataReset(){metadata=[];metadataSources=[];metadataOffsetPointers=[];metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
+function metadataReset(){metadata=[];metadataSources=[];metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
 function metadataCommit(sources){
   ensureModel();
   // Fail closed for known mismatched stock-game TOML before changing active metadata.
@@ -1201,13 +1341,15 @@ function metadataCommit(sources){
       offsets.set(offsetPointer.address,{...offsetPointer,source:source.name});
     }
   }
-  const nextResolution=resolveHmaTableLayouts(nextMetadata,{romSize:model.length});
+  const namedLists=collectHmaLists(sources);
+  const nextResolution=resolveHmaTableLayouts(nextMetadata,{romSize:model.length,lists:namedLists.lists,conflictingLists:namedLists.conflictedNames});
   metadataOffsetPointers=[...offsets.values()];
+  metadataLists=namedLists.lists;metadataListConflicts=namedLists.conflictedNames;
   metadata=nextMetadata;metadataResolution=nextResolution;
   metadataSources=sources.map(({name})=>name);
   selectedAnchor=null;selectedInspection=null;
   drawAnchors();
-  toast(`Loaded ${metadata.length} distinct anchor declarations; ${merged.conflictedNames.size} conflicting names; ${metadataResolution.anchoredCount} linked-length tables · ROM layout unverified`);
+  toast(`Loaded ${metadata.length} distinct anchor declarations; ${merged.conflictedNames.size} conflicting names; ${metadataResolution.anchoredCount} anchor-length and ${metadataResolution.listCount} list-length tables · ROM layout unverified`);
 }
 function semanticChild(tag,value,klass){const el=document.createElement(tag);el.textContent=value;if(klass)el.className=klass;return el;}
 function drawAnchorDetails(){
@@ -1219,7 +1361,7 @@ function drawAnchorDetails(){
   root.append(semanticChild('div',`Source: ${a.source} · TOML line ${a.line}`,'palette-note'));
   root.append(semanticChild('div',`Offset: 0x${hex(a.address)} · Format: ${a.format||'unspecified'}`,'semantic-code'));
   const resolved=metadataResolution?.byName.get(a.name);
-  if(resolved?.kind==='anchored-count')root.append(semanticChild('div',`Linked table length: ${resolved.layout.count} rows, derived from ${resolved.lengthFrom} (beginning ${resolved.parentMargins?.beginning||0}, end ${resolved.parentMargins?.end||0}; metadata only).`,'palette-note'));
+  if(resolved?.kind==='anchored-count'||resolved?.kind==='named-list-count')root.append(semanticChild('div',`Linked table length: ${resolved.layout.count} rows, derived from ${resolved.kind==='named-list-count'?'HMA named list ':'table '}${resolved.lengthFrom} (beginning ${resolved.parentMargins?.beginning||0}, end ${resolved.parentMargins?.end||0}; metadata only).`,'palette-note'));
   if(metadataResolution?.conflicted.has(a.name))root.append(semanticChild('div','Overlapping named-table claims detected. Typed interpretation is disabled for this table.','semantic-warning'));
   const unresolvedReason=metadataResolution?.unresolved.get(a.name);
   if(unresolvedReason)root.append(semanticChild('div',`Table format not resolved: ${unresolvedReason}. No typed interpretation of this anchor is permitted.`,'semantic-warning'));
@@ -1280,7 +1422,7 @@ function drawAnchorDetails(){
   scanButton.addEventListener('click',()=>safeRun(()=>{
     scanButton.disabled=true;scanButton.textContent='Scanning…';
     try {
-    const refs=inspectHmaPointerReferences(model,a.address,metadata,{offsetPointers:metadataOffsetPointers,maxTableSlots:60000,maxDeclared:24,maxCandidates:20,maxScanBytes:2*1024*1024});
+    const refs=inspectHmaPointerReferences(model,a.address,metadata,{offsetPointers:metadataOffsetPointers,lists:metadataLists,conflictingLists:metadataListConflicts,maxTableSlots:60000,maxDeclared:24,maxCandidates:20,maxScanBytes:2*1024*1024});
     results.replaceChildren();
     results.append(semanticChild('p',
       'Declared table/offset-pointer matches: '+refs.matchedDeclared+'; raw aligned candidates: '+refs.candidateHits+'. Scanned first '+formatSize(refs.scannedBytes)+' of '+formatSize(model.length)+' for raw candidates. '+refs.skippedTables+' tables and '+refs.skippedOffsetPointers+' offset sources skipped (bounds or budget).',
@@ -1317,7 +1459,7 @@ function drawAnchors(){
   for(const [name,count] of groupAnchors(metadata))selector.add(new Option(`${name} (${count})`,name));
   selector.value=[...selector.options].some(x=>x.value===previous)?previous:'all';
   $('anchor-count').textContent=metadata.length?`${metadata.length} named anchors`:'No metadata';
-  $('metadata-status').textContent=metadataSources.length?`Loaded: ${metadataSources.join(', ')}. ${metadataOffsetPointers.length} OffsetPointer declarations; ${metadataResolution?.anchoredCount||0} linked-length tables; ${metadataResolution?.overlapWitnesses||0} overlap witnesses (not exhaustive); ${[...metadataResolution?.unresolved.values()||[]].filter(x=>x==='conflicting-duplicate-name').length} conflicting named anchors excluded. ROM metadata compatibility is not independently verified.`:'No metadata loaded. Import TOML produced for this ROM, or fetch a stock-game reference.';
+  $('metadata-status').textContent=metadataSources.length?`Loaded: ${metadataSources.join(', ')}. ${metadataOffsetPointers.length} OffsetPointer declarations; ${metadataResolution?.anchoredCount||0} anchor-length tables; ${metadataResolution?.listCount||0} list-length tables; ${metadataListConflicts.size} conflicting list names; ${metadataResolution?.overlapWitnesses||0} overlap witnesses (not exhaustive); ${[...metadataResolution?.unresolved.values()||[]].filter(x=>x==='conflicting-duplicate-name').length} conflicting named anchors excluded. ROM metadata compatibility is not independently verified.`:'No metadata loaded. Import TOML produced for this ROM, or fetch a stock-game reference.';
   if(!model){root.append(semanticChild('div','Open a ROM first.','empty-state'));drawAnchorDetails();return;}
   if(!metadata.length){root.append(semanticChild('div','Import a CUBHMA .toml file to begin.','empty-state'));drawAnchorDetails();return;}
   displayedAnchors=filterAnchors(metadata,$('anchor-find').value,selector.value,180);

@@ -52,6 +52,14 @@
 - [ ] Implement CUBHMA's authenticated metadata overlay precedence, list/constant-derived counts, full grammar and ROM-version fingerprinting.
 - [ ] Complete formatted-run ownership and editor interoperability before any semantic write or relocation.
 
+## Watchdog checkpoint — HMA named lists (26 October 2026)
+- [x] Parse bounded `[[List]]` metadata with multiline, inline, single-entry and sparse indexed entries, preserving list cardinality.
+- [x] Resolve read-only table lengths from named-list counts with ParentOffset margins and chained table dependencies; named anchors take precedence.
+- [x] Fail closed on conflicting list declarations, invalid formats, unsupported list syntax, invalid adjusted lengths, overlaps and out-of-ROM tables.
+- [x] Include supported list-length tables in pointer inspection and mobile preview, with read-only provenance; add synthetic regression tests.
+- [ ] Implement ROM-backed `[[MatchedWords]]`/`WordRun` constant-derived counts and validate precedence/overlay against upstream.
+- [ ] Full CUBHMA metadata grammar, nested records, ROM-authenticated ownership, safe writes and Android device acceptance remain outstanding.
+
 ## Milestone 1 — semantic read-only CUBHMA engine
 - [ ] Parse HMA metadata and format DSL, beyond named-anchor fields.
 - [ ] Recognise ROM game/version and CUBE-specific metadata without false positives.
