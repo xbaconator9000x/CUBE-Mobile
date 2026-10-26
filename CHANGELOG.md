@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.5.9 — conservative ROM byte-claim collision gates (read only)
+- Audit supported table, MatchedWords and OffsetPointer byte claims with indexed interval witnesses, including unresolved MatchedWords sources.
+- Mark every colliding word source in a table rather than only the first; propagate ambiguity to word-derived and chained tables.
+- Allow an OffsetPointer declaration to coexist with a table only when it starts at an exact four-byte pointer field. Suppress typed interpretation for scalar, partial, overlapping and conflicting claims.
+- Surface unsafe offset-source counts and warnings in the mobile inspector. No semantic writes or relocation are enabled.
+- Add eleven synthetic regression cases, including overlapping word/offset sources, adjacent table boundaries and a 2,000-table scan.
+- **Remaining:** full upstream formatted-run model, CUBE-specific fingerprints, dynamic grammar, map/collision/event/script/graphics/audio editors, round-trip and Android device acceptance.
+
 ## v0.5.8 — ROM-backed MatchedWords table lengths (read only)
 - Parse CUBHMA `[[MatchedWords]]` metadata, including byte/halfword/word lengths, signed offsets, multipliers and source provenance; duplicate declarations are checked without hiding conflicts.
 - Derive supported table lengths from the current staged ROM bytes only when every word source agrees. Preserve anchor > list > matched-word precedence; resolve ParentOffset margins and downstream linked tables.
