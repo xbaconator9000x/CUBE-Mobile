@@ -44,6 +44,14 @@
 - [ ] Upstream parent-length margins, dynamic/streaming table lengths, constants, enum/PCS/tuple/record grammar, authentic ROM fingerprints and full formatted-run ownership remain unsupported.
 - [ ] Audit overlapping ROM-native structures and editor interoperability before semantic writes.
 
+## Watchdog checkpoint — bounded ParentOffset and metadata conflicts (26 October 2026)
+- [x] Parse CUBHMA `ParentOffset` one-sided and two-sided signed decimal margins, resolve parent count + beginning + end with strict positive/size/bounds checks.
+- [x] Propagate adjusted table lengths through forward/chained dependencies; surface margin provenance in the read-only mobile inspector and pointer-source inspection.
+- [x] Preserve conflicting `[[NamedAnchors]]` declarations across imported TOMLs; do not silently overwrite incompatible offsets or formats. Exclude contradictory names from typed inspection.
+- [x] Add synthetic tests for margins, invalid counts, chained lengths, ROM immutability and contradictory metadata.
+- [ ] Implement CUBHMA's authenticated metadata overlay precedence, list/constant-derived counts, full grammar and ROM-version fingerprinting.
+- [ ] Complete formatted-run ownership and editor interoperability before any semantic write or relocation.
+
 ## Milestone 1 — semantic read-only CUBHMA engine
 - [ ] Parse HMA metadata and format DSL, beyond named-anchor fields.
 - [ ] Recognise ROM game/version and CUBE-specific metadata without false positives.
