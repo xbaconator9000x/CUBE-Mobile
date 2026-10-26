@@ -60,3 +60,9 @@ test('end-exclusive span does not inspect a later FF terminator',()=>{
   assert.equal(result.terminated,false);
   assert.equal(result.text,'A');
 });
+
+test('PCS terminator scan rejects invalid skipped arguments and unbounded arrays',()=>{
+ assert.throws(()=>scanPcsTerminator([0xFD,256]));
+ assert.throws(()=>scanPcsTerminator(new Array(2)));
+ assert.throws(()=>scanPcsTerminator(new Array(1025).fill(0)));
+});
