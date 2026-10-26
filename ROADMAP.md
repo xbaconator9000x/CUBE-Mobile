@@ -29,6 +29,13 @@
 - [ ] Full pointer ownership across nested/dynamic tables, offset pointers, code references, overlaps and relocations.
 - [ ] Benchmark large expanded ROMs on Android hardware; make scans incremental and cancellable.
 
+## Watchdog checkpoint — offset pointers (26 October 2026)
+- [x] Read-only parse `[[OffsetPointer]]` TOML records with signed 32-bit displacements and strict bounds.
+- [x] Inspect adjusted pointer references as upstream `PokemonModel.ReadPointer` does (stored GBA pointer minus Offset).
+- [x] Reject contradictory offset declarations across metadata files; preserve active metadata on parse failure.
+- [x] Prioritize explicitly declared offset pointers over generic table/raw interpretations at the same source.
+- [ ] Full CUBHMA pointer ownership graph, dynamic tables, code pointers and safe repointing remain blocked on semantic completeness and ROM fingerprints.
+
 ## Milestone 1 — semantic read-only CUBHMA engine
 - [ ] Parse HMA metadata and format DSL, beyond named-anchor fields.
 - [ ] Recognise ROM game/version and CUBE-specific metadata without false positives.
