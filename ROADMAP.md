@@ -135,3 +135,10 @@
 - [ ] Validate custom CUBE text extensions and complete macro behavior across all supported ROM families before text writes.
 - [ ] Run Android hardware import/cancellation/offline/large-file checks; reference imports remain unauthenticated and read-only.
 
+
+## Watchdog checkpoint — unknown-anchor cross-claim safety (27 October 2026)
+- [x] Treat unresolved named-anchor start bytes as minimum occupied claims against **all** supported typed claims: fixed tables, ROM-backed MatchedWords sources and explicit OffsetPointer sources, including sources outside tables.
+- [x] Propagate unknown/WordRun collisions to matched-word-derived and chained tables; suppress affected offset-pointer inspection. Preserve half-open end boundaries and original ROM bytes.
+- [x] Use sorted unknown starts and binary searches for bounded, non-quadratic collision audits; add synthetic multi-claim and boundary regressions.
+- [ ] Unknown run **extent** is still unknown; a one-byte witness cannot prove independent free space, authenticated ownership, or safe repointing.
+- [ ] Verify real upstream aliases and dynamic run grammar, CUBE-specific ROM fingerprints, emulator/Android roundtrips before semantic writes.
