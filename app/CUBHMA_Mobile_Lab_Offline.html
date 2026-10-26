@@ -99,7 +99,7 @@
 </section>
 <section class="view" id="view-anchors">
  <div class="tool-heading"><div><div class="eyebrow">CUBHMA METADATA · SOURCE-GROUNDED</div><h2>Named ROM data</h2><p>Browse HMA / CUBHMA TOML anchors at their documented offsets. This is the start of the actual ROM-aware editor layer—not a replacement for the desktop table parser.</p></div><span class="pill">Read only</span></div>
- <div class="toolbar-card"><div class="input-wrap"><label>Load CUBHMA metadata</label><div class="input-row"><label for="metadata-picker" class="secondary-button picker-label">↑ Import .toml files</label><button class="subtle-button" id="metadata-stock">Get stock metadata</button></div><p class="palette-note">For a modified CUBE ROM, import metadata generated for <b>that exact ROM build</b>. Stock offsets are unsafe to assume. Stock metadata download needs internet; local TOML files work offline.</p></div><div id="metadata-status" class="palette-note">No metadata loaded. ROM and metadata files remain on this device. Stock metadata fetch downloads text only; it does not upload ROM data.</div></div>
+ <div class="toolbar-card"><div class="input-wrap"><label>Load CUBHMA metadata</label><div class="input-row"><label for="metadata-picker" class="secondary-button picker-label">↑ Import .toml files</label><button class="subtle-button" id="metadata-stock">Get stock metadata</button></div><p class="palette-note">For a modified CUBE ROM, import metadata generated for <b>that exact ROM build</b>. Stock offsets are unsafe to assume. Stock metadata download needs internet; local TOML files work offline.</p></div><div id="metadata-status" class="palette-note">No metadata loaded. ROM and metadata files remain on this device. Stock metadata fetch downloads text only; it does not upload ROM data.</div><div class="input-wrap"><label>Optional HMA text reference (read-only)</label><div class="input-row"><label for="pcs-reference-picker" class="secondary-button picker-label">↑ Import pcsReference.txt</label><button type="button" class="subtle-button" id="pcs-reference-clear">Clear reference</button></div><p id="pcs-reference-status" class="palette-note">No optional PCS reference loaded.</p><p class="palette-note">Imported glyphs and game-specific macros are <b>unverified</b> against this ROM. Files stay on your device; text and pointers cannot be semantically edited.</p></div></div>
  <div class="toolbar-card"><div class="input-wrap"><label for="anchor-find">Search named anchors</label><input id="anchor-find" placeholder="e.g. pokemon.stats, maps, trainers, sound…" spellcheck="false"></div><div class="input-wrap"><label for="anchor-group">Category</label><select id="anchor-group"><option value="all">All categories</option></select></div></div>
  <div class="semantic-grid"><div class="semantic-card"><div class="card-caption"><b>ANCHOR DIRECTORY</b><span id="anchor-count">0 loaded</span></div><div id="anchor-list" class="anchor-list"><div class="empty-state">Load ROM metadata to browse named data.</div></div></div><div class="semantic-card"><div class="card-caption"><b>DATA INSPECTION</b><span>Never writes ROM data</span></div><div id="anchor-detail" class="anchor-detail"><div class="empty-state">Choose an anchor to inspect its address, format and bytes.</div></div><div class="input-row"><button id="anchor-to-hex" class="secondary-button" disabled>Open in hex</button><button id="anchor-follow-pointer" class="secondary-button" disabled>Follow pointer</button><button id="anchor-to-graphics" class="secondary-button" disabled>View LZ graphic</button></div></div></div>
  <div class="safety-strip"><span class="safety-icon">!</span><div><strong>Metadata ≠ verified ROM compatibility.</strong><p>HMA named anchors can describe tables, text, graphics and scripts, but reading their addresses does not establish that an expanded CUBE ROM uses those locations. Full writable format decoding, repointing and map/collision editing are not implemented here.</p></div></div>
@@ -129,6 +129,7 @@
 </div>
 <input hidden type="file" accept=".gba,.bin,.rom,application/octet-stream" id="rom-picker">
 <input hidden type="file" multiple accept=".toml,.txt,text/plain" id="metadata-picker">
+<input hidden type="file" accept=".txt,text/plain" id="pcs-reference-picker">
 <input hidden type="file" accept=".bps,.ips,application/octet-stream" id="patch-picker">
 <input hidden type="file" accept=".json,application/json" id="project-picker">
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -1450,6 +1451,166 @@ function decodeHmaPcsFallback(bytes,start,length,{gameCode}={}) {
 }
 
 /**
+ * Read-only, deliberately unauthenticated parser for HMA's pcsReference.txt.
+ * Source: kcradi/CUBHMA src/HexManiac.Core/Models/PCSString.cs
+ * (GetPCSFromReference, GetControlCodeLengthsFromReference,
+ * GetTextMacrosFromReference, GetLengthForControlCode, FindMacro).
+ * It does not write/encode ROM text or authenticate a CUBE ROM layout.
+ */
+const games = Object.freeze(['AXVE','AXPE','BPRE','BPGE','BPEE']);
+const byteHex = v => v.toString(16).toUpperCase().padStart(2,'0');
+const limit = 1024 * 1024;
+const maxMacros = 2048;
+
+function parseMacroBytes(source,line) {
+  const tokens = source.trim().split(/[\s,]+/);
+  if (!tokens.length || tokens.length === 1 && !tokens[0]) throw Error('Empty PCS macro at line '+line);
+  const bytes = [];
+  for (const token of tokens) {
+    const hex = token.replace(/^0x/i,'');
+    if (!/^(?:[0-9a-f]{2})+$/i.test(hex)) throw Error('Invalid PCS macro bytes at line '+line);
+    for (let i=0;i<hex.length;i+=2) {
+      bytes.push(parseInt(hex.slice(i,i+2),16));
+      if (bytes.length>64) throw Error('PCS macro exceeds 64 bytes at line '+line);
+    }
+  }
+  return Object.freeze(bytes);
+}
+
+/** Parse a locally supplied upstream-style reference; reject ambiguous overrides. */
+function parseHmaPcsReference(source) {
+  if (typeof source!=='string' || source.length>limit) throw Error('PCS reference exceeds 1 MiB or is not text');
+  const lines = source.replace(/^\uFEFF/,'').split(/\r?\n/);
+  if (lines.length>20000) throw Error('Too many PCS reference lines');
+  const glyphs = Array(256).fill(null);
+  const controlCodeLengths = Object.create(null);
+  const macrosByGame = Object.fromEntries(games.map(g=>[g,Object.create(null)]));
+  let activeGames=games,macroCount=0,glyphCount=0;
+  for (let index=0;index<lines.length;index++) {
+    const lineNo=index+1,line=lines[index],trimmed=line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    if (trimmed.startsWith('@!game(')) {
+      const match=/^@!game\(([^)]*)\)\s*(?:#.*)?$/.exec(trimmed);
+      if (!match) throw Error('Invalid PCS game directive at line '+lineNo);
+      const codes=match[1].match(/[A-Z0-9]{4}/g)||[];
+      if (!codes.length || codes.some(g=>!games.includes(g)) ||
+          match[1].replace(/[A-Z0-9]{4}|[\s,|]/g,'').length)
+        throw Error('Unsupported PCS game directive at line '+lineNo);
+      activeGames=[...new Set(codes)];
+      continue;
+    }
+    if (line.startsWith('0x')) {
+      const match=/^0x([0-9a-f]{1,2})\s*=\s*(.*?)\s*(?:#.*)?$/i.exec(line);
+      if (!match) throw Error('Malformed PCS glyph at line '+lineNo);
+      const start=parseInt(match[1],16),raw=match[2].trim();
+      const quoted=raw.length>=2 && raw[0]==='"' && raw.at(-1)==='"';
+      if (raw.startsWith('"') && !quoted) throw Error('Malformed PCS quoted glyph at line '+lineNo);
+      const value=quoted?raw.slice(1,-1):raw;
+      if (!value.length) throw Error('Empty PCS glyph at line '+lineNo);
+      const chars=quoted?value.split(''):[value]; // C# reference uses UTF-16 char indexing
+      if (start+chars.length>256) throw Error('PCS glyph range outside byte table at line '+lineNo);
+      for (let i=0;i<chars.length;i++) {
+        const at=start+i;
+        if (glyphs[at]!==null && glyphs[at]!==chars[i])
+          throw Error('Conflicting PCS glyph at line '+lineNo);
+        if (glyphs[at]===null) glyphCount++;
+        glyphs[at]=chars[i];
+      }
+      continue;
+    }
+    if (line.startsWith('CC_')) {
+      const match=/^CC_([0-9a-f]{1,2})\s*=\s*(\d+)\s*(?:#.*)?$/i.exec(line);
+      if (!match) throw Error('Malformed PCS control length at line '+lineNo);
+      const code=parseInt(match[1],16),argumentsCount=Number(match[2]);
+      if (!Number.isSafeInteger(argumentsCount) || argumentsCount>32)
+        throw Error('Invalid PCS control length at line '+lineNo);
+      const total=argumentsCount+1;
+      if (controlCodeLengths[code]!==undefined && controlCodeLengths[code]!==total)
+        throw Error('Conflicting PCS control length at line '+lineNo);
+      controlCodeLengths[code]=total;
+      continue;
+    }
+    if (line.startsWith('[')) {
+      const match=/^(\[[^\]\r\n]{1,80}\])\s+(.+?)\s*(?:#.*)?$/.exec(line);
+      if (!match) throw Error('Malformed PCS macro at line '+lineNo);
+      const bytes=parseMacroBytes(match[2],lineNo);
+      for (const game of activeGames) {
+        const previous=macrosByGame[game][match[1]];
+        if (previous && (previous.length!==bytes.length || previous.some((v,i)=>v!==bytes[i])))
+          throw Error('Conflicting PCS macro at line '+lineNo);
+        if (!previous) {
+          if (++macroCount>maxMacros) throw Error('Too many PCS macros');
+          macrosByGame[game][match[1]]=bytes;
+        }
+      }
+    }
+  }
+  if (!glyphCount) throw Error('PCS reference has no glyph mappings');
+  for (const game of games) Object.freeze(macrosByGame[game]);
+  return Object.freeze({
+    kind:'hma-pcs-reference-v1',
+    glyphs:Object.freeze(glyphs),
+    controlCodeLengths:Object.freeze(controlCodeLengths),
+    macrosByGame:Object.freeze(macrosByGame),
+    authenticated:false,editable:false
+  });
+}
+
+function boundedBytes(bytes,start,length) {
+  const read=bytes instanceof Uint8Array?i=>bytes[i]:
+    typeof bytes?.read==='function'?i=>bytes.read(i):null;
+  if (!read || !Number.isSafeInteger(bytes.length) ||
+      !Number.isSafeInteger(start) || !Number.isSafeInteger(length) ||
+      start<0 || length<1 || length>1024 ||
+      start>bytes.length || length>bytes.length-start)
+    throw Error('Invalid or out-of-bounds PCS reference span');
+  const raw=Array.from({length},(_,i)=>read(start+i));
+  if (raw.some(v=>!Number.isInteger(v)||v<0||v>255)) throw Error('Invalid ROM byte');
+  return raw;
+}
+
+/**
+ * Preview with an explicitly imported mapping and game-specific macros.
+ * All matching is bounded to the selected span; no fallback glyph guessing.
+ */
+function decodeHmaPcsReference(bytes,start,length,{gameCode,reference}={}) {
+  if (!games.includes(gameCode) || reference?.kind!=='hma-pcs-reference-v1')
+    return {supported:false,reason:'Recognised Gen 3 game code and parsed PCS reference required'};
+  const raw=boundedBytes(bytes,start,length);
+  const macros=Object.entries(reference.macrosByGame[gameCode]||{})
+    .map(([name,values])=>({name,values}))
+    .sort((a,b)=>b.values.length-a.values.length || a.name.localeCompare(b.name));
+  let text='',terminatorOffset=-1,truncatedEscape=false,unknownByteCount=0,macroCount=0;
+  for (let i=0;i<raw.length;) {
+    const value=raw[i];
+    if (value===0xFF) {terminatorOffset=i;break;}
+    const macro=macros.find(m=>m.values.length<=raw.length-i &&
+      m.values.every((v,j)=>v===raw[i+j]));
+    if (macro) {text+=macro.name;i+=macro.values.length;macroCount++;continue;}
+    const glyph=reference.glyphs[value];
+    if (glyph===null || glyph===undefined) {text+='\\!'+byteHex(value);unknownByteCount++;}
+    else text+=glyph;
+    let extra=0;
+    if (value===0xFC) {
+      const code=raw[i+1];
+      extra=code===undefined?1:
+        (reference.controlCodeLengths[code] ?? (code>0x14?1:2));
+    } else if (value===0xF7 || value===0xF8 || value===0xF9 || value===0xFD) extra=1;
+    if (extra) {
+      const available=Math.min(extra,raw.length-i-1);
+      text+=raw.slice(i+1,i+1+available).map(byteHex).join('');
+      if (available<extra) {truncatedEscape=true;break;}
+    }
+    i+=extra+1;
+  }
+  return {
+    supported:true,text,terminated:terminatorOffset>=0,terminatorOffset,
+    truncatedEscape,unknownByteCount,macroCount,
+    mapping:'imported-hma-pcs-reference',authenticated:false,editable:false
+  };
+}
+
+/**
  * Conservative, read-only fixed-width GBA text-byte inspector.
  * This deliberately does NOT claim to decode Pokemon's proprietary PCS
  * alphabet. It exposes raw bytes, escape-aware termination and printable ASCII hints
@@ -1482,6 +1643,7 @@ function inspectFixedTextBytes(bytes, start, length) {
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
+let pcsReference=null,pcsReferenceName='';
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
@@ -1558,7 +1720,7 @@ function updateIndicators(){
   $('changes-tab-count').hidden=!active||!model.dirty;$('changes-tab-count').textContent=active ? String(model.edits.size+(model.appliedPatch?1:0)):'0';
   if(active)showRomInfo();
 }
-function installModel(name,bytes){metadata=[];metadataSources=[];metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
+function installModel(name,bytes){pcsReference=null;pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
 $('rom-picker').addEventListener('change',async e=>{
   const file=e.target.files?.[0];e.target.value='';if(!file)return;
   if(file.size<0xC0 || file.size>MAX_BYTES)return toast('ROM must be 192 bytes to 128 MiB',true);
@@ -1878,7 +2040,7 @@ function drawAnchorDetails(){
       else{
         const section=semanticChild('section','','semantic-table');
         section.append(semanticChild('h4',`Read-only table preview · ${table.count} row(s) · ${table.rowSize} bytes/row`));
-        section.append(semanticChild('p','Read-only unsigned scalars; pointer targets are range-checked. Text fields show raw bytes, escape-aware FF termination and an unverified upstream-default Gen 3 PCS preview when supported. Custom CUBE text mappings, macros and metadata authenticity are NOT verified; no semantic text edits.','palette-note'));
+        section.append(semanticChild('p','Read-only unsigned scalars; pointer targets are range-checked. Text fields show raw bytes, escape-aware FF termination and an unverified Gen 3 PCS preview. Optional imported text references are not authenticated against the ROM. No semantic text edits or pointer writes.','palette-note'));
         const scroller=semanticChild('div','','semantic-table-scroll');
         const grid=document.createElement('table');
         const head=document.createElement('thead'),headRow=document.createElement('tr');
@@ -1902,11 +2064,13 @@ function drawAnchorDetails(){
               col.append(semanticChild('div',status,'palette-note'));
               const header=model.header();
               if(header.fixedValid&&header.checksumValid){
-                const pcs=decodeHmaPcsFallback(model,row.offset+field.offset,field.size,{gameCode:header.code});
+                const pcs=pcsReference?
+                  decodeHmaPcsReference(model,row.offset+field.offset,field.size,{gameCode:header.code,reference:pcsReference}):
+                  decodeHmaPcsFallback(model,row.offset+field.offset,field.size,{gameCode:header.code});
                 if(pcs.supported){
                   const warning=pcs.truncatedEscape?' [truncated escape]':
                     pcs.unknownByteCount?` [${pcs.unknownByteCount} unknown byte(s)]`:'';
-                  col.append(semanticChild('div','Unverified default PCS: '+pcs.text+warning,'palette-note'));
+                  col.append(semanticChild('div',(pcsReference?'Unverified imported PCS: ':'Unverified default PCS: ')+pcs.text+warning,'palette-note'));
                 }
               }
               col.title=`${status}. ASCII-only raw byte hint (not PCS): ${text.asciiHint}`;
@@ -1997,6 +2161,25 @@ $('anchor-group').addEventListener('change',drawAnchors);
 $('anchor-to-hex').addEventListener('click',()=>safeRun(()=>{if(!selectedAnchor?.valid)throw Error('No valid offset selected');setPageForOffset(selectedAnchor.address);gotoTab('hex');}));
 $('anchor-follow-pointer').addEventListener('click',()=>safeRun(()=>{if(selectedInspection?.pointer===null||!Number.isInteger(selectedInspection?.pointer))throw Error('Not a valid ROM pointer');setPageForOffset(selectedInspection.pointer);gotoTab('hex');}));
 $('anchor-to-graphics').addEventListener('click',()=>safeRun(()=>{if(!selectedAnchor?.valid)throw Error('No selected graphic');chooseGraphic('lz',selectedAnchor.address);gotoTab('graphics');}));
+$('pcs-reference-picker').addEventListener('change',async e=>{
+  const file=e.target.files?.[0];e.target.value='';if(!file)return;
+  try{
+    ensureModel();
+    if(file.size>1024*1024)throw Error('PCS reference must be at most 1 MiB');
+    const parsed=parseHmaPcsReference(await file.text());
+    // Atomic replacement: failed imports preserve the previous mapping.
+    pcsReference=parsed;pcsReferenceName=file.name;
+    $('pcs-reference-status').textContent='Unverified local PCS reference: '+pcsReferenceName+
+      '. Game-specific text macros are read-only. This file does not authenticate ROM layout.';
+    drawAnchorDetails();
+    toast('Local PCS reference loaded for read-only preview');
+  }catch(err){toast('PCS reference import failed: '+err.message,true);}
+});
+$('pcs-reference-clear').addEventListener('click',()=>{
+  pcsReference=null;pcsReferenceName='';
+  $('pcs-reference-status').textContent='No optional PCS reference loaded.';
+  drawAnchorDetails();
+});
 $('metadata-picker').addEventListener('change',async e=>{
   const files=[...(e.target.files||[])];e.target.value='';if(!files.length)return;
   try{ensureModel();const sources=[];

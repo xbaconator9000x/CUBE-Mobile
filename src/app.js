@@ -2,9 +2,11 @@ import {RomModel, MAX_BYTES, hex, parseOffset, parseHexBytes, applyBps, applyIps
 import {parseHmaNamedAnchors,collectHmaNamedAnchors,readAnchorInspection,groupAnchors,filterAnchors,previewHmaFixedTable,resolveHmaStockMetadata,checkHmaMetadataSources,inspectHmaPointerReferences,parseHmaOffsetPointers,resolveHmaTableLayouts,collectHmaLists,collectHmaMatchedWords} from './semantic.js';
 import {inspectFixedTextBytes} from './text-inspection.js';
 import {decodeHmaPcsFallback} from './pcs-default.js';
+import {parseHmaPcsReference,decodeHmaPcsReference} from './pcs-reference.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
+let pcsReference=null,pcsReferenceName='';
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
@@ -81,7 +83,7 @@ function updateIndicators(){
   $('changes-tab-count').hidden=!active||!model.dirty;$('changes-tab-count').textContent=active ? String(model.edits.size+(model.appliedPatch?1:0)):'0';
   if(active)showRomInfo();
 }
-function installModel(name,bytes){metadata=[];metadataSources=[];metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
+function installModel(name,bytes){pcsReference=null;pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
 $('rom-picker').addEventListener('change',async e=>{
   const file=e.target.files?.[0];e.target.value='';if(!file)return;
   if(file.size<0xC0 || file.size>MAX_BYTES)return toast('ROM must be 192 bytes to 128 MiB',true);
@@ -401,7 +403,7 @@ function drawAnchorDetails(){
       else{
         const section=semanticChild('section','','semantic-table');
         section.append(semanticChild('h4',`Read-only table preview · ${table.count} row(s) · ${table.rowSize} bytes/row`));
-        section.append(semanticChild('p','Read-only unsigned scalars; pointer targets are range-checked. Text fields show raw bytes, escape-aware FF termination and an unverified upstream-default Gen 3 PCS preview when supported. Custom CUBE text mappings, macros and metadata authenticity are NOT verified; no semantic text edits.','palette-note'));
+        section.append(semanticChild('p','Read-only unsigned scalars; pointer targets are range-checked. Text fields show raw bytes, escape-aware FF termination and an unverified Gen 3 PCS preview. Optional imported text references are not authenticated against the ROM. No semantic text edits or pointer writes.','palette-note'));
         const scroller=semanticChild('div','','semantic-table-scroll');
         const grid=document.createElement('table');
         const head=document.createElement('thead'),headRow=document.createElement('tr');
@@ -425,11 +427,13 @@ function drawAnchorDetails(){
               col.append(semanticChild('div',status,'palette-note'));
               const header=model.header();
               if(header.fixedValid&&header.checksumValid){
-                const pcs=decodeHmaPcsFallback(model,row.offset+field.offset,field.size,{gameCode:header.code});
+                const pcs=pcsReference?
+                  decodeHmaPcsReference(model,row.offset+field.offset,field.size,{gameCode:header.code,reference:pcsReference}):
+                  decodeHmaPcsFallback(model,row.offset+field.offset,field.size,{gameCode:header.code});
                 if(pcs.supported){
                   const warning=pcs.truncatedEscape?' [truncated escape]':
                     pcs.unknownByteCount?` [${pcs.unknownByteCount} unknown byte(s)]`:'';
-                  col.append(semanticChild('div','Unverified default PCS: '+pcs.text+warning,'palette-note'));
+                  col.append(semanticChild('div',(pcsReference?'Unverified imported PCS: ':'Unverified default PCS: ')+pcs.text+warning,'palette-note'));
                 }
               }
               col.title=`${status}. ASCII-only raw byte hint (not PCS): ${text.asciiHint}`;
@@ -520,6 +524,25 @@ $('anchor-group').addEventListener('change',drawAnchors);
 $('anchor-to-hex').addEventListener('click',()=>safeRun(()=>{if(!selectedAnchor?.valid)throw Error('No valid offset selected');setPageForOffset(selectedAnchor.address);gotoTab('hex');}));
 $('anchor-follow-pointer').addEventListener('click',()=>safeRun(()=>{if(selectedInspection?.pointer===null||!Number.isInteger(selectedInspection?.pointer))throw Error('Not a valid ROM pointer');setPageForOffset(selectedInspection.pointer);gotoTab('hex');}));
 $('anchor-to-graphics').addEventListener('click',()=>safeRun(()=>{if(!selectedAnchor?.valid)throw Error('No selected graphic');chooseGraphic('lz',selectedAnchor.address);gotoTab('graphics');}));
+$('pcs-reference-picker').addEventListener('change',async e=>{
+  const file=e.target.files?.[0];e.target.value='';if(!file)return;
+  try{
+    ensureModel();
+    if(file.size>1024*1024)throw Error('PCS reference must be at most 1 MiB');
+    const parsed=parseHmaPcsReference(await file.text());
+    // Atomic replacement: failed imports preserve the previous mapping.
+    pcsReference=parsed;pcsReferenceName=file.name;
+    $('pcs-reference-status').textContent='Unverified local PCS reference: '+pcsReferenceName+
+      '. Game-specific text macros are read-only. This file does not authenticate ROM layout.';
+    drawAnchorDetails();
+    toast('Local PCS reference loaded for read-only preview');
+  }catch(err){toast('PCS reference import failed: '+err.message,true);}
+});
+$('pcs-reference-clear').addEventListener('click',()=>{
+  pcsReference=null;pcsReferenceName='';
+  $('pcs-reference-status').textContent='No optional PCS reference loaded.';
+  drawAnchorDetails();
+});
 $('metadata-picker').addEventListener('change',async e=>{
   const files=[...(e.target.files||[])];e.target.value='';if(!files.length)return;
   try{ensureModel();const sources=[];
