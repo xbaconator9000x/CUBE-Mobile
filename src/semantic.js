@@ -139,7 +139,7 @@ function hmaListLine(text){
 function hmaListItems(source){
   const values=[];let text=source.trim();
   while(text){
-    const m=/^(?:'''([^']*)'''|"""([^"]*)"""|'([^'\r\n]*)'|"([^"\r\n]*)")/.exec(text);
+    const m=/^(?:'''([\s\S]*?)'''|"""([\s\S]*?)"""|'([^'\r\n]*)'|"([^"\r\n]*)")/.exec(text);
     if(!m)throw Error('Unsupported HMA list item syntax');
     values.push(m.slice(1).find(x=>x!==undefined));
     if(values.length>maxListEntries)throw Error('HMA list exceeds entry limit');
