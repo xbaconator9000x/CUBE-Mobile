@@ -46,3 +46,12 @@
  .mobile-tab span{font-size:21px}
 }
 #anchor-group{width:100%;min-height:46px;border-radius:11px;padding:11px 13px;background:#0d1727;color:#f4f5fc;border:1px solid #35425a}
+
+/* Source-grounded fixed-length table inspector; horizontal scrolling on phones. */
+.semantic-table{margin:18px 0;padding:12px;border:1px solid #364561;border-radius:13px;background:#0d1727;min-width:0}
+.semantic-table h4{font-size:14px;margin:4px 0 8px}
+.semantic-table-scroll{overflow-x:auto;overscroll-behavior-x:contain;max-width:100%}
+.semantic-table table{border-collapse:collapse;min-width:max-content;width:100%;font:12px ui-monospace,Consolas,monospace;text-align:left}
+.semantic-table th,.semantic-table td{border-bottom:1px solid #293852;padding:10px 12px;max-width:250px;overflow-wrap:anywhere;vertical-align:top}
+.semantic-table th{color:#b9a9f5;background:#192741}
+.semantic-row-jump{background:#273658;border:1px solid #51658b;color:#e6e9ff;border-radius:7px;min-height:40px;padding:8px 10px;font:inherit;cursor:pointer}
