@@ -266,6 +266,17 @@ export function inspectHmaPointerReferences(bytes,target,anchors,{
   ])if(!Number.isSafeInteger(value)||value<min||value>max)throw Error('Invalid reference scan limit: '+name);
   const read32=at=>(read(at)|(read(at+1)<<8)|(read(at+2)<<16)|(read(at+3)<<24))>>>0;
   const needle=0x08000000+target;
+  const offsetBySource=new Map();
+  let skippedOffsetPointers=0,examinedOffsetPointers=0;
+  for(const record of offsetPointers){
+    if(!record||!Number.isSafeInteger(record.address)||
+       !Number.isSafeInteger(record.offset)||record.offset<-0x80000000||record.offset>0x7FFFFFFF)
+      throw Error('Malformed offset pointer metadata');
+    const old=offsetBySource.get(record.address);
+    if(old!==undefined&&old!==record.offset)
+      throw Error('Conflicting offset pointer metadata at 0x'+record.address.toString(16));
+    offsetBySource.set(record.address,record.offset);
+  }
   const declared=[],knownSlots=new Set();
   let examinedSlots=0,skippedTables=0,matchedDeclared=0,unsupportedFormats=0;
   for(const anchor of anchors){
@@ -282,6 +293,7 @@ export function inspectHmaPointerReferences(bytes,target,anchors,{
       const base=anchor.address+row*layout.rowSize;
       for(const field of pointerFields){
         const source=base+field.offset;
+        if(offsetBySource.has(source))continue; // explicit HMA OffsetPointer overrides generic table interpretation
         if(read32(source)!==needle)continue;
         // Overlapping/duplicate metadata can describe the same physical slot.
         if(knownSlots.has(source))continue;
@@ -293,17 +305,6 @@ export function inspectHmaPointerReferences(bytes,target,anchors,{
   }
   // Explicit OffsetPointer sources: HMA decodes target as raw ROM pointer
   // minus Offset. Conflicting declarations for the same source are ambiguous.
-  const offsetBySource=new Map();
-  let skippedOffsetPointers=0,examinedOffsetPointers=0;
-  for(const record of offsetPointers){
-    if(!record||!Number.isSafeInteger(record.address)||
-       !Number.isSafeInteger(record.offset)||record.offset<-0x80000000||record.offset>0x7FFFFFFF)
-      throw Error('Malformed offset pointer metadata');
-    const old=offsetBySource.get(record.address);
-    if(old!==undefined&&old!==record.offset)
-      throw Error('Conflicting offset pointer metadata at 0x'+record.address.toString(16));
-    offsetBySource.set(record.address,record.offset);
-  }
   for(const [source,offset] of offsetBySource){
     if(source<0||source>bytes.length-4){skippedOffsetPointers++;continue;}
     if(examinedSlots+examinedOffsetPointers>=maxTableSlots){skippedOffsetPointers++;continue;}
