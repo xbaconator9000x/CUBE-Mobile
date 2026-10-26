@@ -1277,7 +1277,9 @@ function inspectHmaMetadataLayout(source){
 function checkHmaMetadataSources(sources,bytes){
   if(!Array.isArray(sources))throw Error('Expected metadata source list');
   const identity=identifyHmaRom(bytes);
-  const layouts=sources.map(source=>inspectHmaMetadataLayout(source?.text));
+  // Filename-only checks are supported for existing stock-metadata callers;
+  // only supplied TOML text can provide expansion-layout evidence.
+  const layouts=sources.map(source=>inspectHmaMetadataLayout(source?.text===undefined?'':source.text));
   const declared=layouts.map(item=>item.marker?.toLowerCase()).filter(Boolean);
   if(new Set(declared).size>1)throw Error('Conflicting MetadataLayout declarations across imported TOMLs');
   const layoutKind=layouts.some(item=>item.kind==='expansion')?'expansion':
