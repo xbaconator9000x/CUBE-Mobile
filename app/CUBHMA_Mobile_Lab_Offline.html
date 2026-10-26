@@ -51,6 +51,15 @@
  .mobile-tab span{font-size:21px}
 }
 #anchor-group{width:100%;min-height:46px;border-radius:11px;padding:11px 13px;background:#0d1727;color:#f4f5fc;border:1px solid #35425a}
+
+/* Source-grounded fixed-length table inspector; horizontal scrolling on phones. */
+.semantic-table{margin:18px 0;padding:12px;border:1px solid #364561;border-radius:13px;background:#0d1727;min-width:0}
+.semantic-table h4{font-size:14px;margin:4px 0 8px}
+.semantic-table-scroll{overflow-x:auto;overscroll-behavior-x:contain;max-width:100%}
+.semantic-table table{border-collapse:collapse;min-width:max-content;width:100%;font:12px ui-monospace,Consolas,monospace;text-align:left}
+.semantic-table th,.semantic-table td{border-bottom:1px solid #293852;padding:10px 12px;max-width:250px;overflow-wrap:anywhere;vertical-align:top}
+.semantic-table th{color:#b9a9f5;background:#192741}
+.semantic-row-jump{background:#273658;border:1px solid #51658b;color:#e6e9ff;border-radius:7px;min-height:40px;padding:8px 10px;font:inherit;cursor:pointer}
 </style>
 </head><body>
 <div class="shell" id="app">
@@ -466,6 +475,79 @@ function filterAnchors(anchors,search='',category='all',limit=180){
   return anchors.filter(a=>(category==='all'||a.name.split('.')[0]===category)&&(!q||a.name.toLowerCase().includes(q)||a.format.toLowerCase().includes(q))).slice(0,limit);
 }
 
+
+/**
+ * Conservative, read-only subset of CUBHMA ArrayRun's fixed-length table grammar.
+ * Source: kcradi/CUBHMA @ 3044393183e01af2ae1e907fb37e4a75eda6a8dc,
+ * src/HexManiac.Core/Models/Runs/ArrayRun.cs (ParseSegments / ExtractSingleFormat).
+ *
+ * This is NOT a replacement for ArrayRun. Dynamic lengths, nested structures,
+ * enums, bit arrays, pointers to typed data and text decoding need the upstream
+ * model and are intentionally not interpreted here. Unknown tokens fail closed.
+ */
+function parseHmaFixedTableFormat(format){
+  if(typeof format!=='string')return null;
+  const match=/^\[([^\[\]]+)\]([1-9][0-9]*)$/.exec(format.trim());
+  if(!match)return null;
+  const count=Number(match[2]);
+  if(!Number.isSafeInteger(count)||count>1000000)return null;
+  const fields=[];
+  let rowSize=0;
+  for(const token of match[1].trim().split(/\s+/)){
+    const field=/^([A-Za-z_][A-Za-z_0-9.]*)(::|:\.|\.[:]|:|\.|""[1-9][0-9]*|<[^<>]*>)([A-Za-z_0-9.|]*)$/.exec(token);
+    if(!field)return null;
+    const [,name,marker,suffix]=field;
+    if(fields.some(f=>f.name===name))return null;
+    let type='integer',size;
+    if(marker==='.')size=1;
+    else if(marker===':')size=2;
+    else if(marker===':.'||marker==='.:')size=3;
+    else if(marker==='::')size=4;
+    else if(marker.startsWith('""')){type='text-bytes';size=Number(marker.slice(2));}
+    else {type='pointer';size=4;}
+    if(type==='integer'){
+      // HMA supports enum names and a hexadecimal display flag (|h), but this
+      // preview reports the underlying unsigned scalar only.
+      if(suffix && !/^(?:[A-Za-z_0-9.]+)?(?:\|h)?$/.test(suffix))return null;
+    }else if(suffix)return null;
+    if(!Number.isSafeInteger(size)||size<1||size>1000)return null;
+    if(rowSize+size>1024)return null;
+    fields.push({name,type,size,offset:rowSize});rowSize+=size;
+  }
+  if(!fields.length||rowSize*count>Number.MAX_SAFE_INTEGER)return null;
+  return {fields,rowSize,count,totalBytes:rowSize*count};
+}
+
+/** Read at most a few rows; never materialize or copy the entire ROM. */
+function previewHmaFixedTable(bytes,anchor,{maxRows=8}={}){
+  const layout=parseHmaFixedTableFormat(anchor?.format);
+  if(!layout)return null;
+  const read=bytes instanceof Uint8Array ? i=>bytes[i] : (typeof bytes?.read==='function'?i=>bytes.read(i):null);
+  if(!read||!Number.isSafeInteger(bytes?.length)||!Number.isSafeInteger(anchor?.address))throw Error('Invalid ROM/anchor');
+  if(anchor.address<0||anchor.address>bytes.length||layout.totalBytes>bytes.length-anchor.address)throw Error('Table extends beyond the selected ROM; preview refused');
+  if(!Number.isSafeInteger(maxRows)||maxRows<1||maxRows>32)throw Error('Invalid table preview limit');
+  const rows=[];
+  for(let index=0;index<Math.min(layout.count,maxRows);index++){
+    const offset=anchor.address+index*layout.rowSize;
+    const cells=layout.fields.map(field=>{
+      const start=offset+field.offset;
+      if(field.type==='text-bytes'){
+        const raw=Array.from({length:field.size},(_,i)=>read(start+i));
+        return {name:field.name,type:field.type,value:raw.map(v=>v.toString(16).toUpperCase().padStart(2,'0')).join(' ')};
+      }
+      let value=0;
+      for(let i=0;i<field.size;i++)value+=read(start+i)*2**(8*i);
+      if(field.type==='pointer'){
+        const target=value>=0x08000000&&value<0x0A000000?value-0x08000000:null;
+        return {name:field.name,type:field.type,value:`0x${value.toString(16).toUpperCase().padStart(8,'0')}`,target:target!==null&&target<bytes.length?target:null};
+      }
+      return {name:field.name,type:field.type,value};
+    });
+    rows.push({index,offset,cells});
+  }
+  return {...layout,rows,truncated:rows.length<layout.count};
+}
+
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],selectedAnchor=null;
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
@@ -803,6 +885,39 @@ function drawAnchorDetails(){
   else if(inspection.pointerCandidate)root.append(semanticChild('div','The first four bytes resemble a ROM pointer but target outside this ROM.','semantic-warning'));
   const pre=document.createElement('pre');pre.className='semantic-bytes';pre.textContent=encodeHex(inspection.bytes);root.append(pre);
   root.append(semanticChild('div','ASCII preview: '+inspection.preview,'palette-note'));
+  // Only simple fixed-size table layouts are supported. Every field is read-only;
+  // text is shown as bytes because PCS character conversion is not yet ported.
+  if(a.format.startsWith('[')){
+    try{
+      const table=previewHmaFixedTable(model,a,{maxRows:8});
+      if(!table){root.append(semanticChild('div','Complex/dynamic HMA table format: not interpreted by this build. Use the hex view; do not infer structure from raw bytes.','palette-note'));}
+      else{
+        const section=semanticChild('section','','semantic-table');
+        section.append(semanticChild('h4',`Fixed table preview · ${table.count} row(s) · ${table.rowSize} bytes/row`));
+        section.append(semanticChild('p','Read-only unsigned scalars; pointer targets are range-checked. Text fields show raw bytes, not decoded PCS. Metadata compatibility is unverified.','palette-note'));
+        const scroller=semanticChild('div','','semantic-table-scroll');
+        const grid=document.createElement('table');
+        const head=document.createElement('thead'),headRow=document.createElement('tr');
+        for(const title of ['Row / offset',...table.fields.map(f=>f.name)])headRow.append(semanticChild('th',title));
+        head.append(headRow);grid.append(head);
+        const body=document.createElement('tbody');
+        for(const row of table.rows){
+          const tr=document.createElement('tr'),td=document.createElement('td');
+          const jump=semanticChild('button',`#${row.index} · 0x${hex(row.offset)}`,'semantic-row-jump');
+          jump.type='button';jump.addEventListener('click',()=>safeRun(()=>{setPageForOffset(row.offset);gotoTab('hex');}));td.append(jump);tr.append(td);
+          for(const cell of row.cells){
+            const col=document.createElement('td');col.textContent=String(cell.value);
+            if(cell.type==='pointer'&&cell.target!==null)col.title=`In-ROM pointer to 0x${hex(cell.target)}`;
+            tr.append(col);
+          }
+          body.append(tr);
+        }
+        grid.append(body);scroller.append(grid);section.append(scroller);
+        if(table.truncated)section.append(semanticChild('p',`First ${table.rows.length} rows shown; remaining rows are not loaded.`, 'palette-note'));
+        root.append(section);
+      }
+    }catch(error){root.append(semanticChild('div',error.message,'semantic-warning'));}
+  }
   $('anchor-to-hex').disabled=false;
   $('anchor-follow-pointer').disabled=inspection.pointer===null;
   $('anchor-to-graphics').disabled=!inspection.isLz10;
