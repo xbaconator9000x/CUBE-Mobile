@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — read-only HMA table inspection
+- Parse conservative fixed-length `ArrayRun` formats directly from imported CUBHMA TOML.
+- Preview at most eight rows of unsigned numeric fields, range-checked ROM pointers and raw text bytes; no semantic writes.
+- Reject dynamic, unknown or out-of-bounds table formats rather than guessing.
+- Touch-friendly horizontally scrolling table and row-to-hex jump; added parser and mobile browser smoke tests.
+- **Still incomplete:** CUBHMA's actual semantic engine, PCS decoding, dynamic anchors, allocation, maps, scripts, graphics editors and Android APK.
+
 ## v0.5 — source checkpoint
 - Imported a self-contained CUBHMA Mobile Lab offline web workbench.
 - Restored modular HTML/CSS/JavaScript sources from the verified standalone bundle.

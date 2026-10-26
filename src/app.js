@@ -1,5 +1,5 @@
 import {RomModel, MAX_BYTES, hex, parseOffset, parseHexBytes, applyBps, applyIps, crc32, paletteAt, gba4bppTile, decodeLz10, scanLz10Graphics} from './core.js';
-import {parseHmaNamedAnchors,readAnchorInspection,groupAnchors,filterAnchors} from './semantic.js';
+import {parseHmaNamedAnchors,readAnchorInspection,groupAnchors,filterAnchors,previewHmaFixedTable} from './semantic.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],selectedAnchor=null;
@@ -338,6 +338,39 @@ function drawAnchorDetails(){
   else if(inspection.pointerCandidate)root.append(semanticChild('div','The first four bytes resemble a ROM pointer but target outside this ROM.','semantic-warning'));
   const pre=document.createElement('pre');pre.className='semantic-bytes';pre.textContent=encodeHex(inspection.bytes);root.append(pre);
   root.append(semanticChild('div','ASCII preview: '+inspection.preview,'palette-note'));
+  // Only simple fixed-size table layouts are supported. Every field is read-only;
+  // text is shown as bytes because PCS character conversion is not yet ported.
+  if(a.format.startsWith('[')){
+    try{
+      const table=previewHmaFixedTable(model,a,{maxRows:8});
+      if(!table){root.append(semanticChild('div','Complex/dynamic HMA table format: not interpreted by this build. Use the hex view; do not infer structure from raw bytes.','palette-note'));}
+      else{
+        const section=semanticChild('section','','semantic-table');
+        section.append(semanticChild('h4',`Fixed table preview · ${table.count} row(s) · ${table.rowSize} bytes/row`));
+        section.append(semanticChild('p','Read-only unsigned scalars; pointer targets are range-checked. Text fields show raw bytes, not decoded PCS. Metadata compatibility is unverified.','palette-note'));
+        const scroller=semanticChild('div','','semantic-table-scroll');
+        const grid=document.createElement('table');
+        const head=document.createElement('thead'),headRow=document.createElement('tr');
+        for(const title of ['Row / offset',...table.fields.map(f=>f.name)])headRow.append(semanticChild('th',title));
+        head.append(headRow);grid.append(head);
+        const body=document.createElement('tbody');
+        for(const row of table.rows){
+          const tr=document.createElement('tr'),td=document.createElement('td');
+          const jump=semanticChild('button',`#${row.index} · 0x${hex(row.offset)}`,'semantic-row-jump');
+          jump.type='button';jump.addEventListener('click',()=>safeRun(()=>{setPageForOffset(row.offset);gotoTab('hex');}));td.append(jump);tr.append(td);
+          for(const cell of row.cells){
+            const col=document.createElement('td');col.textContent=String(cell.value);
+            if(cell.type==='pointer'&&cell.target!==null)col.title=`In-ROM pointer to 0x${hex(cell.target)}`;
+            tr.append(col);
+          }
+          body.append(tr);
+        }
+        grid.append(body);scroller.append(grid);section.append(scroller);
+        if(table.truncated)section.append(semanticChild('p',`First ${table.rows.length} rows shown; remaining rows are not loaded.`, 'palette-note'));
+        root.append(section);
+      }
+    }catch(error){root.append(semanticChild('div',error.message,'semantic-warning'));}
+  }
   $('anchor-to-hex').disabled=false;
   $('anchor-follow-pointer').disabled=inspection.pointer===null;
   $('anchor-to-graphics').disabled=!inspection.isLz10;
