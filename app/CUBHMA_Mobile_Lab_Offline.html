@@ -1388,12 +1388,14 @@ function validateSpan(bytes,start,length) {
 }
 /** FF inside a PCS control-code argument is data, not a terminator. */
 function scanPcsTerminator(raw) {
-  if (!Array.isArray(raw) && !(raw instanceof Uint8Array))
-    throw Error('Expected byte array');
+  if ((!Array.isArray(raw) && !(raw instanceof Uint8Array)) ||
+      raw.length>1024) throw Error('Expected bounded byte array');
+  // Validate even bytes consumed as escape arguments; never silently accept
+  // malformed staged-reader data or sparse arrays.
+  if (Array.from(raw).some(value=>!Number.isInteger(value)||value<0||value>255))
+    throw Error('Invalid ROM byte');
   for (let i=0;i<raw.length;) {
     const value=raw[i];
-    if (!Number.isInteger(value)||value<0||value>255)
-      throw Error('Invalid ROM byte');
     if (value===0xFF) return {terminatorOffset:i,malformedEscape:false};
     const extra=value===0xFC ?
       (i+1<raw.length ? controlLength(raw[i+1]) : 1) :
