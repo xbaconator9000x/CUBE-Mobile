@@ -1,8 +1,8 @@
 import {RomModel, MAX_BYTES, hex, parseOffset, parseHexBytes, applyBps, applyIps, crc32, paletteAt, gba4bppTile, decodeLz10, scanLz10Graphics} from './core.js';
-import {parseHmaNamedAnchors,collectHmaNamedAnchors,readAnchorInspection,groupAnchors,filterAnchors,previewHmaFixedTable,resolveHmaStockMetadata,checkHmaMetadataSources,inspectHmaPointerReferences,parseHmaOffsetPointers,resolveHmaTableLayouts,collectHmaLists} from './semantic.js';
+import {parseHmaNamedAnchors,collectHmaNamedAnchors,readAnchorInspection,groupAnchors,filterAnchors,previewHmaFixedTable,resolveHmaStockMetadata,checkHmaMetadataSources,inspectHmaPointerReferences,parseHmaOffsetPointers,resolveHmaTableLayouts,collectHmaLists,collectHmaMatchedWords} from './semantic.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
-let metadata=[],metadataSources=[],metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataResolution=null,selectedAnchor=null;
+let metadata=[],metadataSources=[],metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
@@ -79,7 +79,7 @@ function updateIndicators(){
   $('changes-tab-count').hidden=!active||!model.dirty;$('changes-tab-count').textContent=active ? String(model.edits.size+(model.appliedPatch?1:0)):'0';
   if(active)showRomInfo();
 }
-function installModel(name,bytes){metadata=[];metadataSources=[];metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
+function installModel(name,bytes){metadata=[];metadataSources=[];metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
 $('rom-picker').addEventListener('change',async e=>{
   const file=e.target.files?.[0];e.target.value='';if(!file)return;
   if(file.size<0xC0 || file.size>MAX_BYTES)return toast('ROM must be 192 bytes to 128 MiB',true);
@@ -272,7 +272,7 @@ $('apply-patch').addEventListener('click',async()=>{
     // BPS uses the working data, and independently validates source/patch/target CRCs.
     // IPS lacks CRCs, so ask the user to verify target ROM compatibility.
     const current=model.snapshot(),result=ext==='bps'?applyBps(current,bytes):applyIps(current,bytes);
-    model.switchPatched(result);page=0;selected=null;resetGraphicState();drawHex();drawGraphics();drawChanges();updateIndicators();toast(`${ext.toUpperCase()} applied in memory. Save a new ROM copy.`);
+    model.switchPatched(result);metadataReset();page=0;selected=null;resetGraphicState();drawHex();drawGraphics();drawChanges();updateIndicators();toast(`${ext.toUpperCase()} applied in memory. Save a new ROM copy.`);
   }catch(err){toast(err.message||String(err),true);}
 });
 $('export-ips').addEventListener('click',()=>safeRun(()=>{ensureModel();const bytes=model.exportIps();downloadFile(`${safeName(model.name)}_mobilelab.ips`,bytes);toast(`IPS diff exported (${bytes.length} bytes)`);}));
@@ -304,7 +304,27 @@ if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostn
 // engine, game fingerprints and pointer allocator have been ported and tested.
 let displayedAnchors=[], selectedInspection=null;
 const encodeHex=bytes=>Array.from(bytes).map((b,i)=>hex(b,2)+(i%16===15?'\n':' ')).join('').trim();
-function metadataReset(){metadata=[];metadataSources=[];metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
+function metadataReset(){metadata=[];metadataSources=[];metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
+function snapshotMatchedWords(){
+  if(!model)return [];
+  return metadataMatchedWords.map(word=>{
+    if(word.address<0||word.address>model.length-word.length)return null;
+    let raw=0;
+    for(let i=0;i<word.length;i++)raw+=model.read(word.address+i)*2**(8*i);
+    return raw;
+  });
+}
+function refreshMatchedWordResolution(){
+  if(!model||!metadataMatchedWords.length)return;
+  const now=snapshotMatchedWords();
+  if(metadataWordSnapshot&&now.length===metadataWordSnapshot.length&&
+     now.every((value,i)=>value===metadataWordSnapshot[i]))return;
+  metadataResolution=resolveHmaTableLayouts(metadata,{
+    romSize:model.length,rom:model,lists:metadataLists,conflictingLists:metadataListConflicts,
+    matchedWords:metadataMatchedWords,conflictingWords:metadataWordConflicts
+  });
+  metadataWordSnapshot=now;
+}
 function metadataCommit(sources){
   ensureModel();
   // Fail closed for known mismatched stock-game TOML before changing active metadata.
@@ -324,26 +344,33 @@ function metadataCommit(sources){
     }
   }
   const namedLists=collectHmaLists(sources);
-  const nextResolution=resolveHmaTableLayouts(nextMetadata,{romSize:model.length,lists:namedLists.lists,conflictingLists:namedLists.conflictedNames});
+  const matched=collectHmaMatchedWords(sources,{romSize:model.length});
+  const nextResolution=resolveHmaTableLayouts(nextMetadata,{
+    romSize:model.length,rom:model,lists:namedLists.lists,conflictingLists:namedLists.conflictedNames,
+    matchedWords:matched.words,conflictingWords:matched.conflictedNames
+  });
   metadataOffsetPointers=[...offsets.values()];
   metadataLists=namedLists.lists;metadataListConflicts=namedLists.conflictedNames;
+  metadataMatchedWords=matched.words;metadataWordConflicts=matched.conflictedNames;
+  metadataWordSnapshot=snapshotMatchedWords();
   metadata=nextMetadata;metadataResolution=nextResolution;
   metadataSources=sources.map(({name})=>name);
   selectedAnchor=null;selectedInspection=null;
   drawAnchors();
-  toast(`Loaded ${metadata.length} distinct anchor declarations; ${merged.conflictedNames.size} conflicting names; ${metadataResolution.anchoredCount} anchor-length and ${metadataResolution.listCount} list-length tables · ROM layout unverified`);
+  toast(`Loaded ${metadata.length} anchor declarations; ${merged.conflictedNames.size} conflicting names; ${metadataResolution.anchoredCount} anchor-length, ${metadataResolution.listCount} list-length and ${metadataResolution.matchedCount} matched-word-length tables · ROM layout unverified`);
 }
 function semanticChild(tag,value,klass){const el=document.createElement(tag);el.textContent=value;if(klass)el.className=klass;return el;}
 function drawAnchorDetails(){
   const root=$('anchor-detail');root.replaceChildren();
   $('anchor-to-hex').disabled=true;$('anchor-follow-pointer').disabled=true;$('anchor-to-graphics').disabled=true;
   if(!model||!selectedAnchor){root.append(semanticChild('div','Choose an anchor to inspect its address, format and bytes.','empty-state'));return;}
+  refreshMatchedWordResolution();
   const a=selectedAnchor;
   root.append(semanticChild('h3',a.name));
   root.append(semanticChild('div',`Source: ${a.source} · TOML line ${a.line}`,'palette-note'));
   root.append(semanticChild('div',`Offset: 0x${hex(a.address)} · Format: ${a.format||'unspecified'}`,'semantic-code'));
   const resolved=metadataResolution?.byName.get(a.name);
-  if(resolved?.kind==='anchored-count'||resolved?.kind==='named-list-count')root.append(semanticChild('div',`Linked table length: ${resolved.layout.count} rows, derived from ${resolved.kind==='named-list-count'?'HMA named list ':'table '}${resolved.lengthFrom} (beginning ${resolved.parentMargins?.beginning||0}, end ${resolved.parentMargins?.end||0}; metadata only).`,'palette-note'));
+  if(resolved?.kind==='anchored-count'||resolved?.kind==='named-list-count'||resolved?.kind==='matched-word-count')root.append(semanticChild('div',`Linked table length: ${resolved.layout.count} rows, derived from ${resolved.kind==='named-list-count'?'HMA named list ':resolved.kind==='matched-word-count'?'ROM-backed MatchedWords ':'table '}${resolved.lengthFrom} (beginning ${resolved.parentMargins?.beginning||0}, end ${resolved.parentMargins?.end||0}; metadata only).`,'palette-note'));
   if(metadataResolution?.conflicted.has(a.name))root.append(semanticChild('div','Overlapping named-table claims detected. Typed interpretation is disabled for this table.','semantic-warning'));
   const unresolvedReason=metadataResolution?.unresolved.get(a.name);
   if(unresolvedReason)root.append(semanticChild('div',`Table format not resolved: ${unresolvedReason}. No typed interpretation of this anchor is permitted.`,'semantic-warning'));
@@ -404,7 +431,7 @@ function drawAnchorDetails(){
   scanButton.addEventListener('click',()=>safeRun(()=>{
     scanButton.disabled=true;scanButton.textContent='Scanning…';
     try {
-    const refs=inspectHmaPointerReferences(model,a.address,metadata,{offsetPointers:metadataOffsetPointers,lists:metadataLists,conflictingLists:metadataListConflicts,maxTableSlots:60000,maxDeclared:24,maxCandidates:20,maxScanBytes:2*1024*1024});
+    const refs=inspectHmaPointerReferences(model,a.address,metadata,{offsetPointers:metadataOffsetPointers,lists:metadataLists,conflictingLists:metadataListConflicts,matchedWords:metadataMatchedWords,conflictingWords:metadataWordConflicts,maxTableSlots:60000,maxDeclared:24,maxCandidates:20,maxScanBytes:2*1024*1024});
     results.replaceChildren();
     results.append(semanticChild('p',
       'Declared table/offset-pointer matches: '+refs.matchedDeclared+'; raw aligned candidates: '+refs.candidateHits+'. Scanned first '+formatSize(refs.scannedBytes)+' of '+formatSize(model.length)+' for raw candidates. '+refs.skippedTables+' tables and '+refs.skippedOffsetPointers+' offset sources skipped (bounds or budget).',
@@ -441,7 +468,7 @@ function drawAnchors(){
   for(const [name,count] of groupAnchors(metadata))selector.add(new Option(`${name} (${count})`,name));
   selector.value=[...selector.options].some(x=>x.value===previous)?previous:'all';
   $('anchor-count').textContent=metadata.length?`${metadata.length} named anchors`:'No metadata';
-  $('metadata-status').textContent=metadataSources.length?`Loaded: ${metadataSources.join(', ')}. ${metadataOffsetPointers.length} OffsetPointer declarations; ${metadataResolution?.anchoredCount||0} anchor-length tables; ${metadataResolution?.listCount||0} list-length tables; ${metadataListConflicts.size} conflicting list names; ${metadataResolution?.overlapWitnesses||0} overlap witnesses (not exhaustive); ${[...metadataResolution?.unresolved.values()||[]].filter(x=>x==='conflicting-duplicate-name').length} conflicting named anchors excluded. ROM metadata compatibility is not independently verified.`:'No metadata loaded. Import TOML produced for this ROM, or fetch a stock-game reference.';
+  $('metadata-status').textContent=metadataSources.length?`Loaded: ${metadataSources.join(', ')}. ${metadataOffsetPointers.length} OffsetPointer declarations; ${metadataResolution?.anchoredCount||0} anchor-length tables; ${metadataResolution?.listCount||0} list-length tables; ${metadataResolution?.matchedCount||0} ROM-backed word-length tables; ${metadataWordConflicts.size} conflicting word names; ${metadataListConflicts.size} conflicting list names; ${metadataResolution?.overlapWitnesses||0} overlap witnesses (not exhaustive); ${[...metadataResolution?.unresolved.values()||[]].filter(x=>x==='conflicting-duplicate-name').length} conflicting named anchors excluded. ROM metadata compatibility is not independently verified.`:'No metadata loaded. Import TOML produced for this ROM, or fetch a stock-game reference.';
   if(!model){root.append(semanticChild('div','Open a ROM first.','empty-state'));drawAnchorDetails();return;}
   if(!metadata.length){root.append(semanticChild('div','Import a CUBHMA .toml file to begin.','empty-state'));drawAnchorDetails();return;}
   displayedAnchors=filterAnchors(metadata,$('anchor-find').value,selector.value,180);
