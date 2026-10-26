@@ -51,3 +51,13 @@ test('malformed game scopes and unmatched quotes still fail closed',()=>{
   for(const bad of ['@!game(BPRE_BOGU)','@!game(BPRE_bad)','@!game(BPRE+)','0x00 = "AB'])
     assert.throws(()=>parseHmaPcsReference('0x00 = " "\n'+bad));
 });
+
+
+test('authentic duplicate-colour aliases decode in upstream declaration order',()=>{
+  const rom=Uint8Array.of(0xFC,0x01,0x03,0xFF);
+  const fr=decodeHmaPcsReference(rom,0,4,{gameCode:'BPRE',reference});
+  const emerald=decodeHmaPcsReference(rom,0,4,{gameCode:'BPEE',reference});
+  assert.equal(fr.text,'[grey]');
+  assert.equal(emerald.text,'[grey]');
+  assert.equal(fr.macroCount,1);
+});

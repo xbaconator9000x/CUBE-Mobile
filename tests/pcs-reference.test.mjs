@@ -94,9 +94,11 @@ test('untrusted references and invalid staged ROM readers cannot be decoded',()=
   assert.throws(()=>decodeHmaPcsReference({length:1,read:()=>-1},0,1,{gameCode:'BPEE',reference:ref}));
 });
 
-test('longest matching macro wins without inspecting beyond a bounded span',()=>{
+test('upstream first-declared macro wins without inspecting beyond bounded span',()=>{
   const ref=parseHmaPcsReference('0x00 = " "\n[SHORT] A1\n[LONG] A1A2');
   const rom=Uint8Array.of(0xA1,0xA2,0xFF);
-  assert.equal(decodeHmaPcsReference(rom,0,3,{gameCode:'BPEE',reference:ref}).text,'[LONG]');
+  assert.equal(decodeHmaPcsReference(rom,0,3,{gameCode:'BPEE',reference:ref}).text,'[SHORT]\\!A2');
   assert.equal(decodeHmaPcsReference(rom,0,1,{gameCode:'BPEE',reference:ref}).text,'[SHORT]');
+  const reversed=parseHmaPcsReference('0x00 = " "\n[LONG] A1A2\n[SHORT] A1');
+  assert.equal(decodeHmaPcsReference(rom,0,3,{gameCode:'BPEE',reference:reversed}).text,'[LONG]');
 });

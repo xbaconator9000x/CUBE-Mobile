@@ -1579,9 +1579,12 @@ function decodeHmaPcsReference(bytes,start,length,{gameCode,reference}={}) {
   if (!games.includes(gameCode) || reference?.kind!=='hma-pcs-reference-v1')
     return {supported:false,reason:'Recognised Gen 3 game code and parsed PCS reference required'};
   const raw=boundedBytes(bytes,start,length);
+  // Upstream PCSString.FindMacro iterates the game's macro dictionary in
+  // declaration order and returns the first complete match. Sorting by length
+  // or name changes alias spellings (for example [grey] versus [gray]).
+  // The parser preserves reference-file insertion order for each game.
   const macros=Object.entries(reference.macrosByGame[gameCode]||{})
-    .map(([name,values])=>({name,values}))
-    .sort((a,b)=>b.values.length-a.values.length || a.name.localeCompare(b.name));
+    .map(([name,values])=>({name,values}));
   let text='',terminatorOffset=-1,truncatedEscape=false,unknownByteCount=0,macroCount=0;
   for (let i=0;i<raw.length;) {
     const value=raw[i];

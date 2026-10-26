@@ -2,6 +2,7 @@
 
 ## Unreleased — authentic CUBHMA PCS reference compatibility (read only)
 - Fix import of the pinned upstream `pcsReference.txt`: accept underscore-separated game scopes and the intentional single-character quote glyph declaration.
+- Match CUBHMA `PCSString.FindMacro` declaration-order precedence rather than longest-first/alphabetical ordering, preserving canonical alias spellings such as `[grey]` over `[gray]`.
 - Add test-only upstream PCS resource with pinned commit provenance and MIT licence; validate game-scoped colour macros, glyphs, control lengths, decoding and ROM immutability.
 - Do not ship upstream test fixture in the standalone HTML. User-supplied references remain unauthenticated and cannot authorize ROM writes.
 - **Remaining:** exact upstream macro alias/precedence parity, CUBE-specific text encodings, authentic ROM fingerprints, safe semantic text editing, Android device acceptance.
