@@ -321,7 +321,8 @@ function refreshMatchedWordResolution(){
      now.every((value,i)=>value===metadataWordSnapshot[i]))return;
   metadataResolution=resolveHmaTableLayouts(metadata,{
     romSize:model.length,rom:model,lists:metadataLists,conflictingLists:metadataListConflicts,
-    matchedWords:metadataMatchedWords,conflictingWords:metadataWordConflicts
+    matchedWords:metadataMatchedWords,conflictingWords:metadataWordConflicts,
+    offsetPointers:metadataOffsetPointers
   });
   metadataWordSnapshot=now;
 }
@@ -347,7 +348,8 @@ function metadataCommit(sources){
   const matched=collectHmaMatchedWords(sources,{romSize:model.length});
   const nextResolution=resolveHmaTableLayouts(nextMetadata,{
     romSize:model.length,rom:model,lists:namedLists.lists,conflictingLists:namedLists.conflictedNames,
-    matchedWords:matched.words,conflictingWords:matched.conflictedNames
+    matchedWords:matched.words,conflictingWords:matched.conflictedNames,
+    offsetPointers:[...offsets.values()]
   });
   const nextWordSnapshot=snapshotMatchedWords(matched.words);
   metadataOffsetPointers=[...offsets.values()];
@@ -376,7 +378,7 @@ function drawAnchorDetails(){
     const words=metadataResolution.wordResolution.byName.get(resolved.lengthFrom)?.words||[];
     root.append(semanticChild('div','ROM-backed word source(s): '+words.slice(0,6).map(w=>'0x'+hex(w.address)).join(', ')+(words.length>6?' (more not shown)':'')+'. These are metadata claims, not authenticated code ownership.','palette-note'));
   }
-  if(metadataResolution?.conflicted.has(a.name))root.append(semanticChild('div','Overlapping metadata ownership claims detected (table/table or table/MatchedWords). Typed interpretation is disabled for this table.','semantic-warning'));
+  if(metadataResolution?.conflicted.has(a.name))root.append(semanticChild('div','Conflicting metadata byte claims detected (table/table, table/MatchedWords or OffsetPointer). Typed interpretation is disabled for this table.','semantic-warning'));
   const unresolvedReason=metadataResolution?.unresolved.get(a.name);
   if(unresolvedReason)root.append(semanticChild('div',`Table format not resolved: ${unresolvedReason}. No typed interpretation of this anchor is permitted.`,'semantic-warning'));
   if(!a.valid){root.append(semanticChild('div','This anchor is outside the selected ROM. It cannot be read.','semantic-warning'));return;}
@@ -456,7 +458,9 @@ function drawAnchorDetails(){
     if(refs.declaredTruncated||refs.candidatesTruncated)results.append(semanticChild('p','Result list truncated to keep the interface responsive.','palette-note'));
     if(!refs.rawScanComplete)results.append(semanticChild('p','Raw pattern search is incomplete: later ROM regions were NOT scanned.','semantic-warning'));
     if(refs.unsupportedFormats)results.append(semanticChild('p',refs.unsupportedFormats+' unsupported or unresolved table formats were not interpreted.', 'palette-note'));
-    if(refs.conflictedTables)results.append(semanticChild('p',refs.conflictedTables+' overlapping table or matched-word claims were excluded from typed reference results.', 'semantic-warning'));
+    if(refs.conflictedTables)results.append(semanticChild('p',refs.conflictedTables+' conflicting table claims were excluded from typed reference results.', 'semantic-warning'));
+    if(refs.skippedConflictedOffsetPointers)results.append(semanticChild('p',refs.skippedConflictedOffsetPointers+' OffsetPointer source(s) overlap incompatible metadata claims and were excluded.', 'semantic-warning'));
+
     if(!refs.matchedDeclared&&!refs.candidateHits)results.append(semanticChild('p','No matches in the inspected subset. This does not prove the anchor has no references.','palette-note'));
     } finally { scanButton.disabled=a.address>=0x02000000;scanButton.textContent='Scan again'; }
   }));
@@ -473,7 +477,7 @@ function drawAnchors(){
   for(const [name,count] of groupAnchors(metadata))selector.add(new Option(`${name} (${count})`,name));
   selector.value=[...selector.options].some(x=>x.value===previous)?previous:'all';
   $('anchor-count').textContent=metadata.length?`${metadata.length} named anchors`:'No metadata';
-  $('metadata-status').textContent=metadataSources.length?`Loaded: ${metadataSources.join(', ')}. ${metadataOffsetPointers.length} OffsetPointer declarations; ${metadataResolution?.anchoredCount||0} anchor-length tables; ${metadataResolution?.listCount||0} list-length tables; ${metadataResolution?.matchedCount||0} ROM-backed word-length tables; ${metadataWordConflicts.size} conflicting word names; ${metadataListConflicts.size} conflicting list names; ${(metadataResolution?.overlapWitnesses||0)+(metadataResolution?.wordOverlapWitnesses||0)} overlap witnesses (not exhaustive); ${[...metadataResolution?.unresolved.values()||[]].filter(x=>x==='conflicting-duplicate-name').length} conflicting named anchors excluded. ROM metadata compatibility is not independently verified.`:'No metadata loaded. Import TOML produced for this ROM, or fetch a stock-game reference.';
+  $('metadata-status').textContent=metadataSources.length?`Loaded: ${metadataSources.join(', ')}. ${metadataOffsetPointers.length} OffsetPointer declarations; ${metadataResolution?.anchoredCount||0} anchor-length tables; ${metadataResolution?.listCount||0} list-length tables; ${metadataResolution?.matchedCount||0} ROM-backed word-length tables; ${metadataWordConflicts.size} conflicting word names; ${metadataListConflicts.size} conflicting list names; ${metadataResolution?.offsetCollisionSources||0} unsafe OffsetPointer source claims; ${(metadataResolution?.overlapWitnesses||0)+(metadataResolution?.wordOverlapWitnesses||0)} overlap witnesses (not exhaustive); ${[...metadataResolution?.unresolved.values()||[]].filter(x=>x==='conflicting-duplicate-name').length} conflicting named anchors excluded. ROM metadata compatibility is not independently verified.`:'No metadata loaded. Import TOML produced for this ROM, or fetch a stock-game reference.';
   if(!model){root.append(semanticChild('div','Open a ROM first.','empty-state'));drawAnchorDetails();return;}
   if(!metadata.length){root.append(semanticChild('div','Import a CUBHMA .toml file to begin.','empty-state'));drawAnchorDetails();return;}
   displayedAnchors=filterAnchors(metadata,$('anchor-find').value,selector.value,180);
