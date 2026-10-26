@@ -4,7 +4,7 @@ import {inspectFixedTextBytes} from './text-inspection.js';
 import {decodeHmaPcsFallback} from './pcs-default.js';
 import {parseHmaPcsReference,decodeHmaPcsReference} from './pcs-reference.js';
 import {fingerprintRomSha256,fingerprintMatchesRom} from './rom-fingerprint.js';
-import {CURATED_ROM_PROFILES,compareRomIdentity} from './rom-compatibility.js';
+import {compareRomIdentity} from './rom-compatibility.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
