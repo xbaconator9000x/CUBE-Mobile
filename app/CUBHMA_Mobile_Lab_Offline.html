@@ -1,0 +1,870 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0d1522"><meta name="description" content="An offline-first, touch-friendly GBA ROM inspection and patching companion. Navigation supports Android Back.">
+<title>CUBHMA Mobile Lab</title>
+<style>:root{color-scheme:dark;--bg:#0b1320;--panel:#141f31;--panel2:#19263a;--border:#2a3850;--text:#f4f5fc;--muted:#94a3bc;--violet:#8980fb;--violet2:#655be0;--aqua:#52d8cf;--amber:#ffd180;--red:#ff8e97;--radius:18px;font-family:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;box-sizing:border-box;font-synthesis:none}
+*{box-sizing:inherit}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--text);line-height:1.48}button,input,label{font:inherit}button{cursor:pointer;touch-action:manipulation}button:disabled{cursor:not-allowed;opacity:.47}button:focus-visible,input:focus-visible,label:focus-visible{outline:2px solid var(--violet);outline-offset:3px}input{min-width:0;background:#0d1727;border:1px solid #35425a;color:var(--text);border-radius:11px;padding:12px 13px;outline:none;width:100%;font-variant-numeric:tabular-nums}input:focus{border-color:var(--violet)}input::placeholder{color:#71819b}h1,h2,h3,p{margin-top:0}h2,h3{letter-spacing:-.04em}p{color:var(--muted)}.shell{display:flex;min-height:100svh}.side{width:250px;position:sticky;top:0;height:100svh;border-right:1px solid var(--border);padding:30px 17px;background:#0f1929;flex-shrink:0;display:flex;flex-direction:column}.brand{display:flex;align-items:center;gap:12px;padding:4px 11px 29px;border-bottom:1px solid var(--border)}.brand-icon{width:37px;height:37px;background:linear-gradient(140deg,#8f89ff,#615bd2);border-radius:12px;display:grid;place-items:center;font-size:26px;box-shadow:0 8px 30px #5c53c033}.brand-name{font-size:15px;font-weight:840;letter-spacing:-.06em;white-space:nowrap}.brand-name span{font-size:10px;font-weight:750;color:#aeb4d5;letter-spacing:.01em}.brand-sub{font-size:9px;font-weight:700;letter-spacing:.15em;color:#8190ab;margin-top:2px;white-space:nowrap}.version{font-size:8px;border-radius:3px;background:#303457;color:#bab5ff;padding:2px 3px;letter-spacing:0}.nav-items{display:grid;gap:5px;margin-top:28px}.tab{display:flex;gap:13px;align-items:center;color:#a4b1c8;border:0;border-radius:12px;background:transparent;text-align:left;padding:12px 14px;font-size:13px;font-weight:650}.tab.active{background:#26284b;color:#e4e3ff}.tab:hover{background:#1d2940}.nav-icon{font-size:19px;font-weight:700;min-width:24px;text-align:center}.nav-counter{margin-left:auto;background:#665dd9;border-radius:100px;padding:0 7px}.sidebar-bottom{margin-top:auto;border-top:1px solid var(--border);padding:20px 8px 5px;color:#d3d7eb;display:flex;gap:10px;align-items:flex-start;font-size:10px;font-weight:790;letter-spacing:.08em}.sidebar-bottom small{font-size:11px;color:var(--muted);font-weight:450;letter-spacing:0}.secure-dot{height:9px;width:9px;margin-top:4px;border-radius:50%;background:var(--aqua);box-shadow:0 0 0 5px #48c9bc15}.main-column{flex:1;min-width:0}.topbar{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding:19px clamp(20px,4vw,64px);gap:12px}.overline,.eyebrow{font-size:10px;font-weight:800;letter-spacing:.16em;color:#a29afa;margin-bottom:5px}.topbar h1{margin:0;font-size:20px;letter-spacing:-.04em}.topbar-actions{display:flex;gap:10px;align-items:center}.icon-button{height:38px;width:38px;border-radius:11px;background:#192437;border:1px solid #344059;color:#cfd6ec;font-weight:900}.top-import{display:flex;align-items:center;gap:8px;background:var(--violet);color:#090e1b;border-radius:11px;padding:11px 15px;font-size:12px;font-weight:820;cursor:pointer;white-space:nowrap}.content{max-width:1340px;margin:0 auto;padding:30px clamp(18px,4vw,64px) 80px}.view{display:none;animation:rise .2s ease}.view.active{display:block}@keyframes rise{from{opacity:.65;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}.hero{min-height:300px;border:1px solid #32376b;border-radius:22px;background:radial-gradient(circle at 73% 34%,#363169 0,transparent 40%),linear-gradient(110deg,#262851,#172643 65%,#15233a);padding:36px clamp(21px,3.8vw,45px);display:flex;overflow:hidden;position:relative}.hero-content{position:relative;z-index:1;max-width:570px}.hero-kicker{color:#bcb4ff;font-size:10px;font-weight:800;letter-spacing:.15em;margin-bottom:17px}.hero h2{font-size:clamp(30px,4vw,49px);line-height:1.14;margin:0 0 16px;font-weight:830}.hero h2 em{font-style:normal;color:#ad9ffd}.hero p{max-width:420px;font-size:13px;color:#c0c5e3;line-height:1.7;margin-bottom:22px}.primary-button,.secondary-button,.subtle-button{border:1px solid transparent;padding:12px 18px;border-radius:11px;display:inline-flex;align-items:center;justify-content:center;gap:10px;font-size:13px;font-weight:760;text-decoration:none;white-space:nowrap}.primary-button{background:var(--violet);color:#10142b}.primary-button:hover:not(:disabled),.top-import:hover{background:#a39cff}.primary-button span{font-size:19px;margin-left:15px}.secondary-button{background:#223049;border-color:#36445d;color:#e2e6f7}.secondary-button:hover:not(:disabled),.subtle-button:hover:not(:disabled){background:#303f5b}.subtle-button{background:#343a64;color:#ebeaff}.hero-note{margin-top:13px;font-size:10px;color:#abaece}.hero-art{flex:1;min-width:240px;display:flex;justify-content:center;align-items:center;transform:rotate(-6deg) translate(22px,3px)}.art-frame{width:310px;background:#151c30;border:1px solid #5e6198;padding:14px;border-radius:15px;box-shadow:20px 25px 60px #070c1eaa}.art-top{display:flex;gap:5px;align-items:center;border-bottom:1px solid #303853;padding-bottom:12px;font-size:10px;color:#8a99b7}.art-top span{width:7px;height:7px;background:#7775c9;border-radius:50%}.art-top b{margin-left:auto;font-size:9px;letter-spacing:.09em}.art-lines{display:grid;grid-template-columns:65px auto;gap:8px;padding:25px 1px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:10px}.art-lines i{font-style:normal;color:#667c9b}.art-lines strong{color:#afb3e4;font-weight:500;white-space:nowrap}.art-lines u{color:#90e9ca;text-decoration:none}.art-bottom{display:flex;justify-content:space-between;border-top:1px solid #323953;padding-top:11px;color:#8995a9;font-size:8px;letter-spacing:.1em}.art-bottom span{color:#88dbc0}.section-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:27px 0 14px}.section-heading h3{margin:0;font-size:17px}.muted{font-size:12px;color:var(--muted)}.rom-panel{border:1px solid var(--border);border-radius:17px;background:var(--panel);min-height:102px;display:flex;align-items:center;padding:22px}.rom-placeholder{display:flex;align-items:center;gap:19px}.rom-placeholder strong{font-size:14px}.rom-placeholder p{margin:6px 0 0;font-size:12px}.big-file-icon{height:51px;width:51px;border-radius:13px;display:grid;place-items:center;font-size:30px;background:#26314b;color:#a8a2ff}.rom-identity{display:flex;align-items:center;gap:16px;flex-wrap:wrap;width:100%}.rom-meta{flex:1;min-width:180px}.rom-meta strong{font-size:16px}.rom-meta p{font-size:12px;margin:2px 0}.rom-badges{display:flex;gap:7px;flex-wrap:wrap}.meta-tag{border:1px solid #3b4c69;color:#b8c9e4;background:#202f46;border-radius:9px;padding:7px 10px;font-size:10px;font-weight:730}.meta-tag.good{color:#9de9c6;border-color:#386857}.meta-tag.warn{color:#ffd9a5;border-color:#765a3a}.dashboard-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:19px}.feature-card{text-align:left;min-width:0;background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:19px;transition:transform .1s,background .1s}.feature-card:hover{background:#1d2a42;transform:translateY(-2px)}.feature-icon{display:grid;place-items:center;width:39px;height:39px;border-radius:10px;margin-bottom:18px;font-weight:800;font-size:24px}.violet{background:#312e66;color:#b6aaff}.blue{background:#1f3c5c;color:#7acaff}.green{background:#1d494c;color:#82e7b9}.amber{background:#52412f;color:#ffce87}.feature-card strong{display:block;font-size:14px;color:var(--text);margin-bottom:8px}.feature-card p{min-height:64px;font-size:12px;line-height:1.55}.feature-card>span{font-size:11px;color:#b2aaff;font-weight:750}.disclaimer{font-size:11px;color:#70829f;text-align:center;margin:25px 0}.tool-heading{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:23px}.tool-heading h2{font-size:30px;line-height:1.15;margin:3px 0 6px}.tool-heading p{font-size:13px;margin:0}.pill{border:1px solid #435079;background:#252d4b;padding:7px 11px;font-size:10px;white-space:nowrap;border-radius:50px;color:#c5bdff;font-weight:760}.toolbar-card,.action-card,.editor-card,.canvas-card,.patch-card,.export-card,.changes-list-card{background:var(--panel);border:1px solid var(--border);border-radius:17px}.toolbar-card{display:grid;grid-template-columns:1fr 1fr;gap:15px;padding:18px;margin-bottom:16px}.input-wrap label,.edit-controls label{display:block;color:#bbc8e0;font-size:11px;font-weight:720;margin-bottom:9px}.input-row{display:flex;gap:8px}.input-row input{flex:1}.editor-top{display:flex;justify-content:space-between;align-items:center;padding:15px 17px;border-bottom:1px solid var(--border)}.editor-location{display:flex;align-items:center;gap:12px}.editor-location span{font-size:10px;letter-spacing:.09em;color:#8996ac;font-weight:780}.editor-location b{font-family:ui-monospace,Consolas,monospace;font-size:14px}.editor-location small{font-size:11px;color:var(--muted)}.editor-controls{display:flex;gap:8px}.small-ctrl{border:1px solid var(--border);background:#22314a;color:var(--text);border-radius:9px;width:35px;height:33px;font-size:18px}.hex-scroller{overflow-x:auto;padding:14px 12px}.hex-grid{min-width:355px;max-width:860px;margin:auto}.hex-row{display:grid;grid-template-columns:62px repeat(8,minmax(29px,1fr));gap:5px;margin:6px 0;align-items:center}.hex-address{font:11px ui-monospace,Consolas,monospace;color:#8093b2}.hex-byte{background:#212e45;border:1px solid transparent;color:#d3dff0;border-radius:7px;text-align:center;padding:10px 2px;font:12px ui-monospace,Consolas,monospace;min-height:38px;min-width:0}.hex-byte:hover{border-color:#8d86ca}.hex-byte.is-selected{background:#514b97;border-color:#aea5ff;color:white}.hex-byte.is-edited{border-color:#ed8899;color:#ffd2db}.hex-byte.is-selected.is-edited{background:#85526a;border-color:#ffb5bf}.hex-byte:disabled{opacity:.2}.editor-footer{border-top:1px solid var(--border);display:flex;justify-content:space-between;padding:12px 16px;color:#8f9bb0;font-size:10px}.legend{display:flex;gap:12px}.legend span{display:flex;align-items:center;gap:5px}.legend-dot{height:8px;width:8px;display:inline-block;border-radius:3px}.lavender{background:#9581ed}.coral{background:#f58ba0}.action-card{padding:19px;margin-top:15px}.action-heading{display:flex;justify-content:space-between;align-items:center;gap:15px}.action-heading strong{font-size:15px}.action-heading p{font-size:12px;margin:5px 0 0}.switch{position:relative;width:47px;height:27px;display:block;flex-shrink:0}.switch input{opacity:0;height:0;width:0}.switch span{position:absolute;inset:0;border-radius:18px;background:#3e4b62;transition:.15s}.switch span:before{content:"";position:absolute;height:19px;width:19px;top:4px;left:4px;background:white;border-radius:50%;transition:.15s}.switch input:checked+span{background:#796bf4}.switch input:checked+span:before{transform:translateX(20px)}.edit-controls{display:grid;grid-template-columns:1fr 1fr auto;align-items:end;gap:13px;margin:20px 0}.compact{height:45px}.edit-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.edit-actions span{font-size:11px;color:var(--muted);margin-left:auto}.graphics-toolbar{margin-bottom:15px}.graphics-layout{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:14px}.canvas-card{padding:19px;min-width:0}.card-caption{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:11px;color:#b4c1d8}.card-caption b{color:#e3e5f4;letter-spacing:.05em;font-size:11px}.canvas-wrap{margin:20px auto;max-width:485px;aspect-ratio:1;background:#0a0d17;display:grid;place-items:center;border:1px solid #3b4863;border-radius:10px;overflow:hidden;background-image:linear-gradient(45deg,#172237 25%,transparent 25%),linear-gradient(-45deg,#172237 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#172237 75%),linear-gradient(-45deg,transparent 75%,#172237 75%);background-size:24px 24px;background-position:0 0,0 12px,12px -12px,-12px 0}#tile-canvas{width:100%;height:auto;image-rendering:pixelated;image-rendering:crisp-edges}.canvas-buttons{display:flex;justify-content:space-between;gap:8px}.palette-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:20px}.swatch{aspect-ratio:1.18;border:2px solid #445370;border-radius:10px;position:relative;overflow:hidden}.swatch span{position:absolute;bottom:0;left:0;right:0;padding:3px 5px;text-align:center;font:10px ui-monospace,Consolas,monospace;color:#e8eaf7;text-shadow:0 1px 3px #0a0d16;background:#141b2780}.palette-note{margin-top:14px;font-size:11px;color:var(--muted)}.graphics-info{margin-top:32px;border-top:1px solid var(--border);padding-top:22px}.graphics-info strong{font-size:13px}.graphics-info p{font-size:12px;margin-bottom:0}.patch-grid{display:grid;grid-template-columns:1fr 1fr;gap:15px}.patch-card{padding:24px;display:flex;flex-direction:column}.patch-number{font-size:10px;color:#b1aaff;font-weight:840;letter-spacing:.12em}.patch-card h3{font-size:23px;margin:11px 0 8px}.patch-card p{font-size:13px;line-height:1.7;min-height:92px}.patch-tagline{display:flex;gap:7px;flex-wrap:wrap;margin:5px 0 23px}.patch-tagline span{padding:5px 8px;border-radius:5px;background:#272f4b;color:#afa8ed;font-weight:780;font-size:10px}.patch-button{justify-content:space-between;cursor:pointer;width:100%}.small-label{color:#8191ac;font-size:11px;margin:10px 0 16px}.block{display:flex;width:100%}.safety-strip{display:flex;gap:14px;align-items:flex-start;margin-top:20px;padding:18px;border:1px solid #5a543f;background:#302c25;border-radius:13px}.safety-icon{border:1px solid #b69c5e;color:#ffdb9e;font-weight:900;height:25px;width:25px;display:grid;place-items:center;border-radius:50%;flex-shrink:0}.safety-strip strong{font-size:13px;color:#f8e6c5}.safety-strip p{font-size:12px;color:#c7b9a2;margin:5px 0 0}.change-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}.change-summary>div{border:1px solid var(--border);background:var(--panel);border-radius:15px;padding:18px}.change-summary small{display:block;font-size:10px;letter-spacing:.1em;color:var(--muted);margin-bottom:8px}.change-summary strong{font-size:26px;letter-spacing:-.04em}.export-card{padding:22px;margin-top:16px;display:flex;justify-content:space-between;align-items:center;gap:20px}.export-card h3{font-size:21px;margin-bottom:6px}.export-card p{font-size:12px;margin-bottom:0;max-width:470px}.export-actions{display:grid;gap:9px;min-width:190px}.picker-label{cursor:pointer}.changes-list-card{padding:18px;margin-top:15px}.changes-list-card .section-heading{margin:0 0 15px}.changes-list{max-height:380px;overflow:auto}.change-row{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:10px;padding:10px 9px;border-top:1px solid #26334b;font:12px ui-monospace,Consolas,monospace}.change-row b{color:#bbb3ff}.change-row span{color:#9babc6}.change-row em{color:#ffb2c0;font-style:normal;font-weight:800}.danger-button{border:1px solid #73444b;border-radius:11px;background:#301d29;color:#ffb4c1;padding:12px 16px;font-size:12px;font-weight:720;margin-top:17px}.empty-state{padding:36px 15px;color:var(--muted);text-align:center;font-size:13px}.bottom-nav{display:none}.toast{position:fixed;bottom:25px;right:25px;background:#38456d;color:white;border:1px solid #6f79b5;max-width:min(440px,calc(100% - 28px));padding:14px 18px;border-radius:12px;box-shadow:0 15px 40px #02040bbb;font-size:13px;font-weight:680;z-index:90;opacity:0;pointer-events:none;transform:translateY(10px);transition:.25s}.toast.show{opacity:1;transform:none}.toast.error{background:#603340;border-color:#9c515f}dialog{max-width:min(450px,calc(100vw - 32px));background:#1c293f;color:var(--text);border:1px solid #485679;border-radius:19px;padding:25px;box-shadow:0 30px 90px #0008}dialog::backdrop{background:#02040bba}dialog h3{font-size:23px;margin:6px 0 10px}dialog p{font-size:13px;line-height:1.7}.dialog-kicker{font-size:10px;color:#b4a8ff;letter-spacing:.13em;font-weight:830}.dialog-buttons{display:flex;gap:10px;justify-content:flex-end;margin-top:24px}
+@media(max-width:1100px){.dashboard-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.feature-card p{min-height:30px}.hero-art{min-width:140px}.art-frame{width:270px}}
+@media(max-width:820px){.side{display:none}.bottom-nav{position:fixed;bottom:0;bottom:env(safe-area-inset-bottom);width:100%;display:grid;grid-template-columns:repeat(5,1fr);height:67px;background:#111c2deb;backdrop-filter:blur(18px);border-top:1px solid #354158;z-index:50}.mobile-tab{border:0;background:none;color:#97a6bf;display:grid;place-content:center;justify-items:center;gap:2px;font-size:10px;font-weight:700}.mobile-tab span{font-size:23px;height:27px;line-height:27px}.mobile-tab.active{color:#aea5ff}.topbar{padding:15px 18px}.content{padding:22px 17px calc(100px + env(safe-area-inset-bottom))}.toast{bottom:85px;right:14px}.hero-art{transform:rotate(-5deg) translate(75px,16px)}.hero{min-height:280px}.hero-content{max-width:410px}}
+@media(max-width:590px){.topbar h1{font-size:18px}.top-import{padding:9px 12px}.top-import span{display:none}.hero{padding:27px 22px;min-height:330px}.hero h2{font-size:34px}.hero-art{position:absolute;right:-160px;opacity:.27;top:26px;transform:rotate(-8deg)}.hero p{max-width:330px}.dashboard-grid{gap:9px}.feature-card{padding:14px}.feature-card strong{font-size:13px}.feature-card p{font-size:11px;min-height:64px}.feature-icon{margin-bottom:11px}.toolbar-card,.graphics-layout,.patch-grid{grid-template-columns:1fr}.toolbar-card{gap:13px;padding:15px}.tool-heading h2{font-size:25px}.tool-heading p{font-size:12px}.pill{font-size:9px}.editor-location{gap:7px}.editor-location small{display:none}.edit-controls{grid-template-columns:1fr 1fr}.edit-controls .compact{grid-column:1/-1}.hex-grid{min-width:333px}.hex-row{grid-template-columns:55px repeat(8,minmax(27px,1fr));gap:4px}.hex-byte{font-size:11px}.hex-scroller{padding:12px 8px}.patch-card p{min-height:0}.export-card{display:block}.export-actions{margin-top:16px}.change-summary{gap:8px}.change-summary>div{padding:12px 9px}.change-summary small{font-size:9px}.change-summary strong{font-size:21px}.rom-panel{padding:16px}.meta-tag{font-size:9px}.change-row{font-size:11px}.canvas-buttons .secondary-button{font-size:11px;padding:9px}.action-card{padding:15px}}
+@media(max-width:370px){.topbar h1{font-size:16px}.feature-card p{min-height:85px}.hero h2{font-size:30px}.hex-byte{padding:8px 1px}.hex-row{gap:3px}}
+
+.header-utility{margin-top:16px;display:flex;justify-content:space-between;align-items:center;gap:15px;padding:18px 20px;background:var(--panel);border:1px solid var(--border);border-radius:15px}.header-utility h3{font-size:15px;margin-bottom:4px}.header-utility p{font-size:12px;margin:0}@media(max-width:590px){.header-utility{display:block}.header-utility button{margin-top:13px;width:100%}}
+
+/* v0.3: explicit graphic source selection; never display the ROM header as a sprite. */
+.discovery-card{border:1px solid var(--border);background:var(--panel);border-radius:17px;padding:19px;margin-bottom:14px;display:grid;gap:9px}
+.discovery-card strong{font-size:14px}.discovery-card p{font-size:12px;margin:0;color:var(--muted)}
+.control-label{color:#bbc8e0;font-size:11px;font-weight:720;margin-top:7px}
+.discovery-card select{display:block;width:100%;min-height:45px;background:#101a2a;border:1px solid #43516f;color:var(--text);border-radius:10px;padding:12px;font-size:13px}
+.discovery-card select:disabled{opacity:.5}
+.text-button{background:none;border:0;color:#bcb4ff;font-size:11px;padding:10px 0 0;text-align:left}
+.tile-placeholder{padding:18px;max-width:240px;color:#a1b0cd;text-align:center;font-size:13px}
+.canvas-wrap:has(#tile-canvas[hidden]){min-height:230px}
+#tile-canvas[hidden]{display:none}
+.graphics-toolbar .input-row{flex-wrap:wrap}.graphics-toolbar .input-row input{min-width:100px}.graphics-toolbar .input-row button{flex-shrink:0}
+#graphics-detail{margin:10px 0 16px;min-height:32px}
+@media(max-width:590px){.graphics-toolbar .input-row input{flex-basis:100%;width:100%}.graphics-toolbar .input-row button{flex:1}.discovery-card .primary-button{width:100%}}
+
+/* v0.4: clear, touch-sized workspace navigation alongside Android system Back. */
+.home-button{display:inline-flex;align-items:center;gap:7px;padding:9px 12px;margin:0 0 9px;border:1px solid #465374;border-radius:10px;color:#d2c8ff;background:#222e49;font-weight:700;font-size:12px;font-family:inherit;cursor:pointer;min-height:39px}
+.home-button[hidden]{display:none}
+@media(max-width:590px){.home-button{margin-bottom:8px}.home-button span{font-size:11px}}
+
+/* HMA named-data inspector: thumb-sized rows, no table overflow. */
+.semantic-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin:18px 0}
+.semantic-card{border:1px solid #344158;background:#172237;border-radius:22px;padding:20px;min-width:0}
+.anchor-list{display:flex;flex-direction:column;gap:6px;max-height:62vh;overflow:auto;overscroll-behavior:contain;margin-top:12px}
+.anchor-entry{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-height:56px;padding:12px;border-radius:11px;border:1px solid #293951;color:#e5ebfa;background:#111c30;max-width:100%;text-align:left;overflow-wrap:anywhere}
+.anchor-entry strong{font-size:13px;font-weight:650}.anchor-entry span{font-size:12px;color:#aab8cf}
+.anchor-entry.active{border-color:#9d89fa;background:#2f3155}
+.anchor-detail{min-height:190px;max-width:100%;overflow-wrap:anywhere;margin:16px 0}
+.anchor-detail h3{font-size:16px;overflow-wrap:anywhere}
+.semantic-code{font-family:ui-monospace,monospace;font-size:12px;color:#c9b8fa;padding:10px;background:#0c172b;border-radius:10px;overflow-wrap:anywhere;margin:10px 0}
+.semantic-warning{background:#4d302c;color:#ffe5dc;padding:12px;border-radius:10px;margin:10px 0}
+.semantic-bytes{font-family:ui-monospace,monospace;white-space:pre-wrap;word-break:break-all;font-size:12px;color:#bcd3ed;line-height:1.6;padding:12px;background:#0c172b;border-radius:12px}
+@media(max-width:850px){.semantic-grid{grid-template-columns:1fr}.anchor-list{max-height:42vh}.semantic-card{padding:15px}}
+/* Six tools, one fixed row on narrow Android screens. */
+@media(max-width:820px){
+ .bottom-nav{grid-template-columns:repeat(6,minmax(0,1fr));height:68px;overflow:hidden}
+ .mobile-tab{min-width:0;max-width:100%;font-size:9.5px;padding:3px 0;white-space:nowrap}
+ .mobile-tab span{font-size:21px}
+}
+#anchor-group{width:100%;min-height:46px;border-radius:11px;padding:11px 13px;background:#0d1727;color:#f4f5fc;border:1px solid #35425a}
+</style>
+</head><body>
+<div class="shell" id="app">
+<aside class="side">
+  <div class="brand"><div class="brand-icon" aria-hidden="true">◆</div><div><div class="brand-name">CUBHMA<span> / MOBILE</span></div><div class="brand-sub">ROM WORKBENCH <span class="version">PORT 0.5 · FOUNDATION</span></div></div></div>
+  <div class="nav-items" aria-label="Tool sections">
+    <button class="tab active" data-tab="home"><span class="nav-icon">▦</span><span>Workspace</span></button>
+    <button class="tab" data-tab="hex"><span class="nav-icon">⌗</span><span>Hex editor</span></button>
+    <button class="tab" data-tab="anchors"><span class="nav-icon">⌕</span><span>Named data</span></button>
+    <button class="tab" data-tab="graphics"><span class="nav-icon">◈</span><span>Graphics</span></button>
+    <button class="tab" data-tab="patches"><span class="nav-icon">⇄</span><span>Patches</span></button>
+    <button class="tab" data-tab="changes"><span class="nav-icon">≡</span><span>Changes</span><span class="nav-counter" id="changes-tab-count" hidden>0</span></button>
+  </div>
+  <div class="sidebar-bottom"><div class="secure-dot"></div><span>LOCAL FILES ONLY<br><small>Never uploaded · Works offline</small></span></div>
+</aside>
+<div class="main-column">
+<header class="topbar"><div class="topbar-left"><button type="button" id="home-button" class="home-button" hidden aria-label="Return to workspace">← <span>Home</span></button><div class="overline" id="top-eyebrow">YOUR WORKSPACE</div><h1 id="top-title">ROM Workbench</h1></div><div class="topbar-actions"><button class="icon-button" id="help-button" aria-label="Help and safety">?</button><label class="top-import" for="rom-picker">＋ <span>Open ROM</span></label></div></header>
+<main class="content">
+<section class="view active" id="view-home">
+  <div class="hero"><div class="hero-content"><div class="hero-kicker">YOUR ROM. YOUR DEVICE.</div><h2>A smarter way to<br><em>work on the go.</em></h2><p>Explore, inspect and safely edit GBA ROM data in your browser. No uploads. No installation required.</p><label for="rom-picker" class="primary-button">＋ Open a GBA ROM <span>›</span></label><div class="hero-note">Supports .gba files · up to 128 MiB</div></div><div class="hero-art" aria-hidden="true"><div class="art-frame"><div class="art-top"><span></span><span></span><span></span><b>ROM / INSPECTOR</b></div><div class="art-lines"><i>0001A0</i><strong>50 4F 4B 45 4D 4F 4E</strong><i>0001B0</i><strong>96 00 00 00 00 00 00</strong><i>0001C0</i><strong>FF FF <u>20 48</u> FF FF FF</strong></div><div class="art-bottom">DATA INTEGRITY <span>● PROTECTED</span></div></div></div></div>
+  <div class="section-heading"><h3>Current session</h3><span id="session-state" class="muted">No ROM loaded</span></div>
+  <div class="rom-panel" id="rom-panel"><div class="rom-placeholder"><div class="big-file-icon">◇</div><div><strong>No ROM loaded yet</strong><p>Choose a legally obtained GBA ROM to get started. Your file stays on this device.</p></div></div></div>
+  <div class="dashboard-grid">
+    <button class="feature-card" data-go="hex"><div class="feature-icon violet">⌗</div><strong>Hex editor</strong><p>Browse bytes, search patterns, use pointers and stage edits.</p><span>Open tool ↗</span></button>
+    <button class="feature-card" data-go="anchors"><div class="feature-icon green">⌕</div><strong>Named ROM data</strong><p>Import CUBHMA TOML metadata and inspect verified-offset anchors, pointers and formats.</p><span>Open tool ↗</span></button>
+    <button class="feature-card" data-go="graphics"><div class="feature-icon blue">◈</div><strong>Graphics inspector</strong><p>Find LZ77-compressed tile candidates and inspect palettes.</p><span>Open tool ↗</span></button>
+    <button class="feature-card" data-go="patches"><div class="feature-icon green">⇄</div><strong>Patch tools</strong><p>Apply validated BPS/IPS patches or export an IPS diff.</p><span>Open tool ↗</span></button>
+    <button class="feature-card" data-go="changes"><div class="feature-icon amber">≡</div><strong>Change history</strong><p>Review every staged edit and save a safe copy.</p><span>Open tool ↗</span></button>
+  </div>
+  <p class="disclaimer">Independent, unofficial mobile companion. This is not the full CUBHMA or CUBE engine. Semantic map, sprite, script and expansion editors are not yet implemented.</p>
+</section>
+<section class="view" id="view-hex">
+  <div class="tool-heading"><div><div class="eyebrow">BINARY INSPECTOR</div><h2>Hex editor</h2><p>Tap a byte to inspect it. Editing is locked until explicitly enabled.</p></div><span class="pill" id="hex-status">Read only</span></div>
+  <div class="toolbar-card"><div class="input-wrap"><label for="hex-offset">Go to offset / GBA pointer</label><div class="input-row"><input id="hex-offset" inputmode="text" value="000000" spellcheck="false" placeholder="0x08000000"><button id="hex-jump" class="subtle-button">Go</button></div></div><div class="input-wrap"><label for="hex-search">Search hexadecimal bytes</label><div class="input-row"><input id="hex-search" placeholder="e.g. 12 34 AB CD" spellcheck="false"><button id="hex-find" class="subtle-button">Find</button></div></div></div>
+  <div class="editor-card"><div class="editor-top"><div class="editor-location"><span>OFFSET</span><b id="hex-page-label">000000</b><small id="hex-range-label">No data</small></div><div class="editor-controls"><button class="small-ctrl" id="hex-prev" aria-label="Previous page">←</button><button class="small-ctrl" id="hex-next" aria-label="Next page">→</button></div></div><div class="hex-scroller"><div id="hex-grid" class="hex-grid" aria-label="ROM hexadecimal bytes"><div class="empty-state">Open a ROM to inspect bytes.</div></div></div><div class="editor-footer"><div class="legend"><span><i class="legend-dot lavender"></i> Selected</span><span><i class="legend-dot coral"></i> Modified</span></div><span>128 bytes / page</span></div></div>
+  <div class="action-card"><div class="action-heading"><div><strong>Raw editing</strong><p>Only edit documented offsets. Raw changes can break ROMs.</p></div><label class="switch"><input type="checkbox" id="edit-unlock"><span></span></label></div><div class="edit-controls"><div><label for="selected-offset">Selected byte</label><input id="selected-offset" readonly placeholder="—"></div><div><label for="selected-value">New value (00–FF)</label><input id="selected-value" spellcheck="false" maxlength="2" placeholder="FF"></div><button class="primary-button compact" id="write-byte" disabled>Write byte</button></div><div class="edit-actions"><button id="undo-button" class="secondary-button">↶ Undo</button><button id="redo-button" class="secondary-button">↷ Redo</button><span id="edited-counter">0 bytes changed</span></div></div>
+</section>
+<section class="view" id="view-anchors">
+ <div class="tool-heading"><div><div class="eyebrow">CUBHMA METADATA · SOURCE-GROUNDED</div><h2>Named ROM data</h2><p>Browse HMA / CUBHMA TOML anchors at their documented offsets. This is the start of the actual ROM-aware editor layer—not a replacement for the desktop table parser.</p></div><span class="pill">Read only</span></div>
+ <div class="toolbar-card"><div class="input-wrap"><label>Load CUBHMA metadata</label><div class="input-row"><label for="metadata-picker" class="secondary-button picker-label">↑ Import .toml files</label><button class="subtle-button" id="metadata-stock">Get stock metadata</button></div><p class="palette-note">For a modified CUBE ROM, import metadata generated for <b>that exact ROM build</b>. Stock offsets are unsafe to assume. Stock metadata download needs internet; local TOML files work offline.</p></div><div id="metadata-status" class="palette-note">No metadata loaded. ROM and metadata files remain on this device. Stock metadata fetch downloads text only; it does not upload ROM data.</div></div>
+ <div class="toolbar-card"><div class="input-wrap"><label for="anchor-find">Search named anchors</label><input id="anchor-find" placeholder="e.g. pokemon.stats, maps, trainers, sound…" spellcheck="false"></div><div class="input-wrap"><label for="anchor-group">Category</label><select id="anchor-group"><option value="all">All categories</option></select></div></div>
+ <div class="semantic-grid"><div class="semantic-card"><div class="card-caption"><b>ANCHOR DIRECTORY</b><span id="anchor-count">0 loaded</span></div><div id="anchor-list" class="anchor-list"><div class="empty-state">Load ROM metadata to browse named data.</div></div></div><div class="semantic-card"><div class="card-caption"><b>DATA INSPECTION</b><span>Never writes ROM data</span></div><div id="anchor-detail" class="anchor-detail"><div class="empty-state">Choose an anchor to inspect its address, format and bytes.</div></div><div class="input-row"><button id="anchor-to-hex" class="secondary-button" disabled>Open in hex</button><button id="anchor-follow-pointer" class="secondary-button" disabled>Follow pointer</button><button id="anchor-to-graphics" class="secondary-button" disabled>View LZ graphic</button></div></div></div>
+ <div class="safety-strip"><span class="safety-icon">!</span><div><strong>Metadata ≠ verified ROM compatibility.</strong><p>HMA named anchors can describe tables, text, graphics and scripts, but reading their addresses does not establish that an expanded CUBE ROM uses those locations. Full writable format decoding, repointing and map/collision editing are not implemented here.</p></div></div>
+</section>
+<section class="view" id="view-graphics">
+ <div class="tool-heading"><div><div class="eyebrow">GBA GRAPHICS EXPLORER</div><h2>Graphics explorer</h2><p>Search for LZ77-compressed tile data, or inspect a known raw offset. Read-only, with no guessed colours.</p></div><span class="pill">Inspect only</span></div>
+ <div class="discovery-card"><div><strong>Find compressed graphics</strong><p>Scan this ROM for valid GBA LZ77 (0x10) streams with 4bpp-compatible lengths. Results are <b>candidates</b>, not verified sprites or maps.</p></div><button id="graphics-scan" class="primary-button" disabled>Find LZ77 graphics</button><p id="graphics-scan-status" class="palette-note" role="status">Open a ROM, then run the scan. Nothing is decoded automatically from offset zero.</p><label class="control-label" for="graphics-candidates">Detected streams</label><select id="graphics-candidates" disabled><option value="">No streams selected</option></select></div>
+ <div class="toolbar-card graphics-toolbar"><div class="input-wrap"><label for="graphics-offset">Known graphics offset / GBA pointer</label><div class="input-row"><input id="graphics-offset" value="" placeholder="e.g. 12F500" spellcheck="false" inputmode="text"><button id="graphics-decode" class="subtle-button" disabled>Decode LZ</button><button id="graphics-show" class="secondary-button" disabled>Raw</button></div></div><div class="input-wrap"><label for="palette-offset">Optional 16-colour palette offset</label><div class="input-row"><input id="palette-offset" value="" placeholder="e.g. 14A200" spellcheck="false" inputmode="text"><button id="palette-show" class="subtle-button" disabled>Load</button></div><button class="text-button" id="palette-reset" disabled>Use neutral grayscale instead</button></div></div>
+ <div class="graphics-layout"><div class="canvas-card"><div class="card-caption"><b id="graphics-source-label">NO GRAPHICS SELECTED</b><span>16 × 16 tiles · 128 × 128 px</span></div><div class="canvas-wrap"><canvas id="tile-canvas" width="128" height="128" hidden></canvas><div id="tile-empty" class="tile-placeholder">Select a compressed stream or enter a known tile offset. Raw ROM bytes are not automatically a picture.</div></div><div class="palette-note" id="graphics-detail">Waiting for a known graphic source.</div><div class="canvas-buttons"><button class="secondary-button" id="tiles-back" disabled>← 256 tiles</button><button class="secondary-button" id="tiles-forward" disabled>256 tiles →</button></div></div><div class="canvas-card"><div class="card-caption"><b>16-COLOUR PALETTE</b><span>BGR555 / neutral</span></div><div class="palette-grid" id="palette-grid"></div><div class="palette-note" id="palette-caption">Neutral grayscale for structure preview. Real colours require the matching ROM palette.</div><div class="graphics-info"><strong>Why did I see rainbow static before?</strong><p>The old viewer interpreted the first 8 KiB of the ROM as uncompressed 4bpp image data and its header as a colour palette. That was arbitrary binary data, <b>not</b> a decoded sprite. This version starts empty, supports bounded LZ77 decoding and makes palette selection explicit. Tile order, dimensions and palette association still require ROM-aware metadata.</p></div></div></div>
+</section>
+<section class="view" id="view-patches">
+ <div class="tool-heading"><div><div class="eyebrow">SAFE PATCH WORKFLOW</div><h2>Patch tools</h2><p>Verify input patches, then save your patched ROM as a separate file.</p></div><span class="pill">Local processing</span></div>
+ <div class="patch-grid"><div class="patch-card"><div class="patch-number">01 / IMPORT</div><h3>Apply a patch</h3><p>Load a .bps or .ips patch against your open ROM. BPS validates patch, source and output CRCs. IPS has no built-in checksum.</p><div class="patch-tagline"><span>BPS1</span><span>IPS</span><span>≤128 MiB</span></div><label for="patch-picker" class="secondary-button patch-button">Choose patch file <span>↗</span></label><div id="patch-filename" class="small-label">No patch selected</div><button class="primary-button block" id="apply-patch" disabled>Apply patch to working copy</button></div><div class="patch-card"><div class="patch-number">02 / EXPORT</div><h3>Create an IPS patch</h3><p>Export your staged raw byte changes as an IPS difference. Not supported after a BPS/IPS import or beyond IPS's 16 MiB address limit.</p><div class="patch-tagline"><span>CHANGED BYTES ONLY</span><span>NO ROM DATA</span></div><button class="secondary-button patch-button" id="export-ips">Export IPS diff <span>↗</span></button><div class="small-label">Available for unpatched sessions with raw edits.</div></div></div>
+ <div class="safety-strip"><span class="safety-icon">!</span><div><strong>ROM safety first</strong><p>Applying a patch never overwrites your selected source file. Save As creates a new ROM. CUBE upgrade/migration routines are not implemented; a compatible BPS patch may be supplied independently.</p></div></div>
+</section>
+<section class="view" id="view-changes">
+ <div class="tool-heading"><div><div class="eyebrow">SESSION CONTROL</div><h2>Changes & export</h2><p>Check what has changed before creating a copy of the ROM.</p></div><span class="pill" id="change-pill">Clean</span></div>
+ <div class="change-summary"><div><small>CHANGED BYTES</small><strong id="summary-byte-count">0</strong></div><div><small>PATCH APPLIED</small><strong id="summary-patched">NO</strong></div><div><small>ROM SIZE</small><strong id="summary-size">—</strong></div></div>
+ <div class="export-card"><div><h3>Save your work</h3><p>Save a separate ROM copy with all staged changes. Or export a JSON sidecar of raw edits to resume later using the exact same original ROM.</p></div><div class="export-actions"><button id="save-rom" class="primary-button">↓ Save ROM copy</button><button id="save-project" class="secondary-button">↓ Export project JSON</button><label for="project-picker" class="secondary-button picker-label">↑ Restore project JSON</label></div></div>
+ <div class="header-utility"><div><h3>GBA header integrity</h3><p id="header-diagnostics">Open a ROM to inspect its GBA header checksum.</p></div><button class="secondary-button" id="fix-checksum">Stage checksum fix</button></div>
+ <div class="changes-list-card"><div class="section-heading"><h3>Raw byte changes</h3><span class="muted" id="change-list-info">No edits</span></div><div class="changes-list" id="changes-list"><div class="empty-state">Open a ROM and make a raw edit to see changes here.</div></div></div>
+ <button id="discard-button" class="danger-button">Discard edits and reset to the original ROM</button>
+</section>
+</main>
+</div>
+<nav class="bottom-nav" aria-label="Mobile navigation"><button class="mobile-tab active" data-tab="home"><span>▦</span>Home</button><button class="mobile-tab" data-tab="hex"><span>⌗</span>Hex</button><button class="mobile-tab" data-tab="anchors"><span>⌕</span>Data</button><button class="mobile-tab" data-tab="graphics"><span>◈</span>Graphics</button><button class="mobile-tab" data-tab="patches"><span>⇄</span>Patches</button><button class="mobile-tab" data-tab="changes"><span>≡</span>Changes</button></nav>
+</div>
+<input hidden type="file" accept=".gba,.bin,.rom,application/octet-stream" id="rom-picker">
+<input hidden type="file" multiple accept=".toml,.txt,text/plain" id="metadata-picker">
+<input hidden type="file" accept=".bps,.ips,application/octet-stream" id="patch-picker">
+<input hidden type="file" accept=".json,application/json" id="project-picker">
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<dialog id="confirm-dialog"><form method="dialog"><div class="dialog-kicker">CONFIRM ACTION</div><h3 id="confirm-title">Confirm</h3><p id="confirm-text"></p><div class="dialog-buttons"><button value="cancel" class="secondary-button">Cancel</button><button value="yes" class="primary-button">Continue</button></div></form></dialog>
+<dialog id="help-dialog"><form method="dialog"><div class="dialog-kicker">IMPORTANT INFORMATION</div><h3>About Mobile Lab</h3><p>This independent web application reads your local ROM. It supports safe copies, hex editing, GBA header checks, patch tools and a graphics inspector with LZ77 tile discovery. It does not include upstream CUBHMA's ROM-specific table parser, map/event/script editors, CUBE version migrations or bundled copyrighted ROM/patch material.</p><p><strong>Safety:</strong> Back up originals. Only edit offsets you understand. No changes are auto-saved; closing the tab can discard edits. An IPS file carries no source validation. No file is transmitted by this app.</p><p><strong>Install:</strong> When hosted over HTTPS, use your browser's “Add to Home screen”. The single-file offline edition works directly from your Files app.</p><button value="close" class="primary-button block">Got it</button></form></dialog>
+<script>
+'use strict';
+/* CUBHMA Mobile Lab: independent, data-only GBA ROM primitives. No upstream code bundled. */
+const MAX_BYTES = 128 * 1024 * 1024;
+const hex = (n, digits=6) => (Number(n) >>> 0).toString(16).toUpperCase().padStart(digits, '0');
+function parseOffset(text, { allowPointer=true }={}) {
+  let s=String(text).trim().replace(/[_\s]/g,'');
+  if (!s) throw Error('Enter an offset');
+  let n;
+  if (/^0x[0-9a-f]+$/i.test(s)) n=parseInt(s.slice(2),16);
+  else if (/^[0-9a-f]+h$/i.test(s)) n=parseInt(s.slice(0,-1),16);
+  else if (/^[0-9a-f]+$/i.test(s)) n=parseInt(s,16); // editor offsets are hexadecimal
+  else throw Error('Offsets must be hexadecimal (example: 1A2B or 0x08001A2B)');
+  if (!Number.isSafeInteger(n)) throw Error('Offset too large');
+  if (allowPointer && n>=0x08000000 && n < 0x0A000000) n-=0x08000000;
+  return n;
+}
+function parseHexBytes(str){
+  let s=String(str).trim().replace(/(?:0x)/gi,'').replace(/[\s,_-]/g,'');
+  if(!s || !/^[0-9a-f]+$/i.test(s) || s.length%2) throw Error('Enter complete hexadecimal byte pairs, e.g. 12 AB 00');
+  if(s.length>8192) throw Error('Search pattern too long');
+  return Uint8Array.from(s.match(/../g), x=>parseInt(x,16));
+}
+function gbaHeader(data){
+  if(!(data instanceof Uint8Array) || data.length<0xC0) throw Error('Not enough bytes for a GBA header');
+  const ascii=(from,len)=>Array.from(data.subarray(from,from+len)).map(c=>c>=32&&c<=126?String.fromCharCode(c):'?').join('').replace(/\?+$/,'').trim();
+  const title=ascii(0xA0,12), code=ascii(0xAC,4);
+  const family=code.startsWith('BPR')?'FireRed family':code.startsWith('BPG')?'LeafGreen family':code.startsWith('BPE')?'Emerald family':code.startsWith('AXV')?'Ruby family':code.startsWith('AXP')?'Sapphire family':'Unknown or custom';
+  let sum=0; for(let i=0xA0;i<=0xBC;i++) sum=(sum+data[i])&255;
+  const expected=(0x19-sum)&255;
+  return {title:title||'Untitled',code:code||'????',family,expected,stored:data[0xBD],fixedValid:data[0xB2]===0x96,checksumValid:expected===data[0xBD],size:data.length};
+}
+const crcTable=(()=>{ const table=new Uint32Array(256);for(let i=0;i<256;i++){let c=i;for(let j=0;j<8;j++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);table[i]=c>>>0;}return table;})();
+function crc32(data,start=0,end=data.length) {
+  let c=0xFFFFFFFF;for(let i=start;i<end;i++)c=crcTable[(c^data[i])&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0;
+}
+const read32=(data,o)=>((data[o]|(data[o+1]<<8)|(data[o+2]<<16)|(data[o+3]<<24))>>>0);
+function bpsVar(data, state, end){
+  let value=0, shift=1;
+  for(let i=0;i<12;i++){
+    if(state.pos>=end)throw Error('Truncated BPS instruction');
+    const b=data[state.pos++]; const term=(b&127)*shift;
+    if(!Number.isSafeInteger(term+value))throw Error('BPS varint overflow');
+    value+=term;
+    if(b&128)return value;
+    shift*=128;value+=shift;
+    if(!Number.isSafeInteger(value))throw Error('BPS varint overflow');
+  }
+  throw Error('BPS varint too long');
+}
+function bpsSigned(data,state,end){let n=bpsVar(data,state,end);return (n&1)?-Math.floor(n/2):Math.floor(n/2);}
+function applyBps(source,patch){
+  if(!(source instanceof Uint8Array) || !(patch instanceof Uint8Array))throw Error('Expected binary ROM and patch');
+  if(patch.length<19 || String.fromCharCode(...patch.subarray(0,4))!=='BPS1')throw Error('Not a BPS1 patch');
+  const end=patch.length-12;
+  if(crc32(patch,0,patch.length-4)!==read32(patch,patch.length-4))throw Error('BPS patch CRC mismatch');
+  if(crc32(source)!==read32(patch,patch.length-12))throw Error('BPS source CRC mismatch: wrong base ROM');
+  const state={pos:4}; const srcLen=bpsVar(patch,state,end),outLen=bpsVar(patch,state,end),metaLen=bpsVar(patch,state,end);
+  if(srcLen!==source.length)throw Error('BPS source size mismatch');
+  if(outLen<0xC0 || outLen>MAX_BYTES)throw Error('Target ROM exceeds safe size limits');
+  if(metaLen<0 || state.pos+metaLen>end)throw Error('BPS metadata truncated');
+  state.pos+=metaLen;
+  const out=new Uint8Array(outLen); let cursor=0, sourceRel=0, targetRel=0;
+  while(cursor<out.length){
+    const action=bpsVar(patch,state,end),kind=action%4,count=Math.floor(action/4)+1;
+    if(count>out.length-cursor)throw Error('BPS instruction exceeds target');
+    if(kind===0){
+      if(cursor+count>source.length)throw Error('BPS source read exceeds ROM');
+      out.set(source.subarray(cursor,cursor+count),cursor);
+    }else if(kind===1){
+      if(state.pos+count>end)throw Error('Truncated BPS literal');
+      out.set(patch.subarray(state.pos,state.pos+count),cursor);state.pos+=count;
+    }else if(kind===2){
+      sourceRel+=bpsSigned(patch,state,end);
+      if(!Number.isSafeInteger(sourceRel)||sourceRel<0||sourceRel+count>source.length)throw Error('BPS source copy out of bounds');
+      out.set(source.subarray(sourceRel,sourceRel+count),cursor);sourceRel+=count;
+    }else{
+      targetRel+=bpsSigned(patch,state,end);
+      if(!Number.isSafeInteger(targetRel)||targetRel<0||targetRel>=cursor)throw Error('BPS target copy out of bounds');
+      for(let j=0;j<count;j++){
+        if(targetRel+j>=cursor+j)throw Error('Invalid BPS target copy');
+        out[cursor+j]=out[targetRel+j];
+      }
+      targetRel+=count;
+    }
+    cursor+=count;
+  }
+  if(state.pos!==end)throw Error('Extra BPS instructions after target');
+  if(crc32(out)!==read32(patch,patch.length-8))throw Error('BPS target CRC mismatch');
+  return out;
+}
+function applyIps(source,patch){
+  if(!(source instanceof Uint8Array)||!(patch instanceof Uint8Array))throw Error('Expected binary data');
+  if(patch.length<8 || String.fromCharCode(...patch.subarray(0,5))!=='PATCH')throw Error('Not an IPS patch');
+  let p=5; const records=[]; let required=source.length,truncate=null;
+  while(true){
+    if(p+3>patch.length)throw Error('Missing IPS EOF');
+    if(patch[p]===69&&patch[p+1]===79&&patch[p+2]===70){p+=3;break;}
+    if(p+5>patch.length)throw Error('Truncated IPS record');
+    const off=patch[p]*65536+patch[p+1]*256+patch[p+2],len=patch[p+3]*256+patch[p+4];p+=5;
+    if(len===0){
+      if(p+3>patch.length)throw Error('Truncated IPS RLE');
+      const count=patch[p]*256+patch[p+1],value=patch[p+2];p+=3;
+      if(off+count>MAX_BYTES)throw Error('IPS writes past max ROM size');
+      records.push({off,len:count,value});required=Math.max(required,off+count);
+    } else {
+      if(p+len>patch.length)throw Error('Truncated IPS bytes');
+      if(off+len>MAX_BYTES)throw Error('IPS writes past max ROM size');
+      records.push({off,len,bytes:patch.subarray(p,p+len)});p+=len;required=Math.max(required,off+len);
+    }
+  }
+  if(p!==patch.length){
+    if(p+3!==patch.length)throw Error('Unexpected data after IPS EOF');
+    truncate=patch[p]*65536+patch[p+1]*256+patch[p+2];
+    if(truncate<0xC0 || truncate>MAX_BYTES)throw Error('Invalid IPS truncate size');
+    if(required>truncate && records.some(r=>r.off+r.len>truncate))throw Error('IPS record exceeds truncation size');
+    required=truncate;
+  }
+  const out=new Uint8Array(required);out.set(source.subarray(0,required));
+  for(const r of records){if(r.bytes)out.set(r.bytes,r.off);else out.fill(r.value,r.off,r.off+r.len);}
+  return out;
+}
+function buildIps(edits, original){
+  if(!edits.size)throw Error('No edits to export');
+  const sorted=[...edits.entries()].sort((a,b)=>a[0]-b[0]);
+  if(sorted.at(-1)[0]>0xFFFFFF)throw Error('IPS cannot encode changes past 16 MiB; save a ROM copy');
+  const output=[80,65,84,67,72];let i=0;
+  while(i<sorted.length){
+    let start=sorted[i][0],data=[];
+    if(start===0x454F46){start--;data.push(original[start]);}
+    let expected=start+data.length;
+    while(i<sorted.length && sorted[i][0]===expected && data.length<65535){data.push(sorted[i][1]);i++;expected++;}
+    if(!data.length)throw Error('Invalid IPS range');
+    output.push((start>>>16)&255,(start>>>8)&255,start&255,(data.length>>>8)&255,data.length&255,...data);
+  }
+  output.push(69,79,70);return Uint8Array.from(output);
+}
+function bgr555(value){
+  const r=value&31,g=(value>>>5)&31,b=(value>>>10)&31;
+  const up=n=>(n<<3)|(n>>>2);
+  return {r:up(r),g:up(g),b:up(b),css:`rgb(${up(r)},${up(g)},${up(b)})`};
+}
+function paletteAt(bytes,offset){
+  if(offset<0||offset+32>bytes.length)throw Error('Palette needs 32 bytes at this offset');
+  return Array.from({length:16},(_,i)=>{const v=bytes[offset+i*2]|(bytes[offset+i*2+1]<<8);return {...bgr555(v),value:v};});
+}
+/** GBA BIOS LZ77 (0x10) decompression. Bounded to avoid untrusted-ROM zip bombs. */
+const MAX_GRAPHIC_BYTES = 512 * 1024;
+function decodeLz10(bytes, offset=0, {maxOutput=MAX_GRAPHIC_BYTES}={}) {
+  if (!(bytes instanceof Uint8Array)) throw Error('Expected ROM bytes');
+  if (!Number.isInteger(offset) || offset < 0 || offset + 4 > bytes.length) throw Error('LZ77 header outside ROM');
+  if (bytes[offset] !== 0x10) throw Error('Not a GBA LZ77 (0x10) stream at this offset');
+  const size = bytes[offset+1] | (bytes[offset+2] << 8) | (bytes[offset+3] << 16);
+  if (!size || size > maxOutput) throw Error(`LZ77 output must be 1–${maxOutput} bytes`);
+  const output = new Uint8Array(size);
+  let ip=offset+4, op=0;
+  while (op < size) {
+    if (ip >= bytes.length) throw Error('Truncated LZ77 flags');
+    const flags=bytes[ip++];
+    for (let bit=7;bit>=0 && op<size;bit--) {
+      if (flags & (1<<bit)) {
+        if (ip+2>bytes.length) throw Error('Truncated LZ77 back-reference');
+        const b0=bytes[ip++],b1=bytes[ip++];
+        const count=(b0>>>4)+3, distance=(((b0&15)<<8)|b1)+1;
+        if (distance>op) throw Error('Invalid LZ77 back-reference before beginning');
+        if (op+count>size) throw Error('LZ77 back-reference exceeds output length');
+        for (let j=0;j<count;j++) {output[op]=output[op-distance];op++;}
+      } else {
+        if (ip>=bytes.length) throw Error('Truncated LZ77 literal');
+        output[op++]=bytes[ip++];
+      }
+    }
+  }
+  return {data:output,consumed:ip-offset};
+}
+/** Scan one bounded ROM interval for syntactically valid LZ77 tile candidates.
+ * Not a sprite classifier: a decoded 4bpp-looking stream can still be non-graphic data.
+ */
+function scanLz10Graphics(bytes, {start=0,end=bytes.length,maxResults=128,minBytes=256,maxBytes=MAX_GRAPHIC_BYTES}={}) {
+  if (!(bytes instanceof Uint8Array)) throw Error('Expected ROM bytes');
+  if (!Number.isInteger(start)||!Number.isInteger(end)||start<0||end<start||end>bytes.length) throw Error('Invalid scan region');
+  const matches=[];
+  for (let offset=start;offset<Math.min(end,bytes.length-3);offset++) {
+    if(bytes[offset]!==0x10)continue;
+    const size=bytes[offset+1]|(bytes[offset+2]<<8)|(bytes[offset+3]<<16);
+    if(size<minBytes||size>maxBytes||size%32!==0)continue;
+    try {
+      const {consumed}=decodeLz10(bytes,offset,{maxOutput:maxBytes});
+      matches.push({offset,size,compressedBytes:consumed,tileCount:size/32});
+      if(matches.length>=maxResults)break;
+    }catch(_){ /* A 0x10 byte is not sufficient evidence of a valid stream. */ }
+  }
+  return matches;
+}
+function gba4bppTile(bytes,tileOffset,palette){
+  if(tileOffset<0 || tileOffset+32>bytes.length)throw Error('Tile needs 32 bytes');
+  const pixels=new Uint8Array(64);
+  for(let i=0;i<32;i++){pixels[i*2]=bytes[tileOffset+i]&15;pixels[i*2+1]=bytes[tileOffset+i]>>>4;}
+  return pixels;
+}
+class RomModel {
+  constructor(name,data){
+    if(!(data instanceof Uint8Array)||data.length<0xC0||data.length>MAX_BYTES)throw Error('ROM must be 192 bytes to 128 MiB');
+    this.name=String(name||'game.gba');this.original=data.slice();this.base=data.slice();this.edits=new Map();this.undoStack=[];this.redoStack=[];this.appliedPatch=false;
+    this.originCrc=crc32(this.original);this.baseCrc=this.originCrc;
+  }
+  get length(){return this.base.length;}
+  get dirty(){return this.edits.size>0 || this.appliedPatch;}
+  read(pos){if(pos<0||pos>=this.base.length)throw Error('Offset beyond ROM');return this.edits.has(pos)?this.edits.get(pos):this.base[pos];}
+  hasEdit(pos){return this.edits.has(pos);}
+  _write(pos,val){if(val===this.base[pos])this.edits.delete(pos);else this.edits.set(pos,val);}
+  write(pos,value){
+    if(!Number.isInteger(pos)||pos<0||pos>=this.length)throw Error('Offset outside ROM');
+    if(!Number.isInteger(value)||value<0||value>255)throw Error('Byte must be between 00 and FF');
+    const before=this.read(pos);if(before===value)return false;
+    this._write(pos,value);this.undoStack.push({pos,before,after:value});if(this.undoStack.length>5000)this.undoStack.shift();this.redoStack=[];return true;
+  }
+  undo(){const e=this.undoStack.pop();if(!e)return false;this._write(e.pos,e.before);this.redoStack.push(e);return true;}
+  redo(){const e=this.redoStack.pop();if(!e)return false;this._write(e.pos,e.after);this.undoStack.push(e);return true;}
+  discardEdits(){this.edits.clear();this.undoStack=[];this.redoStack=[];}
+  reset(){this.base=this.original.slice();this.baseCrc=this.originCrc;this.appliedPatch=false;this.discardEdits();}
+  snapshot(){const out=this.base.slice();for(const [i,v] of this.edits)out[i]=v;return out;}
+  switchPatched(bytes){
+    if(!(bytes instanceof Uint8Array)||bytes.length<0xC0||bytes.length>MAX_BYTES)throw Error('Invalid patched ROM');
+    this.base=bytes.slice();this.baseCrc=crc32(this.base);this.appliedPatch=true;this.discardEdits();
+  }
+  find(pattern,starting=0){
+    if(!pattern.length)throw Error('Search for at least one byte');
+    const size=this.length;
+    for(let p=Math.max(0,starting);p<=size-pattern.length;p++){
+      if(this.read(p)!==pattern[0])continue;
+      let good=true;for(let j=1;j<pattern.length;j++){if(this.read(p+j)!==pattern[j]){good=false;break;}}
+      if(good)return p;
+    }
+    return -1;
+  }
+  fillList(start,count){
+    const rows=[];for(let i=start;i<Math.min(this.length,start+count);i++){rows.push({offset:i,byte:this.read(i),edited:this.hasEdit(i)});}return rows;
+  }
+  header(){const data=this.base.slice(0,0xC0);for(const [i,v] of this.edits){if(i<0xC0)data[i]=v;}return {...gbaHeader(data),size:this.length};}
+  fixHeader(){const checksum=this.header().expected;this.write(0xBD,checksum);return checksum;}
+  exportIps(){if(this.appliedPatch)throw Error('After applying a patch, save a ROM copy first. IPS export only covers raw edits on an unpatched ROM');return buildIps(this.edits,this.base);}
+  project(){
+    return {format:'cubhma-mobile-lab',version:1,fileName:this.name,originalSize:this.original.length,originalCrc32:hex(this.originCrc,8),baseCrc32:hex(this.baseCrc,8),patchApplied:this.appliedPatch,edits:[...this.edits.entries()].sort((a,b)=>a[0]-b[0]).map(([offset,value])=>[offset,value])};
+  }
+  loadProject(project){
+    if(!project||project.format!=='cubhma-mobile-lab'||project.version!==1)throw Error('Unrecognised project format');
+    if(project.patchApplied)throw Error('This sidecar references a patched ROM. Reopen the saved patched ROM before importing a sidecar');
+    if(this.appliedPatch)throw Error('Reset or reload an unpatched ROM before restoring a sidecar');
+    if(project.originalSize!==this.length||project.originalCrc32!==hex(this.originCrc,8)||project.baseCrc32!==hex(this.baseCrc,8))throw Error('ROM CRC or size differs from project. No changes imported');
+    if(!Array.isArray(project.edits)||project.edits.length>1000000)throw Error('Invalid project edit list');
+    const newEdits=new Map();
+    for(const e of project.edits){
+      if(!Array.isArray(e)||e.length!==2||!Number.isInteger(e[0])||e[0]<0||e[0]>=this.length||!Number.isInteger(e[1])||e[1]<0||e[1]>255)throw Error('Invalid edit in project; nothing imported');
+      if(newEdits.has(e[0]))throw Error('Duplicate project edit; nothing imported');
+      if(e[1]!==this.base[e[0]])newEdits.set(e[0],e[1]);
+    }
+    this.discardEdits();this.edits=newEdits;
+    return newEdits.size;
+  }
+}
+
+/** CUBHMA TOML named-anchor discovery.
+ * Provenance: HMA/CUBHMA uses [[NamedAnchors]] records in its TOML metadata.
+ * This parser deliberately reads only Name, Address and Format: it cannot safely
+ * reinterpret HMA's full format DSL, repoint data, or edit semantic tables.
+ */
+const maxMetadataSize=4*1024*1024;
+const maxRecords=50000;
+function tomlString(value){
+  const v=value.trim();
+  if(v.startsWith("'''")){const end=v.indexOf("'''",3);return end>=3?v.slice(3,end):null;}
+  if(v.startsWith('"""')){const end=v.indexOf('"""',3);return end>=3?v.slice(3,end):null;}
+  if(v[0]==='"'||v[0]==="'"){const quote=v[0],end=v.indexOf(quote,1);return end>0?v.slice(1,end):null;}
+  return v.split(/\s+#/)[0].trim();
+}
+function tomlInt(input){
+  const v=input.trim().replace(/_/g,'');
+  if(/^0x[0-9a-f]+$/i.test(v))return parseInt(v,16);
+  if(/^-?[0-9]+$/.test(v))return Number(v);
+  return NaN;
+}
+function parseHmaNamedAnchors(source,{romSize=Infinity}={}){
+  if(typeof source!=='string'||source.length>maxMetadataSize)throw Error('Metadata must be TOML text under 4 MiB');
+  if(!(romSize>=0))throw Error('Invalid ROM length');
+  const list=[],lines=source.replace(/^\uFEFF/,'').split(/\r?\n/);
+  let section='',current=null;
+  const flush=()=>{
+    if(!current)return;
+    const {name,address,format,line}=current;
+    if(name&&Number.isSafeInteger(address)&&address>=0){
+      list.push({name,address,format:format||'',line,valid:address<romSize});
+      if(list.length>maxRecords)throw Error('Too many named anchors');
+    }
+    current=null;
+  };
+  for(let i=0;i<lines.length;i++){
+    const l=lines[i].trim();
+    if(/^\[\[/.test(l)){
+      flush();const match=/^\[\[\s*([^\]]+)\s*\]\]/.exec(l);section=match?.[1]?.trim()||'';
+      if(section==='NamedAnchors')current={name:'',address:NaN,format:'',line:i+1};
+      continue;
+    }
+    if(/^\[/.test(l)){flush();section='';continue;}
+    if(section!=='NamedAnchors'||!current||l.startsWith('#'))continue;
+    const m=/^(Name|Address|Format)\s*=\s*(.+)$/.exec(l);
+    if(!m)continue;
+    if(m[1]==='Address')current.address=tomlInt(m[2]);
+    else {const value=tomlString(m[2]);if(value!==null){if(m[1]==='Name')current.name=value;else current.format=value;}}
+  }
+  flush();
+  return list;
+}
+function readAnchorInspection(bytes,anchor){
+  const readable=bytes instanceof Uint8Array ? i=>bytes[i] : (typeof bytes?.read==='function' ? i=>bytes.read(i) : null);
+  if(!readable||!anchor||!Number.isInteger(anchor.address))throw Error('Invalid ROM/anchor');
+  const start=anchor.address;if(start<0||start>=bytes.length)throw Error('Anchor outside the selected ROM');
+  const view=Uint8Array.from({length:Math.min(64,bytes.length-start)},(_,i)=>readable(start+i));
+  const word=(offset,len)=>offset+len<=bytes.length?Array.from({length:len},(_,i)=>readable(offset+i)).reduce((acc,b,i)=>acc+b*2**(i*8),0):null;
+  const ptr=word(start,4);
+  const romAddress=ptr!==null && ptr>=0x08000000 && ptr<0x0A000000 ? ptr-0x08000000 : null;
+  const pointerValid=romAddress!==null&&romAddress<bytes.length;
+  return {
+    address:start,format:anchor.format,
+    bytes:view,byte:readable(start),u16:word(start,2),u32:ptr,
+    pointer: pointerValid?romAddress:null,
+    pointerCandidate:romAddress!==null&&!pointerValid,
+    preview: Array.from(view).map(x=>x>=32&&x<=126?String.fromCharCode(x):'.').join(''),
+    isLz10:view[0]===0x10&&view.length>=4,
+  };
+}
+function groupAnchors(anchors){
+  const counts=new Map();
+  anchors.forEach(a=>{const k=a.name.split('.')[0]||'Other';counts.set(k,(counts.get(k)||0)+1);});
+  return [...counts].sort((a,b)=>b[1]-a[1]);
+}
+function filterAnchors(anchors,search='',category='all',limit=180){
+  const q=search.trim().toLowerCase();
+  return anchors.filter(a=>(category==='all'||a.name.split('.')[0]===category)&&(!q||a.name.toLowerCase().includes(q)||a.format.toLowerCase().includes(q))).slice(0,limit);
+}
+
+const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
+let metadata=[],metadataSources=[],selectedAnchor=null;
+let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
+const PER_PAGE=128;
+const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
+ctx.imageSmoothingEnabled=false;
+const controls=['hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','save-rom','save-project','export-ips','discard-button','edit-unlock'];
+const tabs={home:['YOUR WORKSPACE','ROM Workbench'],hex:['BINARY INSPECTOR','Hex editor'],anchors:['ROM SEMANTICS','Named data'],graphics:['GBA GRAPHICS','Graphics explorer'],patches:['PATCH WORKFLOW','Patch tools'],changes:['REVIEW & EXPORT','Changes']};
+function toast(message,bad=false){const t=$('toast');t.textContent=message;t.classList.toggle('error',bad);t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),4300);}
+function safeRun(fn){try{const result=fn();if(result?.catch) result.catch(err=>toast(err.message||String(err),true));}catch(err){toast(err.message||String(err),true);}}
+function confirmAction(title,description){return new Promise(resolve=>{const d=$('confirm-dialog');$('confirm-title').textContent=title;$('confirm-text').textContent=description;d.showModal();d.addEventListener('close',()=>resolve(d.returnValue==='yes'),{once:true});});}
+function ensureModel(){if(!model)throw Error('Open a GBA ROM first');return model;}
+// A fragment route works both in an HTTPS-installed PWA and in a locally opened
+// file:// standalone HTML app. Each tab change creates a real history entry,
+// allowing Android's system Back gesture/button to return to the previous tab.
+const routeFromHash=()=>{
+  const match=/^#\/(home|hex|anchors|graphics|patches|changes)$/.exec(location.hash);
+  return match ? match[1] : 'home';
+};
+function renderTab(name){
+  if(!tabs[name])name='home';
+  currentTab=name;
+  qa('.view').forEach(el=>el.classList.toggle('active',el.id==='view-'+name));
+  qa('[data-tab]').forEach(el=>{
+    el.classList.toggle('active',el.dataset.tab===name);
+    if(el.classList.contains('tab'))el.setAttribute('aria-current',el.dataset.tab===name?'page':'false');
+  });
+  $('top-eyebrow').textContent=tabs[name][0];$('top-title').textContent=tabs[name][1];
+  $('home-button').hidden=name==='home';
+  window.scrollTo({top:0,behavior:'instant'});
+  if(name==='hex')drawHex();if(name==='anchors')drawAnchors();if(name==='graphics')drawGraphics();if(name==='changes')drawChanges();
+}
+function gotoTab(name){
+  if(!tabs[name]||name===currentTab)return;
+  // Hash changes automatically add browser history entries, including file://.
+  // Rendering is performed by hashchange to keep native Back/Forward in sync.
+  location.hash='#/'+name;
+}
+window.addEventListener('hashchange',()=>{
+  renderTab(routeFromHash());
+});
+qa('[data-tab]').forEach(b=>b.addEventListener('click',()=>gotoTab(b.dataset.tab)));
+qa('[data-go]').forEach(b=>b.addEventListener('click',()=>gotoTab(b.dataset.go)));
+$('home-button').addEventListener('click',()=>gotoTab('home'));
+$('help-button').addEventListener('click',()=>$('help-dialog').showModal());
+function bytetext(n){return hex(n,2);}
+function showRomInfo(){
+  const panel=$('rom-panel');
+  if(!model){$('session-state').textContent='No ROM loaded';panel.innerHTML='<div class="rom-placeholder"><div class="big-file-icon">◇</div><div><strong>No ROM loaded yet</strong><p>Choose a legally obtained GBA ROM to get started. Your file stays on this device.</p></div></div>';return;}
+  const meta=model.header(),romLabel=document.createElement('div');romLabel.className='rom-identity';
+  const icon=document.createElement('div');icon.className='big-file-icon';icon.textContent='▣';romLabel.append(icon);
+  const middle=document.createElement('div');middle.className='rom-meta';const title=document.createElement('strong');title.textContent=model.name;const sub=document.createElement('p');sub.textContent=`${meta.family} · ${meta.code} · ${formatSize(model.length)}`;middle.append(title,sub);romLabel.append(middle);
+  const tags=document.createElement('div');tags.className='rom-badges';
+  const metaTag=(s,kind='')=>{const el=document.createElement('span');el.className='meta-tag '+kind;el.textContent=s;tags.append(el);};
+  metaTag(model.dirty?'● UNSAVED':'○ CLEAN',model.dirty?'warn':'good');metaTag(meta.fixedValid?'HEADER VALID':'HEADER CHECK',meta.fixedValid?'good':'warn');metaTag(meta.checksumValid?'CHECKSUM OK':'CHECKSUM MISMATCH',meta.checksumValid?'good':'warn');
+  romLabel.append(tags);panel.replaceChildren(romLabel);$('session-state').textContent=meta.title;
+}
+function formatSize(n){return n>=1024*1024?`${(n/1048576).toFixed(2)} MiB`:`${(n/1024).toFixed(1)} KiB`;}
+function updateIndicators(){
+  const active=!!model;
+  controls.forEach(id=>$(id).disabled=!active);
+  $('edit-unlock').disabled=!active;$('write-byte').disabled=!active||!$('edit-unlock').checked||selected===null;
+  $('selected-value').disabled=!active||!$('edit-unlock').checked;
+  $('undo-button').disabled=!active||model.undoStack.length===0;
+  $('redo-button').disabled=!active||model.redoStack.length===0;
+  $('apply-patch').disabled=!active||!patchFile;
+  $('edited-counter').textContent=`${active?model.edits.size:0} bytes changed`;
+  $('hex-status').textContent=$('edit-unlock').checked?'Editing unlocked':'Read only';
+  $('hex-status').style.borderColor=$('edit-unlock').checked?'#9f5969':'#435079';
+  $('change-pill').textContent=active && model.dirty?'Unsaved changes':'Clean';
+  $('fix-checksum').disabled=!active;
+  $('graphics-scan').disabled=!active||scanning;
+  $('graphics-candidates').disabled=!active||scanning||graphicCandidates.length===0;
+  $('tiles-back').disabled=!active||!graphicsSource||tilePage===0;
+  $('tiles-forward').disabled=!active||!graphicsSource||tilePage>=lastTilePage();
+  $('changes-tab-count').hidden=!active||!model.dirty;$('changes-tab-count').textContent=active ? String(model.edits.size+(model.appliedPatch?1:0)):'0';
+  if(active)showRomInfo();
+}
+function installModel(name,bytes){metadata=[];metadataSources=[];selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
+$('rom-picker').addEventListener('change',async e=>{
+  const file=e.target.files?.[0];e.target.value='';if(!file)return;
+  if(file.size<0xC0 || file.size>MAX_BYTES)return toast('ROM must be 192 bytes to 128 MiB',true);
+  if(model?.dirty && !(await confirmAction('Replace current ROM?','You have unsaved changes. Opening a different ROM will discard them.')))return;
+  try{const bytes=new Uint8Array(await file.arrayBuffer());installModel(file.name,bytes);}catch(err){toast(`Could not open ROM: ${err.message}`,true);}
+});
+function clampPage(n){return Math.max(0,Math.min(Math.floor((model.length-1)/PER_PAGE),n));}
+function setPageForOffset(offset){ensureModel();if(offset<0||offset>=model.length)throw Error('Offset outside this ROM');page=clampPage(Math.floor(offset/PER_PAGE));selected=offset;$('hex-offset').value=hex(offset);drawHex();updateIndicators();}
+function drawHex(){
+  const grid=$('hex-grid');if(!model){grid.innerHTML='<div class="empty-state">Open a ROM to inspect bytes.</div>';return;}
+  page=clampPage(page);const start=page*PER_PAGE;$('hex-page-label').textContent=hex(start);$('hex-range-label').textContent=`– ${hex(Math.min(model.length-1,start+PER_PAGE-1))}`;
+  const frag=document.createDocumentFragment();
+  for(let row=0;row<PER_PAGE/8;row++){
+    const line=document.createElement('div');line.className='hex-row';
+    const offset=start+row*8,label=document.createElement('span');label.className='hex-address';label.textContent=hex(offset);line.append(label);
+    for(let col=0;col<8;col++){
+      const i=offset+col,b=document.createElement('button');b.className='hex-byte';b.type='button';
+      if(i>=model.length){b.disabled=true;b.textContent='--';}else{
+        b.textContent=bytetext(model.read(i));b.classList.toggle('is-edited',model.hasEdit(i));b.classList.toggle('is-selected',i===selected);
+        b.setAttribute('aria-label',`Offset ${hex(i)} value ${bytetext(model.read(i))}`);
+        b.onclick=()=>{selected=i;$('selected-offset').value=hex(i);$('selected-value').value=bytetext(model.read(i));drawHex();updateIndicators();};
+      }
+      line.append(b);
+    }
+    frag.append(line);
+  }
+  grid.replaceChildren(frag);if(selected!==null&&selected>=start&&selected<start+PER_PAGE){$('selected-offset').value=hex(selected);$('selected-value').value=bytetext(model.read(selected));}
+}
+$('hex-jump').addEventListener('click',()=>safeRun(()=>setPageForOffset(parseOffset($('hex-offset').value))));
+$('hex-offset').addEventListener('keydown',e=>{if(e.key==='Enter')$('hex-jump').click();});
+$('hex-prev').addEventListener('click',()=>safeRun(()=>{ensureModel();page=clampPage(page-1);selected=null;drawHex();}));
+$('hex-next').addEventListener('click',()=>safeRun(()=>{ensureModel();page=clampPage(page+1);selected=null;drawHex();}));
+$('hex-find').addEventListener('click',()=>safeRun(()=>{ensureModel();const bytes=parseHexBytes($('hex-search').value),start=selected===null?0:selected+1;let found=model.find(bytes,start);if(found<0&&start!==0)found=model.find(bytes,0);if(found<0)throw Error('Pattern not found');setPageForOffset(found);toast(`Found at 0x${hex(found)}`);}));
+$('hex-search').addEventListener('keydown',e=>{if(e.key==='Enter')$('hex-find').click();});
+$('edit-unlock').addEventListener('change',()=>{if(!$('edit-unlock').checked)toast('Raw editing locked');else toast('Raw editing unlocked. Save a backup before changing bytes.');updateIndicators();});
+$('write-byte').addEventListener('click',()=>safeRun(()=>{
+  ensureModel();if(!$('edit-unlock').checked)throw Error('Unlock raw editing first');if(selected===null)throw Error('Tap a byte first');
+  const val=$('selected-value').value.trim();if(!/^[0-9a-f]{1,2}$/i.test(val))throw Error('Enter a 1–2 digit hexadecimal byte');
+  if(model.write(selected,parseInt(val,16))){invalidateDecodedGraphic();toast(`Staged edit at 0x${hex(selected)}`);}drawHex();updateIndicators();
+}));
+$('undo-button').addEventListener('click',()=>safeRun(()=>{if(model.undo()){invalidateDecodedGraphic();drawHex();drawGraphics();updateIndicators();}}));
+$('redo-button').addEventListener('click',()=>safeRun(()=>{if(model.redo()){invalidateDecodedGraphic();drawHex();drawGraphics();updateIndicators();}}));
+$('selected-value').addEventListener('keydown',e=>{if(e.key==='Enter')$('write-byte').click();});
+// The graphic source and the colour palette are deliberately independent:
+// a generic ROM offset has no known sprite layout or matching palette.
+const defaultPalette=Array.from({length:16},(_,i)=>{const v=i*17;return {r:v,g:v,b:v,css:`rgb(${v},${v},${v})`,value:0};});
+function invalidateDecodedGraphic(){if(graphicsSource?.kind==='lz')graphicsSource.bytes=null;}
+function lastTilePage(){
+  if(!model||!graphicsSource)return 0;
+  const size=graphicsSource.kind==='lz'?graphicsSource.size:model.length-graphicsSource.offset;
+  return Math.max(0,Math.floor((size-1)/8192));
+}
+function resetGraphicState(){
+  scanToken++;scanning=false;graphicsSource=null;graphicCandidates=[];tilePage=0;paletteOffset=null;
+  $('graphics-offset').value='';$('palette-offset').value='';
+  $('graphics-candidates').replaceChildren(new Option('No streams selected',''));
+  $('graphics-scan-status').textContent=model?'ROM loaded. Tap Find to discover compressed tile candidates.':'Open a ROM, then scan to find compressed tile candidates.';
+  $('graphics-source-label').textContent='NO GRAPHICS SELECTED';
+  $('graphics-detail').textContent='Waiting for a known graphic source.';
+}
+function drawGraphics(){
+  palette=defaultPalette;
+  if(model&&paletteOffset!==null){
+    const paletteBytes=new Uint8Array(32);for(let i=0;i<32;i++)paletteBytes[i]=model.read(paletteOffset+i);
+    palette=paletteAt(paletteBytes,0);
+  }
+  const paletteRoot=$('palette-grid'),swatches=document.createDocumentFragment();
+  palette.forEach((color,i)=>{const sw=document.createElement('div');sw.className='swatch';sw.style.background=color.css;sw.title=paletteOffset!==null?`Index ${i} · BGR555 ${hex(color.value,4)}`:`Index ${i} · neutral preview`;const label=document.createElement('span');label.textContent=String(i).padStart(2,'0');sw.append(label);swatches.append(sw);});paletteRoot.replaceChildren(swatches);
+  $('palette-caption').textContent=paletteOffset!==null?`ROM palette at 0x${hex(paletteOffset)}. This palette is user-selected, not verified to match the graphic.`:'Neutral grayscale preview. Enter a known ROM palette offset to view real colours.';
+  ctx.clearRect(0,0,128,128);
+  $('tile-canvas').hidden=!graphicsSource;
+  $('tile-empty').hidden=!!graphicsSource;
+  $('tiles-back').disabled=!graphicsSource||tilePage===0;
+  $('tiles-forward').disabled=!graphicsSource||tilePage>=lastTilePage();
+  if(!model||!graphicsSource)return;
+  let pageBytes,totalBytes;
+  try{
+    if(graphicsSource.kind==='lz'){
+      const result=graphicsSource.bytes?{data:graphicsSource.bytes,consumed:graphicsSource.compressedBytes}:decodeLz10(model.snapshot(),graphicsSource.offset);
+      graphicsSource.bytes=result.data;graphicsSource.size=result.data.length;
+      graphicsSource.compressedBytes=result.consumed;
+      totalBytes=result.data.length;
+      pageBytes=result.data.subarray(tilePage*8192,(tilePage+1)*8192);
+    }else{
+      totalBytes=model.length-graphicsSource.offset;
+      const start=graphicsSource.offset+tilePage*8192;
+      const limit=Math.min(8192,model.length-start);
+      pageBytes=new Uint8Array(limit);
+      for(let i=0;i<limit;i++)pageBytes[i]=model.read(start+i);
+    }
+  }catch(err){
+    graphicsSource=null;$('tile-canvas').hidden=true;$('tile-empty').hidden=false;
+    $('graphics-source-label').textContent='GRAPHIC DECODE ERROR';
+    $('tile-empty').textContent=`Unable to decode selected data: ${err.message}`;
+    $('graphics-detail').textContent='ROM bytes may have changed. Select the source again.';
+    $('tiles-back').disabled=true;$('tiles-forward').disabled=true;return;
+  }
+  $('tile-empty').textContent='Select a compressed stream or enter a known tile offset.';
+  $('graphics-source-label').textContent=`${graphicsSource.kind==='lz'?'LZ77 DECODED':'RAW 4BPP'} · 0x${hex(graphicsSource.offset)}`;
+  $('graphics-detail').textContent=`${graphicsSource.kind==='lz'?'Decompressed stream':'Uncompressed bytes'} · ${Math.floor(totalBytes/32)} tiles · page ${tilePage+1}/${Math.max(1,Math.ceil(totalBytes/8192))}. The 16 × 16 arrangement is a tile contact sheet, not the original sprite layout.`;
+  const image=ctx.createImageData(128,128);
+  for(let tileIndex=0;tileIndex<256;tileIndex++){
+    const off=tileIndex*32;if(off+32>pageBytes.length)break;
+    const pixels=gba4bppTile(pageBytes,off,palette);
+    const x0=(tileIndex%16)*8,y0=Math.floor(tileIndex/16)*8;
+    for(let j=0;j<64;j++){
+      const px=x0+j%8,py=y0+Math.floor(j/8),dst=(py*128+px)*4,col=palette[pixels[j]];
+      image.data[dst]=col.r;image.data[dst+1]=col.g;image.data[dst+2]=col.b;image.data[dst+3]=255;
+    }
+  }
+  ctx.putImageData(image,0,0);
+  $('tiles-back').disabled=tilePage===0;
+  $('tiles-forward').disabled=tilePage>=lastTilePage();
+}
+function chooseGraphic(kind,offset){
+  ensureModel();if(!Number.isInteger(offset)||offset<0||offset>=model.length)throw Error('Graphics offset is outside ROM');
+  if(kind==='raw'&&offset+32>model.length)throw Error('A raw 4bpp tile needs at least 32 bytes');
+  const next=kind==='lz'?decodeLz10(model.snapshot(),offset):null;
+  graphicsSource={kind,offset,size:next?.data.length||model.length-offset,compressedBytes:next?.consumed||0,bytes:next?.data||null};tilePage=0;
+  $('graphics-offset').value=hex(offset);drawGraphics();
+  toast(kind==='lz'?`Decoded ${next.data.length} bytes of LZ77 data at 0x${hex(offset)}`:'Raw 4bpp view: bytes may not represent graphics');
+}
+$('graphics-show').addEventListener('click',()=>safeRun(()=>chooseGraphic('raw',parseOffset($('graphics-offset').value))));
+$('graphics-decode').addEventListener('click',()=>safeRun(()=>chooseGraphic('lz',parseOffset($('graphics-offset').value))));
+$('palette-show').addEventListener('click',()=>safeRun(()=>{
+  ensureModel();const off=parseOffset($('palette-offset').value);
+  if(off+32>model.length)throw Error('Palette offset needs 32 bytes');
+  paletteOffset=off;$('palette-offset').value=hex(off);drawGraphics();toast('User-selected palette loaded; matching is not verified.');
+}));
+$('palette-reset').addEventListener('click',()=>{paletteOffset=null;$('palette-offset').value='';drawGraphics();toast('Neutral grayscale restored.');});
+$('tiles-back').addEventListener('click',()=>{tilePage=Math.max(0,tilePage-1);drawGraphics();});
+$('tiles-forward').addEventListener('click',()=>{tilePage=Math.min(lastTilePage(),tilePage+1);drawGraphics();});
+$('graphics-candidates').addEventListener('change',()=>safeRun(()=>{
+  if($('graphics-candidates').value==='')return;
+  const index=Number($('graphics-candidates').value);
+  if(!Number.isInteger(index)||index<0||index>=graphicCandidates.length)throw Error('Choose a detected stream');
+  chooseGraphic('lz',graphicCandidates[index].offset);
+}));
+$('graphics-scan').addEventListener('click',async()=>{
+  if(!model||scanning)return;
+  const token=++scanToken;scanning=true;graphicCandidates=[];const picker=$('graphics-candidates');
+  picker.replaceChildren(new Option('Searching…',''));updateIndicators();
+  $('graphics-scan-status').textContent='Scanning for structurally valid LZ77 streams. This can take time on large ROMs.';
+  const data=model.snapshot(),chunkSize=1024*1024,limit=128;
+  try{
+    for(let start=0;start<data.length;start+=chunkSize){
+      if(token!==scanToken)return;
+      const batch=scanLz10Graphics(data,{start,end:Math.min(data.length,start+chunkSize),maxResults:limit-graphicCandidates.length});
+      graphicCandidates.push(...batch);
+      const percent=Math.round(100*Math.min(start+chunkSize,data.length)/data.length);
+      $('graphics-scan-status').textContent=`Scanning ${percent}% · ${graphicCandidates.length} candidate stream(s) found`;
+      if(graphicCandidates.length>=limit)break;
+      await new Promise(resolve=>setTimeout(resolve,0)); // yield so the phone remains interactive
+    }
+    if(token!==scanToken)return;
+    picker.replaceChildren(new Option(graphicCandidates.length?'Choose a candidate stream':'No valid streams found',''));
+    graphicCandidates.forEach((item,index)=>picker.add(new Option(`0x${hex(item.offset)} · ${item.tileCount} tiles · ${formatSize(item.size)} decoded`,String(index))));
+    $('graphics-scan-status').textContent=`Found ${graphicCandidates.length} structurally valid candidate(s)${graphicCandidates.length>=limit?' (128 result limit reached)':''}. Results are not confirmed sprites or guaranteed to have the correct palette.`;
+    if(!graphicCandidates.length)toast('No LZ77 tile streams found. This ROM may use raw or other compression.',true);
+  }catch(err){if(token===scanToken){$('graphics-scan-status').textContent=`Scan failed: ${err.message}`;toast(err.message,true);}}
+  finally{if(token===scanToken){scanning=false;updateIndicators();}}
+});
+async function downloadFile(name,bytes,mime='application/octet-stream'){
+  const data=new Blob([bytes],{type:mime});const url=URL.createObjectURL(data),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
+}
+function safeName(name){return String(name).replace(/\.(gba|rom|bin)$/i,'').replace(/[^\w.\- ]+/g,'_').slice(0,100)||'rom';}
+$('save-rom').addEventListener('click',()=>safeRun(()=>{ensureModel();downloadFile(`${safeName(model.name)}_mobilelab.gba`,model.snapshot());toast('ROM copy download started. Original file unchanged.');}));
+$('save-project').addEventListener('click',()=>safeRun(()=>{
+  ensureModel();if(model.appliedPatch)throw Error('Export a ROM copy and reopen it before exporting a JSON sidecar. Patch bytes are not represented in sidecar edits.');
+  const data=JSON.stringify(model.project(),null,2);downloadFile(`${safeName(model.name)}_mobilelab.json`,data,'application/json');toast('Checksum-bound project JSON download started.');
+}));
+$('project-picker').addEventListener('change',async e=>{
+  const file=e.target.files?.[0];e.target.value='';if(!file)return;
+  try{
+    ensureModel();if(file.size>16*1024*1024)throw Error('Project JSON is too large');
+    const project=JSON.parse(await file.text());
+    if(model.dirty&&!(await confirmAction('Replace staged edits?','Restoring a project will discard the current staged edits. Continue?')))return;
+    const restored=model.loadProject(project);invalidateDecodedGraphic();drawHex();drawGraphics();drawChanges();updateIndicators();toast(`Restored ${restored} bytes of checked edits.`);
+  }catch(err){toast(err.message||String(err),true);}
+});
+$('patch-picker').addEventListener('change',e=>{patchFile=e.target.files?.[0]||null;$('patch-filename').textContent=patchFile?`${patchFile.name} · ${formatSize(patchFile.size)}`:'No patch selected';updateIndicators();});
+$('apply-patch').addEventListener('click',async()=>{
+  try{
+    ensureModel();if(!patchFile)throw Error('Choose a patch file');if(patchFile.size>MAX_BYTES)throw Error('Patch too large');
+    const confirmed=await confirmAction('Apply to a working copy?',`This will replace the current staged edit session with the patched result of ${patchFile.name}. The original ROM file is never overwritten. Save a new ROM copy after applying.`);
+    if(!confirmed)return;
+    const ext=patchFile.name.split('.').pop().toLowerCase();
+    if(!['bps','ips'].includes(ext))throw Error('Choose an .ips or .bps patch');
+    const bytes=new Uint8Array(await patchFile.arrayBuffer());
+    // BPS uses the working data, and independently validates source/patch/target CRCs.
+    // IPS lacks CRCs, so ask the user to verify target ROM compatibility.
+    const current=model.snapshot(),result=ext==='bps'?applyBps(current,bytes):applyIps(current,bytes);
+    model.switchPatched(result);page=0;selected=null;resetGraphicState();drawHex();drawGraphics();drawChanges();updateIndicators();toast(`${ext.toUpperCase()} applied in memory. Save a new ROM copy.`);
+  }catch(err){toast(err.message||String(err),true);}
+});
+$('export-ips').addEventListener('click',()=>safeRun(()=>{ensureModel();const bytes=model.exportIps();downloadFile(`${safeName(model.name)}_mobilelab.ips`,bytes);toast(`IPS diff exported (${bytes.length} bytes)`);}));
+function drawChanges(){
+  if(!model){$('header-diagnostics').textContent='Open a ROM to inspect its GBA header checksum.';$('summary-byte-count').textContent='0';$('summary-patched').textContent='NO';$('summary-size').textContent='—';$('change-list-info').textContent='No edits';$('changes-list').innerHTML='<div class="empty-state">Open a ROM and make a raw edit to see changes here.</div>';return;}
+  const h=model.header();$('header-diagnostics').textContent=`${h.code} · fixed byte: ${h.fixedValid?'valid':'invalid'} · stored 0x${hex(h.stored,2)} · expected 0x${hex(h.expected,2)} · ${h.checksumValid?'checksum OK':'checksum mismatch'}`;
+  $('summary-byte-count').textContent=model.edits.size.toLocaleString();$('summary-patched').textContent=model.appliedPatch?'YES':'NO';$('summary-size').textContent=formatSize(model.length);
+  const entries=[...model.edits.entries()].sort((a,b)=>a[0]-b[0]);$('change-list-info').textContent=model.appliedPatch?`${entries.length} raw edits + applied patch`:`${entries.length} raw edits`;
+  const root=$('changes-list'),frag=document.createDocumentFragment();
+  if(model.appliedPatch){const info=document.createElement('div');info.className='empty-state';info.textContent='A patch was applied to the in-memory working ROM. Its complete output will be included when you Save ROM copy. Changes made by that patch are not listed individually.';frag.append(info);}
+  if(!entries.length && !model.appliedPatch){const info=document.createElement('div');info.className='empty-state';info.textContent='No staged raw byte changes.';frag.append(info);}
+  for(const [off,newByte] of entries.slice(0,500)){
+    const line=document.createElement('div');line.className='change-row';const a=document.createElement('b');a.textContent=`0x${hex(off)}`;const b=document.createElement('span');b.textContent=bytetext(model.base[off]);const c=document.createElement('em');c.textContent=`→ ${bytetext(newByte)}`;line.append(a,b,c);frag.append(line);
+  }
+  if(entries.length>500){const n=document.createElement('div');n.className='empty-state';n.textContent=`Showing first 500 of ${entries.length} edits.`;frag.append(n);}root.replaceChildren(frag);
+}
+$('fix-checksum').addEventListener('click',()=>safeRun(()=>{ensureModel();const old=model.header(),value=model.fixHeader();invalidateDecodedGraphic();drawHex();drawGraphics();drawChanges();updateIndicators();toast(old.checksumValid?'Header checksum already matches':`Staged checksum byte 0x${hex(value,2)} at 0x0000BD`);}));
+$('discard-button').addEventListener('click',async()=>{
+  if(!model||!model.dirty)return toast('Nothing to discard');
+  const yes=await confirmAction('Discard all changes?','This resets your in-memory workspace to the original ROM. Any applied patch and all staged raw edits will be lost.');
+  if(yes){model.reset();page=0;selected=null;resetGraphicState();$('edit-unlock').checked=false;drawHex();drawGraphics();drawChanges();updateIndicators();toast('Reset to original ROM.');}
+});
+window.addEventListener('beforeunload',e=>{if(model?.dirty){e.preventDefault();e.returnValue='';}});
+if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+
+
+
+// Named-data discovery is intentionally read-only until CUBHMA's full format
+// engine, game fingerprints and pointer allocator have been ported and tested.
+let displayedAnchors=[], selectedInspection=null;
+const encodeHex=bytes=>Array.from(bytes).map((b,i)=>hex(b,2)+(i%16===15?'\n':' ')).join('').trim();
+function metadataReset(){metadata=[];metadataSources=[];selectedAnchor=null;selectedInspection=null;drawAnchors();}
+function metadataCommit(sources){
+  ensureModel();
+  const dedupe=new Map();
+  let count=0;
+  for(const source of sources){
+    const parsed=parseHmaNamedAnchors(source.text,{romSize:model.length});
+    count+=parsed.length;
+    for(const anchor of parsed){dedupe.set(anchor.name,{...anchor,source:source.name});}
+  }
+  metadata=[...dedupe.values()].sort((a,b)=>a.name.localeCompare(b.name));
+  metadataSources=sources.map(({name})=>name);
+  selectedAnchor=null;selectedInspection=null;
+  drawAnchors();
+  toast(`Loaded ${metadata.length} named anchor(s) from ${sources.length} TOML file(s)`);
+}
+function semanticChild(tag,value,klass){const el=document.createElement(tag);el.textContent=value;if(klass)el.className=klass;return el;}
+function drawAnchorDetails(){
+  const root=$('anchor-detail');root.replaceChildren();
+  $('anchor-to-hex').disabled=true;$('anchor-follow-pointer').disabled=true;$('anchor-to-graphics').disabled=true;
+  if(!model||!selectedAnchor){root.append(semanticChild('div','Choose an anchor to inspect its address, format and bytes.','empty-state'));return;}
+  const a=selectedAnchor;
+  root.append(semanticChild('h3',a.name));
+  root.append(semanticChild('div',`Source: ${a.source} · TOML line ${a.line}`,'palette-note'));
+  root.append(semanticChild('div',`Offset: 0x${hex(a.address)} · Format: ${a.format||'unspecified'}`,'semantic-code'));
+  if(!a.valid){root.append(semanticChild('div','This anchor is outside the selected ROM. It cannot be read.','semantic-warning'));return;}
+  let inspection;
+  try{inspection=readAnchorInspection(model,a);}catch(error){root.append(semanticChild('div',error.message,'semantic-warning'));return;}
+  selectedInspection=inspection;
+  root.append(semanticChild('div',`u8 ${inspection.byte} · u16 ${inspection.u16===null?'—':inspection.u16} · u32 ${inspection.u32===null?'—':'0x'+hex(inspection.u32,8)}`,'palette-note'));
+  if(inspection.pointer!==null)root.append(semanticChild('div',`Valid GBA ROM pointer → 0x${hex(inspection.pointer)}`,'semantic-code'));
+  else if(inspection.pointerCandidate)root.append(semanticChild('div','The first four bytes resemble a ROM pointer but target outside this ROM.','semantic-warning'));
+  const pre=document.createElement('pre');pre.className='semantic-bytes';pre.textContent=encodeHex(inspection.bytes);root.append(pre);
+  root.append(semanticChild('div','ASCII preview: '+inspection.preview,'palette-note'));
+  $('anchor-to-hex').disabled=false;
+  $('anchor-follow-pointer').disabled=inspection.pointer===null;
+  $('anchor-to-graphics').disabled=!inspection.isLz10;
+}
+function drawAnchors(){
+  const root=$('anchor-list'),selector=$('anchor-group');root.replaceChildren();
+  const previous=selector.value;
+  selector.replaceChildren(new Option('All categories','all'));
+  for(const [name,count] of groupAnchors(metadata))selector.add(new Option(`${name} (${count})`,name));
+  selector.value=[...selector.options].some(x=>x.value===previous)?previous:'all';
+  $('anchor-count').textContent=metadata.length?`${metadata.length} named anchors`:'No metadata';
+  $('metadata-status').textContent=metadataSources.length?`Loaded: ${metadataSources.join(', ')}. ROM metadata compatibility is not independently verified.`:'No metadata loaded. Import TOML produced for this ROM, or fetch a stock-game reference.';
+  if(!model){root.append(semanticChild('div','Open a ROM first.','empty-state'));drawAnchorDetails();return;}
+  if(!metadata.length){root.append(semanticChild('div','Import a CUBHMA .toml file to begin.','empty-state'));drawAnchorDetails();return;}
+  displayedAnchors=filterAnchors(metadata,$('anchor-find').value,selector.value,180);
+  if(!displayedAnchors.length){root.append(semanticChild('div','No matching anchors.','empty-state'));drawAnchorDetails();return;}
+  const frag=document.createDocumentFragment();
+  for(const anchor of displayedAnchors){
+    const b=document.createElement('button');b.type='button';b.className='anchor-entry';
+    if(anchor===selectedAnchor)b.classList.add('active');
+    b.append(semanticChild('strong',anchor.name));
+    b.append(semanticChild('span',anchor.valid?`0x${hex(anchor.address)}`:`0x${hex(anchor.address)} · out of bounds`));
+    b.onclick=()=>{selectedAnchor=anchor;drawAnchors();};frag.append(b);
+  }
+  root.append(frag);
+  if(filterAnchors(metadata,$('anchor-find').value,selector.value,181).length>180)root.append(semanticChild('p','Showing first 180 matches. Narrow search to see other entries.','palette-note'));
+  drawAnchorDetails();
+}
+$('anchor-find').addEventListener('input',drawAnchors);
+$('anchor-group').addEventListener('change',drawAnchors);
+$('anchor-to-hex').addEventListener('click',()=>safeRun(()=>{if(!selectedAnchor?.valid)throw Error('No valid offset selected');setPageForOffset(selectedAnchor.address);gotoTab('hex');}));
+$('anchor-follow-pointer').addEventListener('click',()=>safeRun(()=>{if(selectedInspection?.pointer===null||!Number.isInteger(selectedInspection?.pointer))throw Error('Not a valid ROM pointer');setPageForOffset(selectedInspection.pointer);gotoTab('hex');}));
+$('anchor-to-graphics').addEventListener('click',()=>safeRun(()=>{if(!selectedAnchor?.valid)throw Error('No selected graphic');chooseGraphic('lz',selectedAnchor.address);gotoTab('graphics');}));
+$('metadata-picker').addEventListener('change',async e=>{
+  const files=[...(e.target.files||[])];e.target.value='';if(!files.length)return;
+  try{ensureModel();const sources=[];
+    for(const file of files){if(file.size>4*1024*1024)throw Error('Metadata file is too large');sources.push({name:file.name,text:await file.text()});}
+    metadataCommit(sources);
+  }catch(err){toast(`Metadata import failed: ${err.message}`,true);}
+});
+const upstreamPin='3044393183e01af2ae1e907fb37e4a75eda6a8dc';
+$('metadata-stock').addEventListener('click',async()=>{
+  try{
+    ensureModel();const code=model.header().code,revision=model.read(0xBC);
+    const names=code==='BPEE'?['default.toml','default.axve.axpe.bpee.toml','default.bpee.toml']:
+      code==='BPRE'?['default.toml','default.bpre.bpge.toml',revision?'default.bpre1.toml':'default.bpre0.toml']:
+      code==='BPGE'?['default.toml','default.bpre.bpge.toml',revision?'default.bpge1.toml':'default.bpge0.toml']:null;
+    if(!names)throw Error('Stock metadata shortcut currently supports US Emerald, FireRed and LeafGreen only. Import a matching TOML for other versions.');
+    if(!await confirmAction('Load stock-game metadata?',`Reference offsets are for stock ${code} ROMs, not necessarily your modified ROM or CUBE. This lookup is read-only. Continue?`))return;
+    $('metadata-stock').disabled=true;
+    const sources=[];
+    for(const name of names){
+      const url=`https://raw.githubusercontent.com/kcradi/CUBHMA/${upstreamPin}/src/HexManiac.Core/Models/Code/${name}`;
+      const response=await fetch(url,{cache:'force-cache'});
+      if(!response.ok)throw Error(`${name} download failed (HTTP ${response.status}). Import files manually if offline.`);
+      sources.push({name:`${name} (upstream ${upstreamPin.slice(0,8)})`,text:await response.text()});
+    }
+    metadataCommit(sources);
+  }catch(err){toast(`Stock metadata: ${err.message}`,true);}finally{$('metadata-stock').disabled=false;}
+});
+
+updateIndicators();drawGraphics();drawAnchors();renderTab(routeFromHash());
+
+</script>
+</body></html>
