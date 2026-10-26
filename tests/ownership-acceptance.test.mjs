@@ -112,3 +112,20 @@ test('ownership fixture: unsupported anchored run at table start is not treated 
   assert.ok(result.conflicted.has('supported'));
   assert.equal(result.unresolvedAnchorCollisionCount,1);
 });
+
+test('ownership fixture: unresolved anchor on end-exclusive boundary stays disjoint',()=>{
+  const result=resolve([
+    anchor('supported',16,'[value::]2'),
+    anchor('unknownNext',24,'\`lzs4x64x64\`')
+  ]);
+  assert.equal(result.unresolvedAnchorCollisionCount,0);
+  assert.equal(result.conflicted.has('supported'),false);
+});
+test('ownership fixture: unresolved anchor inside pointer field suppresses offset source',()=>{
+  const result=resolve([
+    anchor('pointers',16,'[destination<text>]2'),
+    anchor('unknownInside',17,'\`lzs4x64x64\`')
+  ],{offsetPointers:[{address:16,offset:0}]});
+  assert.ok(result.conflicted.has('pointers'));
+  assert.ok(result.conflictedOffsetPointers.has(16));
+});
