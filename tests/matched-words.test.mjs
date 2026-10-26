@@ -193,7 +193,7 @@ test('touching WordRun and table spans are not a collision',()=>{
 });
 
 test('staged ROM byte edits and undo change matched-word-derived counts without mutating original',()=>{
- const bytes=new Uint8Array(128);put(bytes,8,2);
+ const bytes=new Uint8Array(256);put(bytes,8,2);
  const before=bytes.slice(),model=new RomModel('synthetic.gba',bytes);
  const words=[word('COUNT',8)];
  const anchors=[anchor('child',40,'[x.]COUNT')];
