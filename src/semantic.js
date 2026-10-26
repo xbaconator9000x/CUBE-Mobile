@@ -205,7 +205,7 @@ export function parseHmaLists(source){
     // Mirrors StoredMetadata's append semantics for numbered items: gaps are
     // padded with null, existing positions are never overwritten.
     while(current.entries.length<start)current.entries.push(null);
-    current.entries.push(...items);
+    for(const item of items)current.entries.push(item);
   }
   finish();
   return records;
