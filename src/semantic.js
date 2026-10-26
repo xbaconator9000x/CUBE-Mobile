@@ -443,7 +443,22 @@ export function parseHmaParentLengthToken(token){
   const end=second!==null?second:Math.max(0,first);
   return {parent:match[1],beginningMargin:beginning,endMargin:end};
 }
-export function resolveHmaTableLayouts(anchors,{romSize=Infinity,maxOverlaps=128,lists=[],conflictingLists=new Set(),matchedWords=[],conflictingWords=new Set(),rom=null}={}){
+/** Binary-search an intersecting half-open byte span without quadratic scans. */
+function hmaSpanIndex(spans){
+  const prefixEnd=[],prefixIndex=[];
+  let max=-1,idx=-1;
+  for(let i=0;i<spans.length;i++){
+    if(spans[i].end>max){max=spans[i].end;idx=i;}
+    prefixEnd.push(max);prefixIndex.push(idx);
+  }
+  return {find(start,end){
+    let lo=0,hi=spans.length;
+    while(lo<hi){const mid=(lo+hi)>>>1;if(spans[mid].start<end)lo=mid+1;else hi=mid;}
+    const last=lo-1;
+    return last>=0&&prefixEnd[last]>start?spans[prefixIndex[last]]:null;
+  }};
+}
+export function resolveHmaTableLayouts(anchors,{romSize=Infinity,maxOverlaps=128,lists=[],conflictingLists=new Set(),matchedWords=[],conflictingWords=new Set(),offsetPointers=[],rom=null}={}){
   const wordResolution=resolveHmaMatchedWordCounts(matchedWords,rom,{conflictingWords});
   if(rom&&romSize!==Infinity&&rom.length!==romSize)throw Error('MatchedWords ROM length mismatch');
   if(!Array.isArray(lists)||lists.length>50000||!(conflictingLists instanceof Set))throw Error('Invalid HMA list metadata');
@@ -455,6 +470,7 @@ export function resolveHmaTableLayouts(anchors,{romSize=Infinity,maxOverlaps=128
     if(previous&&JSON.stringify(previous.entries)!==JSON.stringify(list.entries))listConflicts.add(list.name);
     if(!previous)listByName.set(list.name,list);
   }
+  if(!Array.isArray(offsetPointers)||offsetPointers.length>50000)throw Error('Invalid or excessive offset pointer metadata');
   if(!Array.isArray(anchors)||anchors.length>50000)throw Error('Invalid or excessive anchor metadata');
   if(!(romSize===Infinity||(Number.isSafeInteger(romSize)&&romSize>=0)))
     throw Error('Invalid ROM length');
@@ -533,47 +549,109 @@ export function resolveHmaTableLayouts(anchors,{romSize=Infinity,maxOverlaps=128
     }
   }
   for(const name of waiting.keys())unresolved.set(name,'unresolved-or-cyclic-length-anchor');
-  // This is only a conservative overlap witness audit, not a run graph.
+  // This is a read-only, conservative byte-claim audit, not CUBHMA's
+  // authoritative run graph. The prefix-max interval lookup finds one
+  // intersection in O(log n), avoiding a 50k x 50k metadata scan.
   const spans=[...byName.values()].map(x=>({
     name:x.anchor.name,start:x.anchor.address,end:x.anchor.address+x.layout.totalBytes
   })).sort((a,b)=>a.start-b.start||b.end-a.end||a.name.localeCompare(b.name));
   const overlaps=[],conflicted=new Set();let overlapWitnesses=0,maxSpan=null;
+  const witness=(first,second,start,end)=>{
+    if(overlaps.length<maxOverlaps)overlaps.push({first,second,start,end});
+  };
   for(const span of spans){
     if(maxSpan&&span.start<maxSpan.end){
       overlapWitnesses++;conflicted.add(span.name);conflicted.add(maxSpan.name);
-      if(overlaps.length<maxOverlaps)
-        overlaps.push({first:maxSpan.name,second:span.name,start:span.start,end:Math.min(span.end,maxSpan.end)});
+      witness(maxSpan.name,span.name,span.start,Math.min(span.end,maxSpan.end));
     }
     if(!maxSpan||span.end>maxSpan.end)maxSpan=span;
   }
-  // A WordRun source cannot safely be treated as an independent constant
-  // when another metadata table claims those same bytes. Keep the count
-  // visible for diagnostics, but exclude affected tables and descendants
-  // from typed previews/reference ownership. Binary-search starts because
-  // WordRun width is bounded to at most four bytes.
-  const wordSpans=[...wordResolution.byName].flatMap(([name,data])=>
-    data.words.map(w=>({name,start:w.address,end:w.address+w.length}))
-  ).sort((a,b)=>a.start-b.start);
+  // Include even unresolved MatchedWords source claims: a malformed/ambiguous
+  // constant must not allow another table to assume its bytes are free.
+  const wordSpans=matchedWords.filter(w=>w.address<=romSize-w.length)
+    .map(w=>({name:w.name,start:w.address,end:w.address+w.length}))
+    .sort((a,b)=>a.start-b.start||b.end-a.end);
+  const wordIndex=hmaSpanIndex(wordSpans),tableIndex=hmaSpanIndex(spans);
   const ambiguousWordNames=new Set();
   let wordOverlapWitnesses=0;
   for(const table of spans){
-    let low=0,high=wordSpans.length;
-    while(low<high){
-      const mid=(low+high)>>>1;
-      if(wordSpans[mid].start<table.start-3)low=mid+1;else high=mid;
-    }
-    for(let i=low;i<wordSpans.length&&wordSpans[i].start<table.end;i++){
-      const word=wordSpans[i];
-      if(word.end<=table.start)continue;
-      conflicted.add(table.name);
-      ambiguousWordNames.add(word.name);
-      wordOverlapWitnesses++;
-      if(overlaps.length<maxOverlaps)
-        overlaps.push({first:'MatchedWords:'+word.name,second:table.name,
-          start:Math.max(word.start,table.start),end:Math.min(word.end,table.end)});
-      break; // One witness per table is enough to disable typed reads.
+    const word=wordIndex.find(table.start,table.end);
+    if(!word)continue;
+    conflicted.add(table.name);wordOverlapWitnesses++;
+    witness('MatchedWords:'+word.name,table.name,
+      Math.max(word.start,table.start),Math.min(word.end,table.end));
+  }
+  // Mark EVERY word source intersecting a table, not merely the first word
+  // found in a large table. Otherwise another count can be trusted unsafely.
+  for(const word of wordSpans)
+    if(tableIndex.find(word.start,word.end))ambiguousWordNames.add(word.name);
+
+  const offsetBySource=new Map(),conflictedOffsetPointers=new Set();
+  let invalidOffsetPointers=0;
+  for(const pointer of offsetPointers){
+    if(!pointer||!Number.isSafeInteger(pointer.address)||pointer.address<0||
+       !Number.isSafeInteger(pointer.offset)||pointer.offset<-0x80000000||pointer.offset>0x7FFFFFFF)
+      throw Error('Malformed offset pointer metadata');
+    const old=offsetBySource.get(pointer.address);
+    if(old!==undefined&&old!==pointer.offset)
+      throw Error('Conflicting offset pointer metadata at 0x'+pointer.address.toString(16));
+    if(pointer.address>romSize-4){invalidOffsetPointers++;continue;}
+    offsetBySource.set(pointer.address,pointer.offset);
+  }
+  const offsetSpans=[...offsetBySource].map(([source,offset])=>({
+    source,offset,start:source,end:source+4
+  })).sort((a,b)=>a.start-b.start);
+  const offsetIndex=hmaSpanIndex(offsetSpans);
+  for(let i=1;i<offsetSpans.length;i++){
+    const left=offsetSpans[i-1],right=offsetSpans[i];
+    if(right.start<left.end){
+      conflictedOffsetPointers.add(left.source);
+      conflictedOffsetPointers.add(right.source);
     }
   }
+  // OffsetPointer can coexist with a table ONLY at the exact start of a
+  // complete four-byte pointer field. Scalar bytes, partial fields and
+  // cross-row references are conflicting byte claims.
+  const pointerFieldOffsets=new Map();
+  const compatible=(table,source)=>{
+    if(source<table.start||source+4>table.end)return false;
+    const layout=byName.get(table.name)?.layout;
+    if(!layout)return false;
+    let fields=pointerFieldOffsets.get(table.name);
+    if(!fields){
+      fields=new Set(layout.fields.filter(f=>f.type==='pointer').map(f=>f.offset));
+      pointerFieldOffsets.set(table.name,fields);
+    }
+    return fields.has((source-table.start)%layout.rowSize);
+  };
+  for(const pointer of offsetSpans){
+    const word=wordIndex.find(pointer.start,pointer.end);
+    if(word){
+      conflictedOffsetPointers.add(pointer.source);
+      ambiguousWordNames.add(word.name);
+    }
+    const table=tableIndex.find(pointer.start,pointer.end);
+    if(table&&(conflicted.has(table.name)||!compatible(table,pointer.source))){
+      conflictedOffsetPointers.add(pointer.source);
+      conflicted.add(table.name);
+    }
+  }
+  // Reverse pass catches all words intersecting offset sources, including
+  // multiple independent WordRuns within the same four-byte pointer slot.
+  for(const word of wordSpans){
+    const pointer=offsetIndex.find(word.start,word.end);
+    if(pointer){
+      ambiguousWordNames.add(word.name);
+      conflictedOffsetPointers.add(pointer.source);
+    }
+  }
+  // A source that intersects multiple adjacent table claims may initially
+  // have flagged only one; suppress every table it touches.
+  const invalidOffsetSpans=offsetSpans.filter(p=>conflictedOffsetPointers.has(p.source));
+  const invalidOffsetIndex=hmaSpanIndex(invalidOffsetSpans);
+  for(const table of spans)
+    if(invalidOffsetIndex.find(table.start,table.end))conflicted.add(table.name);
+
   for(const name of queue){
     const table=byName.get(name);
     if(table.kind==='matched-word-count'&&ambiguousWordNames.has(table.lengthFrom))
@@ -581,14 +659,23 @@ export function resolveHmaTableLayouts(anchors,{romSize=Infinity,maxOverlaps=128
     if(table.kind==='anchored-count'&&conflicted.has(table.lengthFrom))
       conflicted.add(name);
   }
+  // Descendant conflicts may have been established only after the first
+  // pointer pass. Explicit pointer sources inside them are unsafe too.
+  const unsafeTableIndex=hmaSpanIndex(spans.filter(s=>conflicted.has(s.name)));
+  for(const pointer of offsetSpans)
+    if(unsafeTableIndex.find(pointer.start,pointer.end))
+      conflictedOffsetPointers.add(pointer.source);
   return {byName,unresolved,conflicted,overlaps,overlapWitnesses,
     overlapTruncated:overlapWitnesses+wordOverlapWitnesses>overlaps.length,
     wordOverlapWitnesses,
+    conflictedOffsetPointers,invalidOffsetPointers,
+    offsetCollisionSources:conflictedOffsetPointers.size,
     resolvedCount:byName.size,anchoredCount:[...byName.values()].filter(x=>x.kind==='anchored-count').length,
     listCount:[...byName.values()].filter(x=>x.kind==='named-list-count').length,
     matchedCount:[...byName.values()].filter(x=>x.kind==='matched-word-count').length,
     wordResolution,
-    disclaimer:'Metadata-derived lengths and overlap witnesses are unverified. Unsupported grammar and conflicting spans are not safe to edit or repoint.'};
+    disclaimer:'Read-only metadata byte-claim collisions, not authenticated run ownership. Unsupported formats and conflicting claims cannot be edited or repointed.'};
+
 }
 
 /** Read at most a few rows; never materialize or copy the entire ROM. */
@@ -744,7 +831,7 @@ export function inspectHmaPointerReferences(bytes,target,anchors,{
   const read32=at=>(read(at)|(read(at+1)<<8)|(read(at+2)<<16)|(read(at+3)<<24))>>>0;
   const needle=0x08000000+target;
   const offsetBySource=new Map();
-  let skippedOffsetPointers=0,examinedOffsetPointers=0;
+  let skippedOffsetPointers=0,examinedOffsetPointers=0,skippedConflictedOffsetPointers=0;
   for(const record of offsetPointers){
     if(!record||!Number.isSafeInteger(record.address)||
        !Number.isSafeInteger(record.offset)||record.offset<-0x80000000||record.offset>0x7FFFFFFF)
@@ -755,7 +842,7 @@ export function inspectHmaPointerReferences(bytes,target,anchors,{
     offsetBySource.set(record.address,record.offset);
   }
   const declared=[],knownSlots=new Set();
-  const tableResolution=resolveHmaTableLayouts(anchors,{romSize:bytes.length,maxOverlaps:0,lists,conflictingLists,matchedWords,conflictingWords,rom:bytes});
+  const tableResolution=resolveHmaTableLayouts(anchors,{romSize:bytes.length,maxOverlaps:0,lists,conflictingLists,matchedWords,conflictingWords,offsetPointers,rom:bytes});
   let examinedSlots=0,skippedTables=0,matchedDeclared=0,unsupportedFormats=0,conflictedTables=0;
   for(const anchor of anchors){
     if(!anchor||!Number.isSafeInteger(anchor.address))continue;
@@ -787,6 +874,7 @@ export function inspectHmaPointerReferences(bytes,target,anchors,{
   // minus Offset. Conflicting declarations for the same source are ambiguous.
   for(const [source,offset] of offsetBySource){
     if(source<0||source>bytes.length-4){skippedOffsetPointers++;continue;}
+    if(tableResolution.conflictedOffsetPointers.has(source)){skippedConflictedOffsetPointers++;continue;}
     if(examinedSlots+examinedOffsetPointers>=maxTableSlots){skippedOffsetPointers++;continue;}
     examinedOffsetPointers++;
     const raw=read32(source);
@@ -810,9 +898,9 @@ export function inspectHmaPointerReferences(bytes,target,anchors,{
   }
   return {
     target,declared,candidates,matchedDeclared,candidateHits,
-    examinedSlots,skippedTables,unsupportedFormats,conflictedTables,anchoredTables:tableResolution.anchoredCount,listTables:tableResolution.listCount,matchedTables:tableResolution.matchedCount,examinedOffsetPointers,skippedOffsetPointers,scannedBytes:span,
+    examinedSlots,skippedTables,unsupportedFormats,conflictedTables,anchoredTables:tableResolution.anchoredCount,listTables:tableResolution.listCount,matchedTables:tableResolution.matchedCount,examinedOffsetPointers,skippedOffsetPointers,skippedConflictedOffsetPointers,scannedBytes:span,
     rawScanComplete:span===bytes.length,scanAlignment:4,
     declaredTruncated:matchedDeclared>declared.length,candidatesTruncated:candidateHits>candidates.length,
-    disclaimer:'Fixed/linked/list/MatchedWords table and OffsetPointer matches rely on unverified metadata; overlapping table claims are excluded. Raw candidates are only aligned byte-pattern matches. Neither proves ownership or permits safe repointing.'
+    disclaimer:'Fixed/linked/list/MatchedWords table and OffsetPointer matches rely on unverified metadata; overlapping table/word/offset-pointer claims are excluded. Raw candidates are only aligned byte-pattern matches. Neither proves ownership or permits safe repointing.'
   };
 }
