@@ -119,3 +119,8 @@ test('upstream default.toml scriptvariablealiases hex indexes preserve actual ca
  assert.equal(lists[0].entries[0x7fff],null);
  assert.throws(()=>parseHmaLists("[[List]]\nName = '''x'''\n0xZZ = '''bad'''"),/index/);
 });
+
+test('stock default.toml moveinfo and holdeffects apostrophes are preserved',()=>{
+ const lists=parseHmaLists("[[List]]\nName = '''moveinfo'''\n0 = [ '''Makes Contact''', '''Affected by King's Rock''', '''Trainer's Choice''' ]");
+ assert.deepEqual(lists[0].entries,['Makes Contact',"Affected by King's Rock","Trainer's Choice"]);
+});
