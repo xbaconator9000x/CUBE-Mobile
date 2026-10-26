@@ -546,8 +546,44 @@ export function resolveHmaTableLayouts(anchors,{romSize=Infinity,maxOverlaps=128
     }
     if(!maxSpan||span.end>maxSpan.end)maxSpan=span;
   }
+  // A WordRun source cannot safely be treated as an independent constant
+  // when another metadata table claims those same bytes. Keep the count
+  // visible for diagnostics, but exclude affected tables and descendants
+  // from typed previews/reference ownership. Binary-search starts because
+  // WordRun width is bounded to at most four bytes.
+  const wordSpans=[...wordResolution.byName].flatMap(([name,data])=>
+    data.words.map(w=>({name,start:w.address,end:w.address+w.length}))
+  ).sort((a,b)=>a.start-b.start);
+  const ambiguousWordNames=new Set();
+  let wordOverlapWitnesses=0;
+  for(const table of spans){
+    let low=0,high=wordSpans.length;
+    while(low<high){
+      const mid=(low+high)>>>1;
+      if(wordSpans[mid].start<table.start-3)low=mid+1;else high=mid;
+    }
+    for(let i=low;i<wordSpans.length&&wordSpans[i].start<table.end;i++){
+      const word=wordSpans[i];
+      if(word.end<=table.start)continue;
+      conflicted.add(table.name);
+      ambiguousWordNames.add(word.name);
+      wordOverlapWitnesses++;
+      if(overlaps.length<maxOverlaps)
+        overlaps.push({first:'MatchedWords:'+word.name,second:table.name,
+          start:Math.max(word.start,table.start),end:Math.min(word.end,table.end)});
+      break; // One witness per table is enough to disable typed reads.
+    }
+  }
+  for(const name of queue){
+    const table=byName.get(name);
+    if(table.kind==='matched-word-count'&&ambiguousWordNames.has(table.lengthFrom))
+      conflicted.add(name);
+    if(table.kind==='anchored-count'&&conflicted.has(table.lengthFrom))
+      conflicted.add(name);
+  }
   return {byName,unresolved,conflicted,overlaps,overlapWitnesses,
-    overlapTruncated:overlapWitnesses>overlaps.length,
+    overlapTruncated:overlapWitnesses+wordOverlapWitnesses>overlaps.length,
+    wordOverlapWitnesses,
     resolvedCount:byName.size,anchoredCount:[...byName.values()].filter(x=>x.kind==='anchored-count').length,
     listCount:[...byName.values()].filter(x=>x.kind==='named-list-count').length,
     matchedCount:[...byName.values()].filter(x=>x.kind==='matched-word-count').length,
