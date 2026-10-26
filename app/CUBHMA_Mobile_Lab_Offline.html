@@ -1319,6 +1319,36 @@ function inspectHmaPointerReferences(bytes,target,anchors,{
   };
 }
 
+/**
+ * Conservative, read-only fixed-width GBA text-byte inspector.
+ * This deliberately does NOT claim to decode Pokemon's proprietary PCS
+ * alphabet. It exposes raw bytes, termination and printable ASCII hints
+ * for manual inspection without mutating ROM data.
+ */
+function inspectFixedTextBytes(bytes, start, length) {
+  const read = bytes instanceof Uint8Array ? i => bytes[i] :
+    typeof bytes?.read === 'function' ? i => bytes.read(i) : null;
+  if (!read || !Number.isSafeInteger(bytes.length) ||
+      !Number.isSafeInteger(start) || !Number.isSafeInteger(length) ||
+      start < 0 || length < 1 || length > 1024 ||
+      start > bytes.length || length > bytes.length - start)
+    throw Error('Invalid or out-of-bounds text byte span');
+  const raw = Array.from({length}, (_,i)=>read(start+i));
+  if (raw.some(v=>!Number.isInteger(v)||v<0||v>255))
+    throw Error('Invalid ROM byte');
+  const terminator = raw.indexOf(0xFF);
+  const payload = terminator < 0 ? raw : raw.slice(0,terminator);
+  return {
+    start,length,
+    hex: raw.map(v=>v.toString(16).toUpperCase().padStart(2,'0')).join(' '),
+    terminated: terminator >= 0,
+    terminatorOffset: terminator,
+    asciiHint: payload.map(v=>v>=32&&v<=126?String.fromCharCode(v):'.').join(''),
+    // This is NOT decoded PCS; glyph mappings are ROM/game-specific.
+    encoding: 'unknown-gba-text'
+  };
+}
+
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
@@ -1717,7 +1747,7 @@ function drawAnchorDetails(){
       else{
         const section=semanticChild('section','','semantic-table');
         section.append(semanticChild('h4',`Read-only table preview · ${table.count} row(s) · ${table.rowSize} bytes/row`));
-        section.append(semanticChild('p','Read-only unsigned scalars; pointer targets are range-checked. Text fields show raw bytes, not decoded PCS. Metadata compatibility is unverified.','palette-note'));
+        section.append(semanticChild('p','Read-only unsigned scalars; pointer targets are range-checked. Text fields show raw bytes and FF termination only; ASCII hover hints are NOT decoded Pokémon PCS. Metadata compatibility is unverified.','palette-note'));
         const scroller=semanticChild('div','','semantic-table-scroll');
         const grid=document.createElement('table');
         const head=document.createElement('thead'),headRow=document.createElement('tr');
@@ -1731,6 +1761,16 @@ function drawAnchorDetails(){
           for(const cell of row.cells){
             const col=document.createElement('td');col.textContent=String(cell.value);
             if(cell.type==='pointer'&&cell.target!==null)col.title=`In-ROM pointer to 0x${hex(cell.target)}`;
+            if(cell.type==='text-bytes'){
+              const field=table.fields.find(f=>f.name===cell.name);
+              // Read only the bounded, already-resolved field. The ASCII hint is
+              // NOT a Pokémon PCS decoder and must never be displayed as one.
+              const text=inspectFixedTextBytes(model,row.offset+field.offset,field.size);
+              const status=text.terminated?`FF terminator at byte ${text.terminatorOffset}`:'No FF terminator within this field';
+              const badge=semanticChild('div',status,'palette-note');
+              col.append(badge);
+              col.title=`${status}. ASCII-only byte hint (not Pokémon PCS): ${text.asciiHint}`;
+            }
             tr.append(col);
           }
           body.append(tr);
