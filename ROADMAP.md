@@ -116,3 +116,10 @@
 - [ ] Large-ROM responsiveness, import/export, navigation, persistence and recovery.
 - [ ] Android wrapper/APK build, hardware/device testing and emulator validation.
 - [ ] Document any unsupported upstream feature precisely before declaring parity.
+
+## Watchdog checkpoint — imported PCS reference grammar (27 October 2026)
+- [x] Add bounded, read-only parser for upstream-style `0xXX` glyph ranges, `CC_XX` control lengths and game-scoped `[macro]` bytes.
+- [x] Decode with explicit imported reference and game code; never consume bytes beyond selected field or mutate staged ROM data.
+- [x] Add synthetic regression tests for game-specific macros, control escapes, FF termination, malformed declarations, bounds and unknown bytes.
+- [ ] Verify authentic `pcsReference.txt` resource, precedence, macro ordering and CUBE-specific variants against upstream and licensed fixtures.
+- [ ] Wire optional local reference import into mobile UI and standalone build with provenance warnings; no semantic writes/repointing yet.
