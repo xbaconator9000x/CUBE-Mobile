@@ -142,3 +142,10 @@
 - [x] Use sorted unknown starts and binary searches for bounded, non-quadratic collision audits; add synthetic multi-claim and boundary regressions.
 - [ ] Unknown run **extent** is still unknown; a one-byte witness cannot prove independent free space, authenticated ownership, or safe repointing.
 - [ ] Verify real upstream aliases and dynamic run grammar, CUBE-specific ROM fingerprints, emulator/Android roundtrips before semantic writes.
+
+## Watchdog checkpoint — named-list enum hints (27 October 2026)
+- [x] Preserve supported HMA scalar enum-name suffixes in read-only fixed table layouts (including hexadecimal display suffix).
+- [x] Display named-list labels alongside, never instead of, the original unsigned ROM value; suppress conflicting, sparse, out-of-range and anchor-shadowed labels.
+- [x] Add generated-ROM immutability, parser, metadata-conflict and bounds regression tests; synchronize offline HTML.
+- [ ] Upstream enum options can also come from other tables, have offsets, duplicate disambiguation and dynamic data; these are **not** interpreted or edited.
+- [ ] Authentic ROM fingerprinting, safe semantic writes, map/collision/warp editors, Android hardware testing and CUBE-specific formats remain incomplete.

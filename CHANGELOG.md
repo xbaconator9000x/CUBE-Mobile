@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — conservative named-list enum preview
+- Preserve HMA integer field enum suffixes and show matching imported `[[List]]` names as explicitly unverified, read-only hints beside the raw numeric value.
+- Do not label conflicting, sparse, out-of-range or named-anchor-shadowed options; no ROM writes or ownership claims.
+- Add synthetic regression tests and synchronize the offline app. Full enum grammar, offsets, table-derived options and CUBE semantics remain unsupported.
+
 ## Unreleased — unresolved anchor cross-claim safety (read only)
 - Extend the conservative one-byte unknown-anchor witness to intersecting ROM-backed MatchedWords and OffsetPointer source spans, even outside supported tables.
 - Propagate count-source ambiguity to dependent tables; reject offset sources that overlap an unresolved anchor. Half-open adjacent claims remain distinct.
