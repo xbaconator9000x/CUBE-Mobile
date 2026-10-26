@@ -177,9 +177,14 @@ export function parseHmaLists(source){
       if(!value||current.name)throw Error('Invalid HMA List name at line '+(i+1));
       current.name=value;continue;
     }
-    const entry=/^([0-9]+)\s*=\s*(.+)$/.exec(line);
-    if(!entry)continue;
-    const start=Number(entry[1]);
+    const entry=/^(0x[0-9a-f]+|[0-9]+)\s*=\s*(.+)$/i.exec(line);
+    if(!entry){
+      // A malformed index must never be silently skipped: doing so could
+      // produce a believable but incorrect list-derived table length.
+      if(/^(?:0x|[0-9])[^=]*=/.test(line))throw Error('Unsupported HMA list index at line '+(i+1));
+      continue;
+    }
+    const start=tomlInt(entry[1]);
     if(!Number.isSafeInteger(start)||start>maxListEntries)throw Error('HMA list index exceeds limit');
     let value=entry[2].trim(),items;
     if(value.startsWith('[')){
