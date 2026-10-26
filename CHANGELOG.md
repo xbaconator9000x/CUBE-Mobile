@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — authentic CUBHMA PCS reference compatibility (read only)
+- Fix import of the pinned upstream `pcsReference.txt`: accept underscore-separated game scopes and the intentional single-character quote glyph declaration.
+- Add test-only upstream PCS resource with pinned commit provenance and MIT licence; validate game-scoped colour macros, glyphs, control lengths, decoding and ROM immutability.
+- Do not ship upstream test fixture in the standalone HTML. User-supplied references remain unauthenticated and cannot authorize ROM writes.
+- **Remaining:** exact upstream macro alias/precedence parity, CUBE-specific text encodings, authentic ROM fingerprints, safe semantic text editing, Android device acceptance.
+
+
 ## Unreleased — upstream-default Gen 3 PCS preview (read only)
 - Add a bounded fallback PCS decoder based on the pinned upstream `PCSString.GetDefaultPCS` mapping and default control-code lengths, restricted to recognised Gen 3 game codes.
 - Display an explicitly unauthenticated PCS fallback preview in safe fixed-table text fields while retaining original raw bytes and ASCII hints.
