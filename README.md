@@ -6,6 +6,9 @@
 
 ## Current working code
 
+- **Local exact-byte ROM SHA-256 identity (unreleased):** opt-in workspace action hashes the current base plus staged edits in bounded 64 KiB chunks without allocating a full ROM copy, reports progress, cancels on ROM replacement, and invalidates results when bytes change. This is a cryptographic **identity only**, not proof of stock or CUBE layout, provenance, or safe metadata compatibility. No trusted CUBE fingerprint allowlist has been established.
+
+
 - Open GBA ROMs locally (no file uploading), header inspection, guarded hex editing, undo/redo.
 - GBA ROM pointers, byte search and safe Save As copies.
 - BPS/IPS import; BPS source, patch and output CRC validation; IPS export.
