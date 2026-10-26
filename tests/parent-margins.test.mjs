@@ -21,7 +21,7 @@ test('two signed margins distinguish beginning from end',()=>{
  for(const [expr,beginning,end] of [
   ['root+2-1',2,-1],['root-2+1',-2,1],['root+1+2',1,2],
   ['root-1-2',-1,-2],['root+0-1',0,-1]
- ])assert.deepEqual(parseHmaParentLengthToken(expr),{parent:'root',beginningMargin:beginning,endMargin});
+ ])assert.deepEqual(parseHmaParentLengthToken(expr),{parent:'root',beginningMargin:beginning,endMargin:end});
 });
 test('invalid, ambiguous and excessive margin tokens fail closed',()=>{
  for(const token of ['root++1','root+-1','root+1-2+3','root+1.5','root-',
