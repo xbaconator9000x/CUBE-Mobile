@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — exact ROM identity foundation (27 October 2026)
+- Add opt-in local streaming SHA-256 of current staged ROM bytes, with cancellation, stale-result invalidation and bounded memory.
+- Test NIST SHA-256 vectors, independent Node crypto parity, staged edits and concurrent mutation.
+- A digest does not authenticate CUBE layout; no verified version/signature allowlist or semantic writes are enabled.
+
 ## Unreleased — CUBE expansion-layout TOML safety
 - Recognise upstream CUBHMA's `MetadataLayout` marker and legacy `tpte` trainer-party named-run evidence, without claiming these markers authenticate a ROM.
 - Refuse mixing stock-game reference TOMLs with declared expansion/custom layouts; detect contradictory explicit markers before mutating the active metadata state.
