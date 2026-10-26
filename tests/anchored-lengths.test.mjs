@@ -33,13 +33,14 @@ test('cycles and unresolved parents fail closed, never inferred as one row',()=>
  assert.equal(r.unresolved.get('c'),'missing-length-anchor');
 });
 
-test('upstream parent margins, malformed fields and non-table parents stay unsupported',()=>{
+test('bounded parent margins resolve while malformed fields and non-table parents stay unsupported',()=>{
  const a=[anchor('root',10,'[hp.]2'),anchor('margin',20,'[hp.]root-1'),
           anchor('bad',30,'[hp.|z]root'),anchor('text',40,'text'),
           anchor('fromText',50,'[hp.]text')];
  const r=resolveHmaTableLayouts(a,{romSize:128});
- assert.equal(r.byName.size,1);
- assert.equal(r.unresolved.get('margin'),'unsupported-format');
+ assert.equal(r.byName.size,2);
+ assert.equal(r.byName.get('margin').layout.count,1);
+ assert.deepEqual(r.byName.get('margin').parentMargins,{beginning:-1,end:0});
  assert.equal(r.unresolved.get('bad'),'unsupported-fields');
  assert.equal(r.unresolved.get('fromText'),'unresolved-or-cyclic-length-anchor');
 });

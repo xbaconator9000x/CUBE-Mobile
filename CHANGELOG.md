@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.5.6 — ParentOffset margins and metadata conflict safety
+- Support a conservative, source-grounded subset of `ArrayRun.ParentOffset`: one positive margin adds rows at the end; one negative margin removes from the beginning; two signed margins adjust beginning and end separately.
+- Resolve bounded margin-adjusted counts through linked table chains and reject zero, excessive, unsupported and out-of-ROM results without falling back to guessed rows.
+- Retain conflicting named-anchor declarations across TOML sources rather than last-write-wins; ambiguous names cannot be typed or used as verified pointer owners.
+- Show margin provenance and metadata conflict warnings in the mobile inspector. Add synthetic regression tests and regenerate offline HTML.
+- **Not yet implemented:** authenticated metadata overlay precedence, full CUBHMA grammar, authoritative pointer ownership, safe semantic writes, native maps/collision/scripts/graphics/audio or Android APK testing.
+
+
 ## v0.5.5 — conservative named-array lengths and overlap audit
 - Resolve read-only table lengths linked by an exact named-array reference, including forward and chained dependencies, without recursive traversal.
 - Refuse unsupported margin/stream/record formats, missing/cyclic parents, conflicting duplicate names and out-of-ROM layouts.
