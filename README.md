@@ -2,7 +2,7 @@
 
 **Private development repository for a full mobile port of CUBHMA (Cradi's Unofficial Build of Hex Maniac Advance), targeting CUBE-aware Pokémon Emerald editing and the other ROM families supported by upstream.**
 
-> **Status: v0.5 — early foundation, NOT a complete port.** The working code today is an offline ROM inspection / patching workbench and a limited read-only CUBHMA TOML named-anchor inspector. The desktop editor's semantic engine, map/collision/event editors, scripts, sprites, trainers, Pokémon, sound and CUBE upgrades are **not yet ported**.
+> **Status: v0.5.2 — early foundation, NOT a complete port.** The working code today is an offline ROM inspection / patching workbench and a limited read-only CUBHMA TOML named-anchor inspector. The desktop editor's semantic engine, map/collision/event editors, scripts, sprites, trainers, Pokémon, sound and CUBE upgrades are **not yet ported**.
 
 ## Current working code
 
@@ -11,6 +11,7 @@
 - BPS/IPS import; BPS source, patch and output CRC validation; IPS export.
 - Read-only LZ77 4bpp graphics stream discovery and palette preview (not semantic graphics editing).
 - Load CUBHMA/HMA `[[NamedAnchors]]` TOML records, search formats/addresses and inspect named pointers.
+- **Version-aware stock metadata safety:** validates GBA header code, header checksum and exact revision before fetching upstream reference TOML; refuses known mismatched stock TOML imports. Neither header nor TOML filenames authenticate CUBE/custom ROM layout.
 - **Experimental read-only fixed table previews:** decode a strictly bounded subset of CUBHMA `ArrayRun` formats (byte/word/dword integers, raw text bytes and ROM pointers), show up to eight rows, and jump to a row in hex. Unknown/dynamic layouts fail closed; metadata is not ROM-version authenticated.
 - Browser history-backed navigation on Android, including Back/Forward.
 - CRC-bound JSON sidecar project edits.
