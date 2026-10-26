@@ -1,5 +1,5 @@
 import {RomModel, MAX_BYTES, hex, parseOffset, parseHexBytes, applyBps, applyIps, crc32, paletteAt, gba4bppTile, decodeLz10, scanLz10Graphics} from './core.js';
-import {parseHmaNamedAnchors,readAnchorInspection,groupAnchors,filterAnchors,previewHmaFixedTable,resolveHmaStockMetadata,checkHmaMetadataSources} from './semantic.js';
+import {parseHmaNamedAnchors,readAnchorInspection,groupAnchors,filterAnchors,previewHmaFixedTable,resolveHmaStockMetadata,checkHmaMetadataSources,inspectHmaPointerReferences} from './semantic.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],selectedAnchor=null;
@@ -374,6 +374,44 @@ function drawAnchorDetails(){
       }
     }catch(error){root.append(semanticChild('div',error.message,'semantic-warning'));}
   }
+  // Explicit opt-in: bounded pointer inspection can take time on larger ROMs.
+  // Matches from this incomplete semantic subset do NOT establish safe repointing.
+  const refsSection=semanticChild('section','','semantic-table');
+  refsSection.append(semanticChild('h4','Pointer references (read only)'));
+  refsSection.append(semanticChild('p','Inspect typed pointer fields in supported fixed tables and a bounded aligned raw-byte search. Results are potential references, never proven ownership.','palette-note'));
+  const scanButton=semanticChild('button','Find possible references','semantic-row-jump');
+  scanButton.type='button';
+  if(a.address>=0x02000000){
+    scanButton.disabled=true;
+    refsSection.append(semanticChild('p','This anchor is above the 32 MiB GBA ROM pointer window; it cannot be targeted by a conventional 0x08/0x09 ROM pointer.','semantic-warning'));
+  }
+  const results=semanticChild('div','','semantic-references');
+  scanButton.addEventListener('click',()=>safeRun(()=>{
+    scanButton.disabled=true;scanButton.textContent='Scanning…';
+    try {
+    const refs=inspectHmaPointerReferences(model,a.address,metadata,{maxTableSlots:60000,maxDeclared:24,maxCandidates:20,maxScanBytes:2*1024*1024});
+    results.replaceChildren();
+    results.append(semanticChild('p',
+      'Typed table matches: '+refs.matchedDeclared+'; raw aligned candidates: '+refs.candidateHits+'. Scanned first '+formatSize(refs.scannedBytes)+' of '+formatSize(model.length)+' for raw candidates. '+refs.skippedTables+' tables skipped (bounds or budget).',
+      'palette-note'));
+    results.append(semanticChild('p',refs.disclaimer,'semantic-warning'));
+    for(const ref of [...refs.declared,...refs.candidates]){
+      const label=ref.kind==='typed-table'
+        ? 'Typed-table match · '+ref.table+' #'+ref.row+' / '+ref.field+' · 0x'+hex(ref.source)
+        : 'Unverified raw match · 0x'+hex(ref.source);
+      const jump=semanticChild('button',label,'semantic-row-jump');
+      jump.type='button';
+      jump.addEventListener('click',()=>safeRun(()=>{setPageForOffset(ref.source);gotoTab('hex');}));
+      results.append(jump);
+    }
+    if(refs.declaredTruncated||refs.candidatesTruncated)results.append(semanticChild('p','Result list truncated to keep the interface responsive.','palette-note'));
+    if(!refs.rawScanComplete)results.append(semanticChild('p','Raw pattern search is incomplete: later ROM regions were NOT scanned.','semantic-warning'));
+    if(refs.unsupportedFormats)results.append(semanticChild('p',refs.unsupportedFormats+' unsupported table formats were not interpreted.', 'palette-note'));
+    if(!refs.matchedDeclared&&!refs.candidateHits)results.append(semanticChild('p','No matches in the inspected subset. This does not prove the anchor has no references.','palette-note'));
+    } finally { scanButton.disabled=a.address>=0x02000000;scanButton.textContent='Scan again'; }
+  }));
+  refsSection.append(scanButton,results);
+  root.append(refsSection);
   $('anchor-to-hex').disabled=false;
   $('anchor-follow-pointer').disabled=inspection.pointer===null;
   $('anchor-to-graphics').disabled=!inspection.isLz10;

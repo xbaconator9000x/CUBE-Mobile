@@ -22,6 +22,13 @@
 - [ ] Full ArrayRun format grammar, dynamic lengths, enum/PCS interpretation, table inheritance, typed pointers, occupancy graph and relocation.
 - [ ] Migrate full original browser/unit test archive into CI and run Android device tests.
 
+## Watchdog checkpoint — pointer cross-references (26 October 2026)
+- [x] Bounded source-location inspection for supported fixed-table pointer fields, including row/field provenance.
+- [x] Separate typed-table matches from unverified aligned byte-pattern candidates; never infer ownership from candidate matches.
+- [x] Opt-in mobile cross-reference viewer and source-offset navigation with scan caps and explicit partial coverage.
+- [ ] Full pointer ownership across nested/dynamic tables, offset pointers, code references, overlaps and relocations.
+- [ ] Benchmark large expanded ROMs on Android hardware; make scans incremental and cancellable.
+
 ## Milestone 1 — semantic read-only CUBHMA engine
 - [ ] Parse HMA metadata and format DSL, beyond named-anchor fields.
 - [ ] Recognise ROM game/version and CUBE-specific metadata without false positives.
