@@ -149,3 +149,10 @@
 - [x] Add generated-ROM immutability, parser, metadata-conflict and bounds regression tests; synchronize offline HTML.
 - [ ] Upstream enum options can also come from other tables, have offsets, duplicate disambiguation and dynamic data; these are **not** interpreted or edited.
 - [ ] Authentic ROM fingerprinting, safe semantic writes, map/collision/warp editors, Android hardware testing and CUBE-specific formats remain incomplete.
+
+## Watchdog checkpoint — upstream CUBE expansion metadata guard (27 October 2026)
+- [x] Inspect pinned upstream `StoredMetadata.cs`: `MetadataLayout = '''expansion'''` and named-anchor trainer-party `tpte` formats protect pokeemerald-expansion layouts from vanilla metadata upgrades.
+- [x] Detect those TOML markers read-only, including legacy unmarked `tpte` layouts; reject vanilla stock TOML overlays on expansion/custom metadata even with a valid Emerald header.
+- [x] Reject contradictory explicit layout declarations, preserve imported layout evidence in the mobile inspector, and add synthetic ROM immutability/regression tests.
+- [ ] **ROM fingerprinting is not done**: a valid stock game code or user-supplied TOML marker cannot prove a ROM is CUBE or that a particular table layout matches its bytes.
+- [ ] Implement authenticated CUBE version/layout signatures, upstream metadata overlay precedence and full run ownership before any semantic writes or relocation.

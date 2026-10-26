@@ -844,10 +844,47 @@ export function resolveHmaStockMetadata(bytes){
   if(!files)throw Error('No verified stock metadata profile for '+identity.code+' revision '+identity.revision);
   return {identity,files:[...files],verifiedStock:false};
 }
+
+/**
+ * Read-only CUBHMA expansion-layout evidence from imported TOML.
+ * Pinned upstream StoredMetadata.cs (3044393183e01af2) recognises both the
+ * General MetadataLayout marker and trainer-party tpte formatted runs.
+ * These are claims made by the TOML, NOT fingerprints of the selected ROM.
+ */
+export function inspectHmaMetadataLayout(source){
+  if(typeof source!=='string'||source.length>maxMetadataSize)
+    throw Error('Metadata must be TOML text under 4 MiB');
+  const lines=source.replace(/^\uFEFF/,'').split(/\r?\n/);
+  let marker=null;
+  for(let i=0;i<lines.length;i++){
+    const line=lines[i].trim();
+    const match=/^MetadataLayout\s*=\s*(.*)$/.exec(line);
+    if(!match)continue;
+    if(marker!==null)throw Error('Duplicate MetadataLayout declarations at TOML line '+(i+1));
+    // CUBHMA serializes triple-quoted values; accept other simple TOML quoted
+    // strings but reject malformed/unquoted declarations rather than guessing.
+    const quoted=/^(?:'''(.*?)'''|"""(.*?)"""|'([^']*)'|"([^"]*)")\s*(?:#.*)?$/.exec(match[1].trim());
+    if(!quoted)throw Error('Invalid MetadataLayout declaration at TOML line '+(i+1));
+    marker=quoted.slice(1).find(v=>v!==undefined).trim();
+  }
+  const tpteAnchors=parseHmaNamedAnchors(source)
+    .filter(anchor=>anchor.format.includes('\x60tpte\x60')).map(anchor=>anchor.name);
+  const kind=marker?.toLowerCase()==='expansion'||tpteAnchors.length?'expansion':
+    marker?'custom':'unspecified';
+  return {kind,marker:marker||null,viaTpte:tpteAnchors.length>0,tpteAnchors};
+}
+
 /** Detect a *known wrong* upstream stock TOML; unknown custom files stay read-only and unverified. */
 export function checkHmaMetadataSources(sources,bytes){
   if(!Array.isArray(sources))throw Error('Expected metadata source list');
   const identity=identifyHmaRom(bytes);
+  // Filename-only checks are supported for existing stock-metadata callers;
+  // only supplied TOML text can provide expansion-layout evidence.
+  const layouts=sources.map(source=>inspectHmaMetadataLayout(source?.text===undefined?'':source.text));
+  const declared=layouts.map(item=>item.marker?.toLowerCase()).filter(Boolean);
+  if(new Set(declared).size>1)throw Error('Conflicting MetadataLayout declarations across imported TOMLs');
+  const layoutKind=layouts.some(item=>item.kind==='expansion')?'expansion':
+    layouts.some(item=>item.kind==='custom')?'custom':'unspecified';
   const expected=HMA_STOCK_PROFILES[identity.code]?.[identity.revision]||[];
   const known=new Set([...Object.values(HMA_STOCK_PROFILES).flatMap(byRev=>Object.values(byRev).flat()),
     'default.bpef.toml','default.bpei0.toml','default.bpri.toml','default.bprf0.toml']);
@@ -861,7 +898,11 @@ export function checkHmaMetadataSources(sources,bytes){
       checked.push({filename,kind:'stock-reference'});
     }else checked.push({filename,kind:'unverified-custom'});
   }
-  return {identity,sources:checked,warning:'ROM header and filenames cannot authenticate edited ROM layouts or CUBE versions; semantic data is read-only.'};
+  if(layoutKind!=='unspecified'&&checked.some(item=>item.kind==='stock-reference'))
+    throw Error('Refusing vanilla stock metadata overlay on '+layoutKind+' (CUBE/custom) metadata layout');
+  return {identity,sources:checked,
+    layout:{kind:layoutKind,marker:declared[0]||null,viaTpte:layouts.some(item=>item.viaTpte)},
+    warning:'Layout markers describe imported TOML, not the ROM. Header and filenames cannot authenticate CUBE versions; semantic data is read-only.'};
 }
 
 
