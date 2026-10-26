@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — unresolved anchor cross-claim safety (read only)
+- Extend the conservative one-byte unknown-anchor witness to intersecting ROM-backed MatchedWords and OffsetPointer source spans, even outside supported tables.
+- Propagate count-source ambiguity to dependent tables; reject offset sources that overlap an unresolved anchor. Half-open adjacent claims remain distinct.
+- Index unknown anchor starts for bounded binary-search audits; add synthetic ROM immutability, multi-claim and boundary regressions.
+- This does not establish unknown run extents, authenticated metadata, writable ownership or safe relocation.
+
 ## Unreleased — authentic CUBHMA PCS reference compatibility (read only)
 - Fix import of the pinned upstream `pcsReference.txt`: accept underscore-separated game scopes and the intentional single-character quote glyph declaration.
 - Match CUBHMA `PCSString.FindMacro` declaration-order precedence rather than longest-first/alphabetical ordering, preserving canonical alias spellings such as `[grey]` over `[gray]`.

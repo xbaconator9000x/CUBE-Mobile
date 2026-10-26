@@ -151,3 +151,55 @@ test('ownership fixture: unrelated unresolved run cannot invalidate distant tabl
   ]);
   assert.equal(result.conflicted.has('table'),false);
 });
+
+test('ownership fixture: unresolved anchor inside ROM-backed count invalidates derived table',()=>{
+  const rom=new Uint8Array(256);rom[40]=2;
+  const before=rom.slice();
+  const result=resolve([
+    anchor('unparsedWordAlias',42,'`lzs4x64x64`'),
+    anchor('dependent',80,'[value.]counter')
+  ],{rom,matchedWords:[{name:'counter',address:40,length:4,offset:0,multOffset:1}]});
+  assert.ok(result.byName.has('dependent'));
+  assert.ok(result.conflicted.has('dependent'));
+  assert.equal(result.unresolvedAnchorCollisionCount,1);
+  assert.deepEqual(rom,before);
+});
+
+test('ownership fixture: unresolved anchor inside standalone OffsetPointer source is unsafe',()=>{
+  const result=resolve([anchor('unknown',43,'`lzs4x64x64`')],{
+    offsetPointers:[{address:40,offset:0}]
+  });
+  assert.ok(result.conflictedOffsetPointers.has(40));
+  assert.equal(result.unresolvedAnchorCollisionCount,1);
+});
+
+test('ownership fixture: unresolved anchor at OffsetPointer end-exclusive boundary is disjoint',()=>{
+  const result=resolve([anchor('unknown',44,'`lzs4x64x64`')],{
+    offsetPointers:[{address:40,offset:0}]
+  });
+  assert.equal(result.conflictedOffsetPointers.has(40),false);
+  assert.equal(result.unresolvedAnchorCollisionCount,0);
+});
+
+test('ownership fixture: unresolved anchor at WordRun end-exclusive boundary is disjoint',()=>{
+  const rom=new Uint8Array(256);rom[40]=2;
+  const result=resolve([
+    anchor('unknown',44,'`lzs4x64x64`'),
+    anchor('dependent',80,'[value.]counter')
+  ],{rom,matchedWords:[{name:'counter',address:40,length:4,offset:0,multOffset:1}]});
+  assert.ok(result.byName.has('dependent'));
+  assert.equal(result.conflicted.has('dependent'),false);
+  assert.equal(result.unresolvedAnchorCollisionCount,0);
+});
+
+test('ownership fixture: unknown run start colliding with both WordRun and OffsetPointer invalidates both',()=>{
+  const rom=new Uint8Array(256);rom[40]=2;
+  const result=resolve([
+    anchor('unknown',40,'`lzs4x64x64`'),
+    anchor('dependent',80,'[value.]counter')
+  ],{rom,matchedWords:[{name:'counter',address:40,length:4,offset:0,multOffset:1}],
+    offsetPointers:[{address:40,offset:0}]});
+  assert.ok(result.conflicted.has('dependent'));
+  assert.ok(result.conflictedOffsetPointers.has(40));
+  assert.equal(result.unresolvedAnchorCollisionCount,2);
+});
