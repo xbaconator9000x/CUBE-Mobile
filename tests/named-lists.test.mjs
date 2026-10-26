@@ -109,3 +109,13 @@ test('malformed, incomplete, excessive and unsupported list data fails closed',(
  assert.throws(()=>collectHmaLists([source('',bad[0])]),/Unnamed/);
  assert.throws(()=>resolveHmaTableLayouts([],{lists:[{name:'x',entries:[]}]}),/list metadata/);
 });
+
+test('upstream default.toml scriptvariablealiases hex indexes preserve actual cardinality',()=>{
+ const lists=parseHmaLists("[[List]]\nName = '''scriptvariablealiases'''\n0x4000 = [ '''temp0''', '''temp1''' ]\n0x8000 = [ '''var0''', '''var1''' ]");
+ assert.equal(lists[0].entries.length,0x8002);
+ assert.equal(lists[0].entries[0x4000],'temp0');
+ assert.equal(lists[0].entries[0x4001],'temp1');
+ assert.equal(lists[0].entries[0x8000],'var0');
+ assert.equal(lists[0].entries[0x7fff],null);
+ assert.throws(()=>parseHmaLists("[[List]]\nName = '''x'''\n0xZZ = '''bad'''"),/index/);
+});
