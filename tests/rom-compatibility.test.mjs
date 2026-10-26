@@ -92,3 +92,18 @@ test('invalid fingerprint shape is rejected instead of treated as a known profil
   assert.throws(()=>compareRomIdentity(rom,bad),/Invalid ROM fingerprint/);
   assert.throws(()=>compareRomIdentity(rom,{...fingerprint,length:0}),/Invalid ROM fingerprint/);
 });
+
+test('mobile comparison and standalone bundler expose no trusted-layout claims',async()=>{
+  const {readFileSync}=await import('node:fs');
+  const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
+  const html=read('index.html'),app=read('src/app.js');
+  const build=read('build-standalone.mjs'),offline=read('app/CUBHMA_Mobile_Lab_Offline.html');
+  assert.match(html,/id="rom-fingerprint-expected"/);
+  assert.match(html,/id="rom-fingerprint-check"/);
+  assert.match(html,/No verified CUBE fingerprints are bundled yet/);
+  assert.match(app,/compareRomIdentity\(model,fingerprintResult/);
+  assert.match(app,/semantic writes remain disabled/);
+  assert.match(build,/stripRomCompatibility/);
+  assert.match(offline,/function compareRomIdentity\(/);
+  assert.match(offline,/id="rom-fingerprint-check"/);
+});
