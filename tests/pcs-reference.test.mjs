@@ -49,10 +49,10 @@ test('a macro for another game is never silently applied',()=>{
 
 test('control lengths from reference protect FF argument bytes',()=>{
   const ref=parseHmaPcsReference(source);
-  const rom=Uint8Array.of(0xFC,4,0xFF,0xA1,0xA2,0xFF);
+  const rom=Uint8Array.of(0xFC,4,0xFF,0x00,0xA1,0xFF);
   const result=decodeHmaPcsReference(rom,0,rom.length,{gameCode:'BPEE',reference:ref});
   assert.equal(result.terminatorOffset,5);
-  assert.equal(result.text,'\\CC04FFA1\\!A2');
+  assert.equal(result.text,'\\CC04FF000');
 });
 
 test('unmapped bytes remain visible rather than fabricated',()=>{
