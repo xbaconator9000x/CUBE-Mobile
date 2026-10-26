@@ -405,7 +405,11 @@ export function parseHmaFixedTableFormat(format){
     }else if(suffix)return null;
     if(!Number.isSafeInteger(size)||size<1||size>1000)return null;
     if(rowSize+size>1024)return null;
-    fields.push({name,type,size,offset:rowSize});rowSize+=size;
+    // A scalar suffix can name an HMA enum. Preserve the raw integer and
+    // resolve a label only from a non-conflicting, explicitly imported List.
+    // Other enum sources (including table-derived options) remain unsupported.
+    const enumName=type==='integer' ? suffix.replace(/\\|h$/,'') : '';
+    fields.push({name,type,size,offset:rowSize,...(enumName?{enumName}:{})});rowSize+=size;
   }
   if(!fields.length||rowSize*count>Number.MAX_SAFE_INTEGER)return null;
   return {fields,rowSize,count,totalBytes:rowSize*count};
@@ -717,7 +721,7 @@ export function resolveHmaTableLayouts(anchors,{romSize=Infinity,maxOverlaps=128
 }
 
 /** Read at most a few rows; never materialize or copy the entire ROM. */
-export function previewHmaFixedTable(bytes,anchor,{maxRows=8,tableResolution=null}={}){
+export function previewHmaFixedTable(bytes,anchor,{maxRows=8,tableResolution=null,lists=[],conflictingLists=new Set(),anchors=[]}={}){
   let layout=parseHmaFixedTableFormat(anchor?.format);
   if(tableResolution){
     const resolved=tableResolution.byName?.get(anchor?.name);
@@ -730,6 +734,17 @@ export function previewHmaFixedTable(bytes,anchor,{maxRows=8,tableResolution=nul
   if(!read||!Number.isSafeInteger(bytes?.length)||!Number.isSafeInteger(anchor?.address))throw Error('Invalid ROM/anchor');
   if(anchor.address<0||anchor.address>bytes.length||layout.totalBytes>bytes.length-anchor.address)throw Error('Table extends beyond the selected ROM; preview refused');
   if(!Number.isSafeInteger(maxRows)||maxRows<1||maxRows>32)throw Error('Invalid table preview limit');
+  // Labels are hints only: CUBHMA enums may also refer to named tables,
+  // whose dynamic options are not implemented. Named anchors take precedence.
+  if(!Array.isArray(lists)||!Array.isArray(anchors)||!(conflictingLists instanceof Set))
+    throw Error('Invalid enum preview metadata');
+  const namedAnchors=new Set(anchors.map(a=>a.name));
+  const labelLists=new Map();
+  for(const list of lists){
+    if(!list||typeof list.name!=='string'||!Array.isArray(list.entries))continue;
+    if(labelLists.has(list.name)){labelLists.set(list.name,null);continue;}
+    labelLists.set(list.name,list.entries);
+  }
   const rows=[];
   for(let index=0;index<Math.min(layout.count,maxRows);index++){
     const offset=anchor.address+index*layout.rowSize;
@@ -745,7 +760,11 @@ export function previewHmaFixedTable(bytes,anchor,{maxRows=8,tableResolution=nul
         const target=value>=0x08000000&&value<0x0A000000?value-0x08000000:null;
         return {name:field.name,type:field.type,value:`0x${value.toString(16).toUpperCase().padStart(8,'0')}`,target:target!==null&&target<bytes.length?target:null};
       }
-      return {name:field.name,type:field.type,value};
+      const options=field.enumName&&!conflictingLists.has(field.enumName)&&
+        !namedAnchors.has(field.enumName)?labelLists.get(field.enumName):null;
+      const label=Array.isArray(options)&&value<options.length?options[value]:null;
+      return {name:field.name,type:field.type,value,
+        ...(typeof label==='string'?{enumLabel:label,enumSource:field.enumName}:{})};
     });
     rows.push({index,offset,cells});
   }
