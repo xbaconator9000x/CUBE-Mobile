@@ -408,7 +408,7 @@ export function parseHmaFixedTableFormat(format){
     // A scalar suffix can name an HMA enum. Preserve the raw integer and
     // resolve a label only from a non-conflicting, explicitly imported List.
     // Other enum sources (including table-derived options) remain unsupported.
-    const enumName=type==='integer' ? suffix.replace(/\\|h$/,'') : '';
+    const enumName=type==='integer' ? suffix.replace(/\|h$/,'') : '';
     fields.push({name,type,size,offset:rowSize,...(enumName?{enumName}:{})});rowSize+=size;
   }
   if(!fields.length||rowSize*count>Number.MAX_SAFE_INTEGER)return null;
