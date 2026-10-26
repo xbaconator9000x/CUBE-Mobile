@@ -324,7 +324,7 @@ export function inspectHmaPointerReferences(bytes,target,anchors,{
   const span=Math.min(bytes.length,maxScanBytes);
   const candidates=[];let candidateHits=0;
   for(let i=0;i+4<=span;i+=4){
-    if(knownSlots.has(i)||read32(i)!==needle)continue;
+    if(knownSlots.has(i)||offsetBySource.has(i)||read32(i)!==needle)continue;
     candidateHits++;
     if(candidates.length<maxCandidates)candidates.push({source:i,kind:'raw-candidate'});
   }
