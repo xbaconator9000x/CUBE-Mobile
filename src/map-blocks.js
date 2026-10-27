@@ -29,13 +29,15 @@ export function decodeBlockCell(word) {
 /**
  * Inspect a bounded viewport of a validated blockmap. Address is a ROM
  * file offset, not a GBA 0x08xxxxxx pointer. Even-aligned cells are required.
- * The full declared map must fit inside the ROM even for a tiny viewport.
+ * The full declared map must fit inside the ROM even for a tiny viewport.\n * A read-only {length, read(offset)} ROM model can expose staged edits\n * without allocating a complete copy of a large ROM.
  */
 export function inspectBlockMap(bytes, {
   address, width, height,
   x = 0, y = 0, viewportWidth = 16, viewportHeight = 16,
 } = {}) {
-  if (!(bytes instanceof Uint8Array)) throw new TypeError('ROM must be Uint8Array');
+  if (!(bytes instanceof Uint8Array) && !(bytes && Number.isSafeInteger(bytes.length) && bytes.length >= 0 && typeof bytes.read === 'function'))
+    throw new TypeError('ROM must be Uint8Array or a read-only ROM accessor');
+  const read = bytes instanceof Uint8Array ? offset => bytes[offset] : offset => bytes.read(offset);
   if (!Number.isSafeInteger(address) || address < 0 || address % 2 !== 0)
     throw new RangeError('Blockmap ROM offset must be a non-negative even integer');
   positiveInt(width, 'Map width', 1024);
@@ -54,7 +56,10 @@ export function inspectBlockMap(bytes, {
     const row = [];
     for (let dx = 0; dx < columns; dx++) {
       const offset = address + ((y + dy) * width + x + dx) * 2;
-      const raw = bytes[offset] | (bytes[offset + 1] << 8);
+      const low = read(offset), high = read(offset + 1);
+      if (!Number.isInteger(low) || low < 0 || low > 255 || !Number.isInteger(high) || high < 0 || high > 255)
+        throw new RangeError('ROM accessor returned invalid byte');
+      const raw = low | (high << 8);
       row.push(Object.freeze({
         x: x + dx, y: y + dy, byteOffset: offset, ...decodeBlockCell(raw),
       }));
