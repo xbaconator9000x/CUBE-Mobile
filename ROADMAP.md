@@ -1,3 +1,8 @@
+## Checkpoint — mobile reviewed-warp raw route comparison (28 October 2026)
+- [x] Compare original and proposed shortest raw routes for 1–16 typed reviewed warp changes, with per-hop original-byte inspection.
+- [x] Revalidate queue identity, atlas, endpoint selection and both decoded routes before navigation; regenerate offline HTML and add UI regressions.
+- [ ] Authenticate CUBE layouts, implement safe semantic ROM save/reopen and verify emulator/Android acceptance. Strict parity unchanged. See [mobile route comparison](docs/MOBILE_REVIEWED_ROUTE_DELTA.md).
+
 ## Checkpoint — reviewed warp queue raw-route preflight (28 October 2026)
 - [x] Compare before/after shortest raw map-link paths through a typed, multi-owner-checked, immutable reviewed warp overlay.
 - [x] Reject stale originals, non-warp proposals and bounded-budget violations; synthetic tests cover changed/no-op routes and ROM immutability.
