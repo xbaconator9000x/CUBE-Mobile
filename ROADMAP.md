@@ -1,5 +1,10 @@
 # Roadmap
 
+## Checkpoint — mobile raw warp arrival tracing (27 October 2026)
+- [x] Follow selected declared vanilla warp IDs to recorded destination warp coordinates, center mobile blockmap on that cell and report exact source/target ROM offsets.
+- [x] Reject ambiguous aliased source headers, stale atlas snapshots, special IDs, out-of-range destination indexes and out-of-bounds arrival records; no script execution or ROM writes.
+- [ ] Runtime warp semantics, CUBE-specific layouts, authenticated edit/save roundtrips, emulator and Android acceptance remain unverified; parity unchanged.
+
 ## Checkpoint — touch-friendly exact-byte blockmap change preview (27 October 2026)
 - [x] Preview proposed tile ID and raw six-bit collision changes from explicit vanilla header/coordinates without modifying ROM bytes; tap rendered cells to prefill fields.
 - [x] Show exact original/proposed bytes, source offset and declared-atlas shared-blockmap owner count; stale selection rejects changed cell words.
