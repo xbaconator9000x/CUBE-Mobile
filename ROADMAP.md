@@ -1,5 +1,10 @@
 # Roadmap
 
+## Checkpoint — bounded vanilla bank-table candidate probe (27 October 2026)
+- [x] Inspect at most 4096 bytes near a user-supplied approximate offset for vanilla-format pointer-table candidates using explicit counts (max 128 maps).
+- [x] Expose candidate selection in mobile/offline map UI, with synthetic ROM/staged accessor immutability tests.
+- [ ] Automatically authenticate CUBE map-bank layout and real map counts from independently verified engine metadata; no semantic writes.
+
 ## Checkpoint — bounded atlas-wide link review (27 October 2026)
 - [x] Inspect 16 declared vanilla maps per tap, count all raw warp/connection link statuses and display at most 128 flagged links per batch.
 - [x] Preserve source offsets, staged reads, strict bounds, pagination and fail-closed malformed-pointer behavior with synthetic regression tests.

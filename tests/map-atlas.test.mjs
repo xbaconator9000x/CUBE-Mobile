@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {parseVanillaBankMapCounts,inspectVanillaMapAtlas,lookupVanillaMapAtlasTarget} from '../src/map-atlas.js';
+import {parseVanillaBankMapCounts,inspectVanillaMapAtlas,lookupVanillaMapAtlasTarget,probeVanillaMapBankTables} from '../src/map-atlas.js';
 const ptr=n=>0x08000000+n;
 function d(r,o,n){for(let i=0;i<4;i++)r[o+i]=n>>>(i*8)&255;}
 function fixture(){
@@ -48,4 +48,32 @@ test('invalid map counts, overlapping arrays and malformed pointers fail closed'
  assert.throws(()=>inspectVanillaMapAtlas(a,{address:0x100,bankMapCounts:[2,1],family:'RSE'}),/overlap/);
  const b=fixture();d(b,0x160,ptr(0x100));
  assert.throws(()=>inspectVanillaMapAtlas(b,{address:0x100,bankMapCounts:[2,1],family:'RSE'}));
+});
+
+test('bounded vanilla pointer-table probe finds structural candidate without ROM mutation',()=>{
+ const rom=fixture(),before=rom.slice();
+ const result=probeVanillaMapBankTables(rom,{
+  start:0xf0,bytes:0x30,bankMapCounts:[2,1],family:'RSE'
+ });
+ assert.ok(result.candidates.some(c=>c.address===0x100));
+ assert.ok(result.checkedOffsets<=12);
+ assert.equal(result.layoutAuthenticated,false);
+ assert.ok(Object.isFrozen(result.candidates));
+ assert.deepEqual(rom,before);
+ const staged={length:rom.length,read:i=>i===0x100?0xff:rom[i]};
+ const changed=probeVanillaMapBankTables(staged,{
+  start:0x100,bytes:8,bankMapCounts:[2,1],family:'RSE'
+ });
+ assert.equal(changed.matches,0);
+});
+test('bank-table probe rejects oversized, ambiguous and unaligned requests',()=>{
+ const rom=fixture();
+ for(const options of [
+  {start:1,bytes:64,bankMapCounts:[2,1],family:'RSE'},
+  {start:0,bytes:4097,bankMapCounts:[2,1],family:'RSE'},
+  {start:0,bytes:4,bankMapCounts:[2,1],family:'RSE'},
+  {start:0,bytes:64,bankMapCounts:[129],family:'RSE'},
+  {start:0,bytes:64,bankMapCounts:[2,1],family:'CUBE'},
+  {start:0,bytes:64,bankMapCounts:[2,1],family:'RSE',maxCandidates:0}
+ ])assert.throws(()=>probeVanillaMapBankTables(rom,options),RangeError);
 });

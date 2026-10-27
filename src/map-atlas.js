@@ -59,3 +59,49 @@ export function lookupVanillaMapAtlasTarget(atlas,bankIndex,mapIndex) {
     bankIndex<0||mapIndex<0)return null;
  return atlas.maps.find(m=>m.bankIndex===bankIndex&&m.mapIndex===mapIndex)||null;
 }
+
+/**
+ * Bounded structural probe near a USER-SUPPLIED approximate bank table offset.
+ * Only a small explicitly counted subset of vanilla maps is tested.
+ * A candidate is not an authenticated ROM identity or CUBE layout.
+ */
+export function probeVanillaMapBankTables(source,{
+ start,bytes=1024,bankMapCounts,family,maxCandidates=16
+}={}){
+ if(!source||!Number.isSafeInteger(source.length)||source.length<0||
+    !(source instanceof Uint8Array)&&typeof source.read!=='function')
+  throw new TypeError('Expected ROM bytes or a staged read-only ROM accessor');
+ if(!['RSE','FRLG'].includes(family))throw new RangeError('Explicit vanilla family required');
+ if(!Array.isArray(bankMapCounts)||bankMapCounts.length<1||bankMapCounts.length>16||
+    bankMapCounts.some(n=>!Number.isSafeInteger(n)||n<1||n>128)||
+    bankMapCounts.reduce((a,b)=>a+b,0)>128)
+  throw new RangeError('Probe requires 1–16 banks and at most 128 explicitly counted maps');
+ if(!Number.isSafeInteger(start)||start<0||start%4||
+    !Number.isSafeInteger(bytes)||bytes<bankMapCounts.length*4||
+    bytes>4096||bytes%4||start>source.length-bytes)
+  throw new RangeError('Probe window must be aligned, inside ROM and at most 4096 bytes');
+ if(!Number.isSafeInteger(maxCandidates)||maxCandidates<1||maxCandidates>32)
+  throw new RangeError('Candidate cap must be 1–32');
+ const candidates=[];let matches=0;
+ const end=start+bytes-bankMapCounts.length*4;
+ for(let address=start;address<=end;address+=4){
+  try{
+   const atlas=inspectVanillaMapAtlas(source,{
+    address,bankMapCounts,family,maxMaps:128
+   });
+   matches++;
+   if(candidates.length<maxCandidates)candidates.push(Object.freeze({
+    address,declaredBanks:atlas.bankCount,checkedMaps:atlas.mapCount,
+    firstHeaderOffset:atlas.maps[0].mapHeaderOffset,
+    readOnly:true,layoutAuthenticated:false
+   }));
+  }catch(err){
+   if(!(err instanceof RangeError))throw err;
+  }
+ }
+ return Object.freeze({
+  start,bytes,checkedOffsets:(end-start)/4+1,matches,
+  truncated:matches>candidates.length,
+  candidates:Object.freeze(candidates),readOnly:true,layoutAuthenticated:false
+ });
+}
