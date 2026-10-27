@@ -237,6 +237,7 @@
         <button type="button" id="map-review-run" class="subtle-button" disabled>Check queued changes</button>
         <button type="button" id="map-review-impact" class="subtle-button" disabled>Audit shared map impact</button>
         <button type="button" id="map-review-roundtrip" class="subtle-button" disabled>Verify typed queued preview (no writes)</button>
+        <button type="button" id="map-review-route-delta" class="subtle-button" disabled>Compare raw route before/after queued warps (no writes)</button>
         <button type="button" id="map-review-export" class="secondary-button" disabled>Download review-only JSON (no ROM bytes)</button>
         <button type="button" id="map-review-clear" class="secondary-button" disabled>Clear review queue</button>
       </div>
@@ -246,6 +247,8 @@
       <div id="map-review-impact-list" class="anchor-list" aria-label="Shared map ownership and structural impact warnings"></div>
       <output id="map-review-roundtrip-status" class="palette-note" aria-live="polite">No typed queued-preview roundtrip run.</output>
       <div id="map-review-roundtrip-list" class="anchor-list" aria-label="Decoded queued map change preflight findings"></div>
+      <output id="map-review-route-delta-status" class="palette-note" aria-live="polite">No reviewed warp route comparison.</output>
+      <div id="map-review-route-delta-list" class="anchor-list" aria-label="Original and proposed raw map-link route steps"></div>
     </div>
     <button type="button" id="map-script-map-audit" class="subtle-button" disabled>Audit all vanilla map event script prefixes (read only)</button>
     <output id="map-script-map-audit-status" class="palette-note" aria-live="polite">No map script audit run.</output>

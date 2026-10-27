@@ -37,6 +37,7 @@ import {buildVanillaRawMapOverlay,buildRawBlockmapGridOverlay} from './map-raw-o
 import {auditVanillaAtlasRawCells} from './map-cell-census.js';
 import {auditVanillaAtlasWarpGraph} from './map-warp-graph.js';
 import {inspectVanillaAtlasRawRoute} from './map-route-explorer.js';
+import {compareVanillaReviewedRawRoute} from './map-route-change-preview.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
@@ -800,10 +801,12 @@ function clearMapChangeReview(){
  for(const id of ['map-compare-before','map-compare-after'])$(id).hidden=true;
  $('map-compare-status').textContent='Review queue cleared; preview a cell again.';
  for(const id of ['map-review-cell-add','map-review-warp-add','map-review-event-add',
-  'map-review-run','map-review-clear','map-review-impact','map-review-roundtrip','map-review-export'])$(id).disabled=true;
+  'map-review-run','map-review-clear','map-review-impact','map-review-roundtrip','map-review-route-delta','map-review-export'])$(id).disabled=true;
  $('map-review-list').replaceChildren();
  $('map-review-impact-list').replaceChildren();
  $('map-review-roundtrip-list').replaceChildren();
+ $('map-review-route-delta-list').replaceChildren();
+ $('map-review-route-delta-status').textContent='Queue or atlas changed; rerun raw route comparison.';
  $('map-review-roundtrip-status').textContent='Queue or atlas changed; rerun typed roundtrip.';
  $('map-review-impact-status').textContent='No structural impact audit run.';
  $('map-review-status').textContent='No proposed changes queued. No ROM writes.';
@@ -818,12 +821,17 @@ function removeQueuedMapPreview(index){
  $('map-review-list').replaceChildren();
  $('map-review-impact-list').replaceChildren();
  $('map-review-roundtrip-list').replaceChildren();
+ $('map-review-route-delta-list').replaceChildren();
+ $('map-review-route-delta-status').textContent='Queue or atlas changed; rerun raw route comparison.';
  $('map-review-roundtrip-status').textContent='Queue or atlas changed; rerun typed roundtrip.';
  $('map-review-impact-status').textContent='Queue changed; rerun impact audit.';
  $('map-review-status').textContent=mapReviewQueue.length+
   ' proposed record(s) remain. Rerun review before relying on these previews; no writes.';
  $('map-review-impact').disabled=!inspectedMapAtlas||inspectedMapAtlas.rom!==model;
  $('map-review-roundtrip').disabled=$('map-review-impact').disabled;
+ $('map-review-route-delta').disabled=!mapReviewQueue.length||mapReviewQueue.length>16||
+  mapReviewQueue.some(p=>!Number.isSafeInteger(p.warpIndex))||
+  !inspectedMapAtlas||inspectedMapAtlas.rom!==model;
 }
 function queueMapChangePreview(kind){
  ensureModel();
@@ -839,8 +847,13 @@ function queueMapChangePreview(kind){
  $('map-review-export').disabled=false;
  $('map-review-impact').disabled=!inspectedMapAtlas||inspectedMapAtlas.rom!==model;
  $('map-review-roundtrip').disabled=$('map-review-impact').disabled;
+ $('map-review-route-delta').disabled=!mapReviewQueue.length||mapReviewQueue.length>16||
+  mapReviewQueue.some(p=>!Number.isSafeInteger(p.warpIndex))||
+  !inspectedMapAtlas||inspectedMapAtlas.rom!==model;
  $('map-review-impact-list').replaceChildren();
  $('map-review-roundtrip-list').replaceChildren();
+ $('map-review-route-delta-list').replaceChildren();
+ $('map-review-route-delta-status').textContent='Queue or atlas changed; rerun raw route comparison.';
  $('map-review-roundtrip-status').textContent='Queue or atlas changed; rerun typed roundtrip.';
  $('map-review-impact-status').textContent='Queue changed; rerun impact audit.';
  $('map-review-list').replaceChildren();
@@ -974,6 +987,78 @@ $('map-review-roundtrip').addEventListener('click',()=>safeRun(()=>{
   root.append(item);
  }
 }));
+$('map-review-route-delta').addEventListener('click',()=>safeRun(()=>{
+ requireVanillaMapFormat();
+ if(!mapReviewQueue.length||mapReviewQueue.length>16||
+    mapReviewQueue.some(p=>!Number.isSafeInteger(p.warpIndex))||
+    mapReviewRom!==model||!inspectedMapAtlas||
+    inspectedMapAtlas.rom!==model)
+  throw Error('Queue 1–16 vanilla warp previews and inspect the current atlas first');
+ const atlas=inspectedMapAtlas.atlas;
+ const sourceIndex=Number($('map-atlas-select').value);
+ const targetIndex=Number($('map-atlas-route-target').value);
+ if(!Number.isSafeInteger(sourceIndex)||!Number.isSafeInteger(targetIndex)||
+    sourceIndex<0||targetIndex<0||
+    sourceIndex>=atlas.maps.length||targetIndex>=atlas.maps.length)
+  throw Error('Select a declared route origin and destination');
+ const origin=atlas.maps[sourceIndex],target=atlas.maps[targetIndex];
+ const queueSnapshot=[...mapReviewQueue];
+ const opts={originBank:origin.bankIndex,originMap:origin.mapIndex,
+  targetBank:target.bankIndex,targetMap:target.mapIndex,
+  maxMaps:128,maxLinks:8192,maxHops:128,maxChanges:16};
+ function inputsUnchanged(){
+  const counts=parseVanillaBankMapCounts($('map-atlas-counts').value);
+  return inspectedMapAtlas?.rom===model&&mapReviewRom===model&&
+   mapReviewQueue.length===queueSnapshot.length&&
+   queueSnapshot.every((p,i)=>p===mapReviewQueue[i])&&
+   Number($('map-atlas-select').value)===sourceIndex&&
+   Number($('map-atlas-route-target').value)===targetIndex&&
+   parseOffset($('map-bank-offset').value)===atlas.address&&
+   $('map-layout-family').value===atlas.family&&
+   counts.length===atlas.bankCount&&
+   counts.every((n,i)=>n===atlas.bankMapCounts[i]);
+ }
+ if(!inputsUnchanged())throw Error('Queue or atlas inputs changed; reinspect first');
+ const result=compareVanillaReviewedRawRoute(model,atlas,queueSnapshot,opts);
+ const root=$('map-review-route-delta-list');root.replaceChildren();
+ const describe=r=>r.status==='raw-reachable'?r.hops+' raw hop(s)':'no resolved raw path';
+ $('map-review-route-delta-status').textContent=
+  'Original: '+describe(result.before)+'; proposed: '+describe(result.after)+
+  '. '+(result.routeChanged?'Shortest raw route changes.':'Raw route unchanged.')+
+  ' '+result.reviewedWarps+' typed warp preview(s), '+result.checkedOwners+
+  ' owner(s) checked. NO ROM write, CUBE authentication or gameplay travel verification.';
+ function freshResult(){
+  requireVanillaMapFormat();
+  if(!inputsUnchanged())throw Error('Queue or atlas selection changed; rerun comparison');
+  const fresh=compareVanillaReviewedRawRoute(model,atlas,queueSnapshot,opts);
+  if(fresh.routeChanged!==result.routeChanged||
+     JSON.stringify(fresh.before.steps)!==JSON.stringify(result.before.steps)||
+     JSON.stringify(fresh.after.steps)!==JSON.stringify(result.after.steps))
+   throw Error('Raw route preview changed; rerun comparison');
+  return fresh;
+ }
+ for(const [label,route] of [['Original',result.before],['Proposed',result.after]]){
+  for(const [i,step] of route.steps.entries()){
+   const button=document.createElement('button');
+   button.type='button';button.className='secondary-button';
+   button.style.display='block';button.style.margin='8px 0';
+   button.style.textAlign='left';
+   button.textContent=label+' step '+(i+1)+': '+step.source+' → '+
+    step.target+' · '+step.kind+' '+step.index+
+    ' · inspect original ROM 0x'+hex(step.sourceOffset);
+   button.addEventListener('click',()=>safeRun(()=>{
+    freshResult();setPageForOffset(step.sourceOffset);gotoTab('hex');
+   }));
+   root.append(button);
+  }
+ }
+ if(!result.before.steps.length&&!result.after.steps.length){
+  const empty=document.createElement('div');empty.className='empty-state';
+  empty.textContent='No raw route hops to display for either state.';
+  root.append(empty);
+ }
+}));
+
 $('map-review-clear').addEventListener('click',()=>clearMapChangeReview());
 
 function clearBlocksetInspection(message='Select a vanilla map header to inspect tileset pointers.'){
@@ -993,10 +1078,17 @@ function clearMapAtlas(message='Declared atlas invalidated; inspect again.') {
  inspectedMapAtlas=null;atlasBatchStart=0;atlasCoordinateBatchStart=0;atlasScriptAliasStart=0;atlasScriptCrossPageStart=0;atlasIncomingStart=0;atlasIncomingTarget=null;
  $('map-review-impact').disabled=true;
  $('map-review-roundtrip').disabled=true;
+ $('map-review-route-delta').disabled=true;
+ $('map-review-route-delta-list').replaceChildren();
+ $('map-review-route-delta-status').textContent='No reviewed warp route comparison.';
  $('map-review-roundtrip-list').replaceChildren();
+ $('map-review-route-delta-list').replaceChildren();
+ $('map-review-route-delta-status').textContent='Queue or atlas changed; rerun raw route comparison.';
  $('map-review-roundtrip-status').textContent='Declared atlas invalidated; inspect again.';
  $('map-review-impact-list').replaceChildren();
  $('map-review-roundtrip-list').replaceChildren();
+ $('map-review-route-delta-list').replaceChildren();
+ $('map-review-route-delta-status').textContent='Queue or atlas changed; rerun raw route comparison.';
  $('map-review-roundtrip-status').textContent='Queue or atlas changed; rerun typed roundtrip.';
  $('map-review-impact-status').textContent='Declared atlas invalidated; inspect again.';
  $('map-atlas-batch-audit').disabled=true;
@@ -1124,6 +1216,9 @@ $('map-atlas-inspect').addEventListener('click',()=>safeRun(()=>{
  inspectedMapAtlas={atlas,rom:model};
  $('map-review-impact').disabled=!mapReviewQueue.length||mapReviewRom!==model;
  $('map-review-roundtrip').disabled=$('map-review-impact').disabled;
+ $('map-review-route-delta').disabled=!mapReviewQueue.length||mapReviewQueue.length>16||
+  mapReviewQueue.some(p=>!Number.isSafeInteger(p.warpIndex))||
+  !inspectedMapAtlas||inspectedMapAtlas.rom!==model;
  const select=$('map-atlas-select'),options=document.createDocumentFragment();
  for(let i=0;i<atlas.maps.length;i++){
   const entry=atlas.maps[i];
