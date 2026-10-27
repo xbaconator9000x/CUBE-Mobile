@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {inspectVanillaMapAtlas} from '../src/map-atlas.js';
-import {auditVanillaMapLinks,auditVanillaAtlasLinkBatch} from '../src/map-link-audit.js';
+import {auditVanillaMapLinks,auditVanillaAtlasLinkBatch,auditVanillaMapEventCoordinates} from '../src/map-link-audit.js';
 
 const ptr=n=>0x08000000+n;
 function u32(rom,at,value){for(let i=0;i<4;i++)rom[at+i]=(value>>>(8*i))&255;}
@@ -89,4 +89,74 @@ test('batch audit rejects invalid windows and malformed event pointers without p
  assert.throws(()=>auditVanillaAtlasLinkBatch(rom,{}),TypeError);
  u32(rom,0x948,0x07000000);
  assert.throws(()=>auditVanillaAtlasLinkBatch(rom,catalog,{limit:2}),/pointer/i);
+});
+
+test('event coordinate audit distinguishes co-located raw warps from map bounds',()=>{
+ const rom=fixture(),before=rom.slice(),catalog=atlas(rom);
+ const result=auditVanillaMapEventCoordinates(rom,catalog,{bankIndex:0,mapIndex:0});
+ assert.deepEqual(result.counts,{total:4,withinMap:4,outsideMap:0,sharedCell:4});
+ assert.equal(result.totalFindings,4);
+ assert.equal(result.findings[0].status,'shared-cell');
+ assert.equal(result.findings[0].offset,0xa00);
+ assert.equal(result.findings[0].cellOffset,0x506);
+ assert.equal(result.findings[0].rawCollision,63);
+ assert.equal(result.findings[0].rawTileId,1023);
+ assert.equal(result.walkabilityVerified,false);
+ assert.ok(Object.isFrozen(result.findings[0]));
+ assert.deepEqual(rom,before);
+});
+test('objects, triggers and signposts retain raw coordinate provenance and bounds',()=>{
+ const rom=fixture();
+ rom[0x900]=1;rom[0x902]=1;rom[0x903]=1;
+ u32(rom,0x904,ptr(0xd00));u32(rom,0x90c,ptr(0xd40));u32(rom,0x910,ptr(0xd80));
+ rom.fill(0,0xd00,0xd18);rom.fill(0,0xd40,0xd50);rom.fill(0,0xd80,0xd8c);
+ u16(rom,0xd04,3);u16(rom,0xd06,1);
+ u16(rom,0xd40,0);u16(rom,0xd42,1);
+ u16(rom,0xd80,0);u16(rom,0xd82,1);
+ rom[0x504]=1;rom[0x505]=8;
+ const before=rom.slice();
+ const result=auditVanillaMapEventCoordinates(rom,atlas(rom),{
+  bankIndex:0,mapIndex:0,maxFindings:2
+ });
+ assert.deepEqual(result.counts,{total:7,withinMap:6,outsideMap:1,sharedCell:6});
+ assert.equal(result.totalFindings,7);
+ assert.equal(result.findings.length,2);
+ assert.equal(result.truncated,true);
+ const full=auditVanillaMapEventCoordinates(rom,atlas(rom),{
+  bankIndex:0,mapIndex:0
+ });
+ const object=full.findings.find(x=>x.kind==='objects');
+ assert.deepEqual([object.status,object.offset,object.x,object.y,object.cellOffset],
+  ['outside-map',0xd00,3,1,null]);
+ const script=full.findings.find(x=>x.kind==='scripts');
+ const sign=full.findings.find(x=>x.kind==='signposts');
+ assert.equal(script.status,'shared-cell');
+ assert.equal(sign.status,'shared-cell');
+ assert.equal(script.cellOffset,0x504);
+ assert.equal(script.rawTileId,1);
+ assert.equal(script.rawCollision,2);
+ assert.deepEqual(rom,before);
+});
+test('coordinate audit rejects stale layouts, invalid caps and malformed staged reads',()=>{
+ const rom=fixture(),before=rom.slice(),catalog=atlas(rom);
+ for(const maxFindings of [0,257,-1,1.5])
+  assert.throws(()=>auditVanillaMapEventCoordinates(rom,catalog,{
+   bankIndex:0,mapIndex:0,maxFindings
+  }),/limit/);
+ assert.throws(()=>auditVanillaMapEventCoordinates(rom,catalog,{
+  bankIndex:1,mapIndex:0
+ }),/outside/);
+ const reader={length:rom.length,read:i=>i===0xa00?9:rom[i]};
+ const staged=auditVanillaMapEventCoordinates(reader,catalog,{bankIndex:0,mapIndex:0});
+ assert.equal(staged.counts.outsideMap,1);
+ assert.equal(staged.counts.sharedCell,3);
+ const invalid={length:rom.length,read:i=>i===0x506?-1:rom[i]};
+ assert.throws(()=>auditVanillaMapEventCoordinates(invalid,catalog,{
+  bankIndex:0,mapIndex:0
+ }),/Invalid blockmap/);
+ u32(rom,0x300,3);
+ assert.throws(()=>auditVanillaMapEventCoordinates(rom,catalog,{
+  bankIndex:0,mapIndex:0
+ }),/layout changed/);
+ assert.deepEqual(before.slice(0,0x300),rom.slice(0,0x300));
 });

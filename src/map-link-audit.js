@@ -5,6 +5,7 @@
  */
 import {inspectVanillaMapEvents} from './map-events.js';
 import {inspectVanillaMapConnections} from './map-connections.js';
+import {inspectVanillaMapHeader} from './map-layouts.js';
 import {lookupVanillaMapAtlasTarget} from './map-atlas.js';
 
 export function auditVanillaMapLinks(source,atlas,{bankIndex,mapIndex}={}) {
@@ -99,4 +100,81 @@ export function auditVanillaAtlasLinkBatch(source,atlas,{start=0,limit=16,maxFin
   truncated:totalFindings>findings.length,
   findings:Object.freeze(findings),readOnly:true,layoutAuthenticated:false
  });
+}
+
+/**
+ * Read-only spatial audit of vanilla event coordinates against the current
+ * map blockmap. Raw collision bits are shown as bytes, never interpreted as
+ * walkability. Shared cells are informational, not necessarily defects.
+ *
+ * Coordinates and record widths follow pinned CUBHMA MapModel.cs vanilla
+ * EventsFormat / WarpsFormat. No CUBE expansion layout is authenticated.
+ */
+export function auditVanillaMapEventCoordinates(source,atlas,{
+ bankIndex,mapIndex,maxFindings=128
+}={}){
+ if(!atlas||atlas.readOnly!==true||atlas.layoutAuthenticated!==false||
+    !Array.isArray(atlas.maps)||!['RSE','FRLG'].includes(atlas.family))
+  throw new TypeError('A read-only declared vanilla atlas is required');
+ if(!Number.isSafeInteger(maxFindings)||maxFindings<1||maxFindings>256)
+  throw new RangeError('Finding limit must be 1–256');
+ const selected=lookupVanillaMapAtlasTarget(atlas,bankIndex,mapIndex);
+ if(!selected)throw new RangeError('Map is outside the declared atlas');
+ const header=inspectVanillaMapHeader(source,{
+  address:selected.mapHeaderOffset,family:atlas.family
+ });
+ const layout=header.layout;
+ if(layout.width!==selected.width||layout.height!==selected.height||
+    layout.blockmapOffset!==selected.blockmapOffset)
+  throw new RangeError('Map layout changed since atlas inspection; reinspect');
+ const events=inspectVanillaMapEvents(source,{
+  address:selected.mapHeaderOffset,family:atlas.family
+ });
+ const rows=[],occupants=new Map();
+ for(const kind of ['warps','objects','scripts','signposts']){
+  for(const record of events.arrays[kind]){
+   const inside=record.x<layout.width&&record.y<layout.height;
+   const row={kind,index:record.index,offset:record.offset,
+    x:record.x,y:record.y,inside};
+   rows.push(row);
+   if(inside){
+    const key=record.x+','+record.y;
+    occupants.set(key,(occupants.get(key)||0)+1);
+   }
+  }
+ }
+ const read=source instanceof Uint8Array?i=>source[i]:
+  source&&typeof source.read==='function'?i=>source.read(i):null;
+ if(!read)throw new TypeError('Expected ROM bytes or a read-only accessor');
+ const counts={total:rows.length,withinMap:0,outsideMap:0,sharedCell:0};
+ const findings=[];let totalFindings=0;
+ for(const row of rows){
+  if(row.inside)counts.withinMap++;else counts.outsideMap++;
+  const shared=row.inside&&occupants.get(row.x+','+row.y)>1;
+  if(shared)counts.sharedCell++;
+  if(row.inside&&!shared)continue;
+  totalFindings++;
+  let cellOffset=null,rawCell=null,rawTileId=null,rawCollision=null;
+  if(row.inside){
+   cellOffset=layout.blockmapOffset+(row.y*layout.width+row.x)*2;
+   const low=read(cellOffset),high=read(cellOffset+1);
+   if(!Number.isInteger(low)||low<0||low>255||
+      !Number.isInteger(high)||high<0||high>255)
+    throw new RangeError('Invalid blockmap accessor byte');
+   rawCell=low|(high<<8);
+   rawTileId=rawCell&0x3ff;
+   rawCollision=rawCell>>>10;
+  }
+  if(findings.length<maxFindings)findings.push(Object.freeze({
+   kind:row.kind,index:row.index,offset:row.offset,
+   x:row.x,y:row.y,status:row.inside?'shared-cell':'outside-map',
+   cellOffset,rawCell,rawTileId,rawCollision
+  }));
+ }
+ return Object.freeze({bankIndex,mapIndex,headerOffset:selected.mapHeaderOffset,
+  width:layout.width,height:layout.height,
+  counts:Object.freeze(counts),totalFindings,
+  truncated:totalFindings>findings.length,
+  findings:Object.freeze(findings),readOnly:true,
+  layoutAuthenticated:false,walkabilityVerified:false});
 }

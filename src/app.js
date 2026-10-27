@@ -10,7 +10,7 @@ import {inspectBlockMap} from './map-blocks.js';
 import {inspectVanillaMapLayout,inspectVanillaMapHeader} from './map-layouts.js';
 import {inspectVanillaMapBankEntry,inspectVanillaMapWarps} from './map-discovery.js';
 import {parseVanillaBankMapCounts,inspectVanillaMapAtlas,lookupVanillaMapAtlasTarget,probeVanillaMapBankTables} from './map-atlas.js';
-import {auditVanillaMapLinks,auditVanillaAtlasLinkBatch} from './map-link-audit.js';
+import {auditVanillaMapLinks,auditVanillaAtlasLinkBatch,auditVanillaMapEventCoordinates} from './map-link-audit.js';
 import {inspectVanillaMapConnections} from './map-connections.js';
 import {inspectVanillaMapEvents,inspectVanillaEventScriptPointers} from './map-events.js';
 import {inspectVanillaMapBlocksets} from './map-blocksets.js';
@@ -771,6 +771,9 @@ function clearMapAtlas(message='Declared atlas invalidated; inspect again.') {
  select.disabled=true;
  $('map-atlas-open').disabled=true;
  $('map-atlas-audit').disabled=true;
+ $('map-event-coordinate-audit').disabled=true;
+ $('map-event-coordinate-list').replaceChildren();
+ $('map-event-coordinate-status').textContent='No event coordinate audit run.';
  $('map-atlas-audit-list').replaceChildren();
  $('map-atlas-audit-status').textContent='No declared map links audited.';
  $('map-atlas-status').textContent=message;
@@ -852,6 +855,7 @@ $('map-atlas-inspect').addEventListener('click',()=>safeRun(()=>{
  select.replaceChildren(options);select.disabled=false;
  $('map-atlas-open').disabled=false;
  $('map-atlas-audit').disabled=false;
+ $('map-event-coordinate-audit').disabled=false;
  $('map-atlas-batch-audit').disabled=false;
  $('map-atlas-status').textContent='Inspected '+atlas.mapCount+' explicitly declared maps across '+
   atlas.bankCount+' vanilla-format banks. Pointer/layout bounds checked; no ROM identity, CUBE layout or warp topology authenticated.';
@@ -913,6 +917,53 @@ $('map-atlas-audit').addEventListener('click',()=>safeRun(()=>{
  }
 }));
 
+
+$('map-event-coordinate-audit').addEventListener('click',()=>safeRun(()=>{
+ requireVanillaMapFormat();
+ if(!inspectedMapAtlas||inspectedMapAtlas.rom!==model)
+  throw Error('Reinspect the declared atlas before auditing event coordinates');
+ const atlas=inspectedMapAtlas.atlas;
+ const counts=parseVanillaBankMapCounts($('map-atlas-counts').value);
+ if(parseOffset($('map-bank-offset').value)!==atlas.address||
+    $('map-layout-family').value!==atlas.family||
+    counts.length!==atlas.bankCount||
+    counts.some((n,i)=>n!==atlas.bankMapCounts[i]))
+  throw Error('Atlas inputs changed; reinspect before coordinate auditing');
+ const i=Number($('map-atlas-select').value);
+ if(!Number.isSafeInteger(i)||i<0||i>=atlas.maps.length)
+  throw Error('Select a declared map first');
+ const entry=atlas.maps[i];
+ const result=auditVanillaMapEventCoordinates(model,atlas,{
+  bankIndex:entry.bankIndex,mapIndex:entry.mapIndex,maxFindings:128
+ });
+ const root=$('map-event-coordinate-list');root.replaceChildren();
+ $('map-event-coordinate-status').textContent='Map '+entry.bankIndex+'/'+entry.mapIndex+
+  ' ('+result.width+'×'+result.height+'): '+result.counts.total+
+  ' raw events, '+result.counts.outsideMap+' outside the blockmap, '+
+  result.counts.sharedCell+' sharing in-map coordinates. '+
+  result.totalFindings+' review hints'+(result.truncated?' (first 128 shown)':'')+
+  '. Shared tiles can be intentional; collision bits are raw, not walkability. Read only; CUBE layout unverified.';
+ for(const finding of result.findings){
+  const button=document.createElement('button');button.type='button';
+  button.className='secondary-button';button.style.display='block';
+  button.style.margin='8px 0';button.style.textAlign='left';
+  button.textContent=finding.kind+' '+finding.index+' at ('+finding.x+','+
+   finding.y+') · '+finding.status+' · ROM 0x'+hex(finding.offset)+
+   (finding.cellOffset===null?'':' · block cell 0x'+hex(finding.cellOffset)+
+   ' tile '+finding.rawTileId+' raw high bits '+finding.rawCollision);
+  button.addEventListener('click',()=>safeRun(()=>{
+   if(inspectedMapAtlas?.rom!==model)throw Error('Atlas expired; reinspect');
+   setPageForOffset(finding.offset);gotoTab('hex');
+  }));
+  root.append(button);
+ }
+ if(!result.findings.length){
+  const empty=document.createElement('div');empty.className='empty-state';
+  empty.textContent='All raw event coordinates lie within the declared blockmap, with no shared in-map cells.';
+  root.append(empty);
+ }
+}));
+
 $('map-atlas-batch-audit').addEventListener('click',()=>safeRun(()=>{
  requireVanillaMapFormat();
  if(!inspectedMapAtlas||inspectedMapAtlas.rom!==model)
@@ -959,6 +1010,8 @@ $('map-atlas-batch-audit').addEventListener('click',()=>safeRun(()=>{
 $('map-atlas-select').addEventListener('change',()=>{
  $('map-atlas-audit-list').replaceChildren();
  $('map-atlas-audit-status').textContent='Map selection changed; audit again.';
+ $('map-event-coordinate-list').replaceChildren();
+ $('map-event-coordinate-status').textContent='Map selection changed; audit coordinates again.';
 });
 for(const id of ['map-atlas-counts','map-bank-offset','map-layout-family'])
  $(id).addEventListener('change',()=>clearMapAtlas('Declared atlas inputs changed; inspect again.'));

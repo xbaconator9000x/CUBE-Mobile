@@ -1,5 +1,9 @@
 # CUBE Mobile
 
+## Development checkpoint — raw event coordinate review
+
+The declared vanilla map atlas now offers a read-only coordinate integrity review for warps, objects, triggers and signposts. It highlights out-of-blockmap records and shared coordinates, with raw block-cell bytes and touch-to-hex provenance. Shared cells can be intentional; no CUBE layout or walkability is authenticated. See [coordinate checkpoint](docs/VANILLA_EVENT_COORDINATE_AUDIT.md).
+
 **Private development repository for a full mobile port of CUBHMA (Cradi's Unofficial Build of Hex Maniac Advance), targeting CUBE-aware Pokémon Emerald editing and the other ROM families supported by upstream.**
 
 > **Status: v0.5.9 — early foundation, NOT a complete port.** The working code today is an offline ROM inspection / patching workbench and a limited read-only CUBHMA TOML named-anchor inspector. The desktop editor's semantic engine, map/collision/event editors, scripts, sprites, trainers, Pokémon, sound and CUBE upgrades are **not yet ported**.
