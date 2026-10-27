@@ -28,3 +28,16 @@ test('bounded bank-table candidate probe appears in modular and offline map UI',
  assert.match(read('src/app.js'),/probeVanillaMapBankTables\(model/);
  assert.match(read('app/CUBHMA_Mobile_Lab_Offline.html'),/function probeVanillaMapBankTables/);
 });
+
+test('shared map pointer alias review is wired in modular and offline UI',()=>{
+ for(const path of ['index.html','app/CUBHMA_Mobile_Lab_Offline.html']){
+  const html=read(path);
+  for(const id of ['map-atlas-alias-audit','map-atlas-alias-status','map-atlas-alias-list'])
+   assert.match(html,new RegExp('id="'+id+'"'));
+ }
+ const app=read('src/app.js'),offline=read('app/CUBHMA_Mobile_Lab_Offline.html');
+ assert.match(app,/auditVanillaAtlasPointerAliases\(atlas/);
+ assert.match(app,/map-atlas-alias-audit'\)\.disabled=false/);
+ assert.match(app,/map-atlas-alias-audit'\)\.disabled=true/);
+ assert.match(offline,/function auditVanillaAtlasPointerAliases\(/);
+});

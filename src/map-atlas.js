@@ -105,3 +105,56 @@ export function probeVanillaMapBankTables(source,{
   candidates:Object.freeze(candidates),readOnly:true,layoutAuthenticated:false
  });
 }
+
+/**
+ * Read-only pointer alias inventory for an already inspected vanilla atlas.
+ * Shared headers/layouts/blockmaps can be intentional; this reports ownership
+ * questions before any future semantic write or relocation.
+ * Source pointers: bank map-pointer entry, map header +0, layout +12.
+ */
+export function auditVanillaAtlasPointerAliases(atlas,{
+ maxGroups=64,maxReferences=16
+}={}){
+ if(!atlas||atlas.readOnly!==true||atlas.layoutAuthenticated!==false||
+    !Array.isArray(atlas.maps)||atlas.maps.length<1||atlas.maps.length>4096||
+    !['RSE','FRLG'].includes(atlas.family))
+  throw new TypeError('A read-only declared vanilla atlas is required');
+ if(!Number.isSafeInteger(maxGroups)||maxGroups<1||maxGroups>256)
+  throw new RangeError('Group limit must be 1–256');
+ if(!Number.isSafeInteger(maxReferences)||maxReferences<1||maxReferences>32)
+  throw new RangeError('Reference limit must be 1–32');
+ const fields=[
+  ['header','mapHeaderOffset',m=>m.mapPointerSource],
+  ['layout','layoutOffset',m=>m.mapHeaderOffset],
+  ['blockmap','blockmapOffset',m=>m.layoutOffset+12]
+ ];
+ const counts={header:0,layout:0,blockmap:0};
+ const groups=[];let totalGroups=0;
+ for(const [kind,field,sourceOffset] of fields){
+  const buckets=new Map();
+  for(const m of atlas.maps){
+   for(const n of [m.bankIndex,m.mapIndex,m[field],sourceOffset(m)])
+    if(!Number.isSafeInteger(n)||n<0)
+     throw new RangeError('Invalid map pointer provenance');
+   const refs=buckets.get(m[field])||[];
+   refs.push(Object.freeze({bankIndex:m.bankIndex,mapIndex:m.mapIndex,
+    sourceOffset:sourceOffset(m)}));
+   buckets.set(m[field],refs);
+  }
+  for(const [offset,refs] of buckets){
+   if(refs.length<2)continue;
+   counts[kind]++;totalGroups++;
+   if(groups.length<maxGroups)groups.push(Object.freeze({
+    kind,offset,referenceCount:refs.length,
+    references:Object.freeze(refs.slice(0,maxReferences)),
+    referencesTruncated:refs.length>maxReferences
+   }));
+  }
+ }
+ return Object.freeze({
+  totalMaps:atlas.maps.length,counts:Object.freeze(counts),
+  totalGroups,truncated:totalGroups>groups.length,
+  groups:Object.freeze(groups),readOnly:true,layoutAuthenticated:false,
+  ownershipAuthenticated:false
+ });
+}

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {parseVanillaBankMapCounts,inspectVanillaMapAtlas,lookupVanillaMapAtlasTarget,probeVanillaMapBankTables} from '../src/map-atlas.js';
+import {parseVanillaBankMapCounts,inspectVanillaMapAtlas,lookupVanillaMapAtlasTarget,probeVanillaMapBankTables,auditVanillaAtlasPointerAliases} from '../src/map-atlas.js';
 const ptr=n=>0x08000000+n;
 function d(r,o,n){for(let i=0;i<4;i++)r[o+i]=n>>>(i*8)&255;}
 function fixture(){
@@ -76,4 +76,44 @@ test('bank-table probe rejects oversized, ambiguous and unaligned requests',()=>
   {start:0,bytes:64,bankMapCounts:[2,1],family:'CUBE'},
   {start:0,bytes:64,bankMapCounts:[2,1],family:'RSE',maxCandidates:0}
  ])assert.throws(()=>probeVanillaMapBankTables(rom,options),RangeError);
+});
+
+test('shared vanilla layouts and blockmaps expose exact pointer-source ownership hints',()=>{
+ const rom=fixture(),before=rom.slice();
+ const independent=inspectVanillaMapAtlas(rom,{
+  address:0x100,bankMapCounts:[2,1],family:'RSE'
+ });
+ assert.equal(auditVanillaAtlasPointerAliases(independent).totalGroups,0);
+ d(rom,0x240,ptr(0x300));
+ const atlas=inspectVanillaMapAtlas(rom,{
+  address:0x100,bankMapCounts:[2,1],family:'RSE'
+ });
+ const result=auditVanillaAtlasPointerAliases(atlas);
+ assert.deepEqual(result.counts,{header:0,layout:1,blockmap:1});
+ assert.equal(result.totalGroups,2);
+ assert.equal(result.groups[0].offset,0x300);
+ assert.deepEqual(result.groups[0].references.map(x=>x.sourceOffset),[0x200,0x240]);
+ assert.equal(result.groups[1].offset,0x400);
+ assert.deepEqual(result.groups[1].references.map(x=>x.sourceOffset),[0x30c,0x30c]);
+ assert.equal(result.ownershipAuthenticated,false);
+ assert.ok(Object.isFrozen(result.groups)&&Object.isFrozen(result.groups[0].references));
+ assert.deepEqual(rom.slice(0,0x240),before.slice(0,0x240));
+});
+test('alias groups are bounded, include shared headers and reject invalid catalogs',()=>{
+ const rom=fixture();d(rom,0x144,ptr(0x200));
+ const atlas=inspectVanillaMapAtlas(rom,{
+  address:0x100,bankMapCounts:[2,1],family:'RSE'
+ });
+ const result=auditVanillaAtlasPointerAliases(atlas,{maxGroups:1,maxReferences:1});
+ assert.deepEqual(result.counts,{header:1,layout:1,blockmap:1});
+ assert.equal(result.totalGroups,3);
+ assert.equal(result.groups.length,1);
+ assert.equal(result.groups[0].kind,'header');
+ assert.equal(result.groups[0].referenceCount,2);
+ assert.equal(result.groups[0].referencesTruncated,true);
+ assert.equal(result.truncated,true);
+ for(const options of [{maxGroups:0},{maxGroups:257},{maxReferences:0},
+  {maxReferences:33},{maxGroups:1.5}])
+  assert.throws(()=>auditVanillaAtlasPointerAliases(atlas,options),RangeError);
+ assert.throws(()=>auditVanillaAtlasPointerAliases({}),TypeError);
 });
