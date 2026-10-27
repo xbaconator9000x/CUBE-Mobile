@@ -70,6 +70,13 @@
       <div class="input-wrap"><label for="map-x">Start X</label><input id="map-x" type="number" min="0" value="0"></div>
       <div class="input-wrap"><label for="map-y">Start Y</label><input id="map-y" type="number" min="0" value="0"></div>
     </div>
+    <div class="input-wrap"><label for="map-layout-offset">Optional known VANILLA map header/layout ROM offset (hex)</label><input id="map-layout-offset" inputmode="text" spellcheck="false" placeholder="e.g. 1A2B3C"></div>
+    <div class="input-row">
+      <div class="input-wrap"><label for="map-layout-source">Source structure</label><select id="map-layout-source"><option value="header">Vanilla map header</option><option value="layout">Vanilla map layout</option></select></div>
+      <div class="input-wrap"><label for="map-layout-family">Vanilla format</label><select id="map-layout-family"><option value="RSE">Ruby / Sapphire / Emerald</option><option value="FRLG">FireRed / LeafGreen</option></select></div>
+    </div>
+    <button type="button" id="map-layout-inspect" class="subtle-button" disabled>Read vanilla structure (no writes)</button>
+    <output id="map-layout-status" class="palette-note" aria-live="polite">This optional decoder is ONLY for independently verified vanilla-format structures, not CUBE expansion layouts. ROM header identity does not verify a structure.</output>
     <button type="button" id="map-inspect" class="subtle-button" disabled>Inspect 12 × 10 cells</button>
     <p class="palette-note">You must independently verify the map's blockmap offset and dimensions. Header identity alone cannot verify CUBE layouts. No bytes are changed. Collision values are raw metadata, not passability colours.</p>
     <output id="map-status" class="palette-note" aria-live="polite">Open a ROM and enter a known blockmap offset.</output>
