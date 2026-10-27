@@ -64,3 +64,9 @@
 .blockmap-cell:focus-visible{outline:3px solid #b4a7ff;outline-offset:2px}
 
 #map-render-canvas{image-rendering:pixelated;max-width:none;border:1px solid #435079;border-radius:4px}
+
+/* Bounded local preview canvases; image pixels are never saved to the ROM. */
+.map-compare-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:12px;margin:12px 0}
+.map-compare-grid>div{min-width:0;overflow:auto}
+.map-compare-grid strong{display:block;margin-bottom:6px}
+.map-compare-grid canvas{image-rendering:pixelated;width:min(100%,384px);height:auto;border:1px solid var(--border,#64748b)}

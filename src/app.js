@@ -23,6 +23,7 @@ import {previewVanillaWarpRecordChange} from './map-warp-edit-preview.js';
 import {previewVanillaEventCoordinateChange} from './map-event-edit-preview.js';
 import {reviewVanillaChangeSet,exportVanillaChangeReviewJson} from './map-change-review.js';
 import {auditVanillaChangeImpact} from './map-change-impact.js';
+import {compareVanillaBlockmapVisualChange} from './map-visual-diff.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
@@ -36,7 +37,7 @@ let model=null, currentTab='home', page=0, selected=null, patchFile=null, palett
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
 ctx.imageSmoothingEnabled=false;
-const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-summary-scan','map-preview-cell','map-layout-inspect','map-bank-inspect','map-atlas-inspect','map-atlas-probe','map-warp-inspect','map-connection-inspect','map-event-inspect','map-script-pointer-inspect','map-blockset-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','discard-button','edit-unlock'];
+const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-summary-scan','map-preview-cell','map-visual-compare','map-layout-inspect','map-bank-inspect','map-atlas-inspect','map-atlas-probe','map-warp-inspect','map-connection-inspect','map-event-inspect','map-script-pointer-inspect','map-blockset-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','discard-button','edit-unlock'];
 const tabs={home:['YOUR WORKSPACE','ROM Workbench'],hex:['BINARY INSPECTOR','Hex editor'],anchors:['ROM SEMANTICS','Named data'],maps:['RAW MAP CELLS','Blockmap inspector'],graphics:['GBA GRAPHICS','Graphics explorer'],patches:['PATCH WORKFLOW','Patch tools'],changes:['REVIEW & EXPORT','Changes']};
 function toast(message,bad=false){const t=$('toast');t.textContent=message;t.classList.toggle('error',bad);t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),4300);}
 function safeRun(fn){try{const result=fn();if(result?.catch) result.catch(err=>toast(err.message||String(err),true));}catch(err){toast(err.message||String(err),true);}}
@@ -735,6 +736,9 @@ function clearRenderedMap(message='Rendered preview invalidated; inspect again.'
  $('map-preview-status').textContent='Select an explicit vanilla header and coordinates to preview bytes. No writes.';
  $('map-render-jump').disabled=true;
  $('map-render-canvas').hidden=true;
+ $('map-visual-compare').disabled=true;
+ for(const id of ['map-compare-before','map-compare-after'])$(id).hidden=true;
+ $('map-compare-status').textContent='No proposed visual comparison. Preview a cell first.';
  $('map-render-status').textContent=message;
 }
 function clearMapGrid(message='Map structure changed; inspect again.'){
@@ -773,6 +777,9 @@ function clearEventInspection(message='Select a vanilla map header to inspect ob
 function clearMapChangeReview(){
  mapReviewQueue=[];mapReviewRom=null;
  lastMapPreviews={cell:null,warp:null,event:null};
+ $('map-visual-compare').disabled=true;
+ for(const id of ['map-compare-before','map-compare-after'])$(id).hidden=true;
+ $('map-compare-status').textContent='Review queue cleared; preview a cell again.';
  for(const id of ['map-review-cell-add','map-review-warp-add','map-review-event-add',
   'map-review-run','map-review-clear','map-review-impact','map-review-export'])$(id).disabled=true;
  $('map-review-list').replaceChildren();
@@ -2076,6 +2083,9 @@ $('map-preview-cell').addEventListener('click',()=>safeRun(()=>{
   ...(expectedRaw===undefined?{}:{expectedRaw}),...(atlas?{atlas}:{})
  });
  lastMapPreviews.cell=result;$('map-review-cell-add').disabled=false;
+ $('map-visual-compare').disabled=false;
+ for(const id of ['map-compare-before','map-compare-after'])$(id).hidden=true;
+ $('map-compare-status').textContent='Proposed bytes ready. Compare rendered appearance without writing ROM data.';
  const old=result.before.bytes.map(n=>hex(n,2)).join(' ');
  const next=result.after.bytes.map(n=>hex(n,2)).join(' ');
  $('map-preview-status').textContent='ROM 0x'+hex(result.byteOffset)+
@@ -2084,6 +2094,32 @@ $('map-preview-cell').addEventListener('click',()=>safeRun(()=>{
   '). '+(result.changed?'Two-byte change preview only.':'No byte difference.')+
   ' Shared blockmap owners: '+(result.aliases.known?result.aliases.total:'unknown (no matching atlas)')+
   '. NOT applied. CUBE layout, collision semantics and write safety unverified.';
+}));
+
+$('map-visual-compare').addEventListener('click',()=>safeRun(()=>{
+ ensureModel();requireVanillaMapFormat();
+ const preview=lastMapPreviews.cell;
+ if(!preview)throw Error('Preview the selected vanilla cell before comparing its appearance');
+ const currentX=Number($('map-x').value),currentY=Number($('map-y').value);
+ const x=Number.isSafeInteger(currentX)&&currentX>=0&&preview.x>=currentX&&preview.x<currentX+12?
+  currentX:Math.max(0,preview.x-5);
+ const y=Number.isSafeInteger(currentY)&&currentY>=0&&preview.y>=currentY&&preview.y<currentY+10?
+  currentY:Math.max(0,preview.y-4);
+ const result=compareVanillaBlockmapVisualChange(model,{preview,x,y,viewportWidth:12,viewportHeight:10});
+ for(const [id,view] of [['map-compare-before',result.before],['map-compare-after',result.after]]){
+  const canvas=$(id),context=canvas.getContext('2d');
+  canvas.width=view.width;canvas.height=view.height;
+  const image=context.createImageData(view.width,view.height);
+  image.data.set(view.pixels);context.putImageData(image,0,0);
+  canvas.hidden=false;
+ }
+ $('map-compare-status').textContent='Proposed cell ('+preview.x+', '+preview.y+
+  ') at ROM 0x'+hex(preview.byteOffset)+': '+result.changedPixelCount+
+  ' changed rendered pixel(s)'+
+  (result.changedPixelBounds?' in '+result.changedPixelBounds.width+' × '+
+   result.changedPixelBounds.height+' pixel bounds':'')+
+  (result.changedRawCollision?'. Raw high bits changed; this is not a walkability preview.':'')+
+  ' Before/after images are local and read-only. No ROM bytes were modified; CUBE layout remains unauthenticated.';
 }));
 
 $('map-summary-scan').addEventListener('click',()=>safeRun(()=>{
