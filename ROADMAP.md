@@ -172,3 +172,11 @@
 - [x] Add synthetic ROM immutability, invalid-provenance, mobile integration and standalone-build regressions.
 - [ ] Obtain independently verified CUBE ROM and matching TOML SHA-256 digests with licensed provenance; do not invent or copy commercial ROM bytes.
 - [ ] Verify exact metadata bytes against curated metadata hashes and run authentic ROM/emulator and Android-device compatibility tests before trusting any layout.
+
+## Watchdog checkpoint — exact TOML byte identity (27 October 2026)
+- [x] Add bounded, exact-byte per-file SHA-256 hashing without text normalisation or ROM mutation.
+- [x] Bind a **single** metadata digest to a matching full-ROM profile, with explicit missing/multi-file/mismatch/stale outcomes and no write authority.
+- [x] Add regression coverage for UTF-8 BOM, CRLF, mismatches, stale ROMs, unverified profiles and multi-file overlays.
+- [ ] Integrate raw-file hashing with atomic TOML imports and mobile/standalone status UI.
+- [ ] Add authenticated multi-file manifest support for upstream common + game-specific TOML overlays; verify independent CUBE build fingerprints.
+- [ ] Complete semantic ownership, map/collision/warp roundtrip and emulator/Android acceptance before enabling writes.
