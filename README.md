@@ -25,6 +25,10 @@ The Blockmaps screen now follows an **explicitly supplied vanilla bank pointer t
 
 A read-only map connections inspector now follows the selected vanilla header's connections pointer and displays raw direction codes, signed displacement, target bank/map and source offsets with tap-to-hex navigation. It rejects invalid counts, pointers, bounds and overlaps, but does not authenticate map topology or CUBE expansion formats. See [connections checkpoint](docs/VANILLA_CONNECTIONS_CHECKPOINT.md).
 
+## Development checkpoint — vanilla object, script trigger and signpost inspection
+
+The Blockmaps screen now reads **raw, read-only vanilla event records** for objects (24 bytes), script triggers (16 bytes) and signposts (12 bytes) from an explicitly selected RSE/FRLG map header. It preserves source offsets, coordinates, raw script pointer words and signpost arguments, with tap-to-hex navigation. All four event arrays are cross-checked for overlaps and bounds. This does **not** authenticate CUBE layouts, interpret scripts, draw overworld sprites or permit semantic edits. See [event inspection checkpoint](docs/VANILLA_MAP_EVENTS_CHECKPOINT.md).
+
 ## Development checkpoint — touch map navigation and warp hints
 
 The read-only Blockmaps viewport now supports large touch pan controls and optional raw warp-index markers on matching inspected vanilla map cells. Markers are cleared when the ROM or selected map changes and never represent verified passability. See [touch viewport checkpoint](docs/TOUCH_MAP_VIEWPORT_CHECKPOINT.md).
