@@ -27,7 +27,7 @@ test('map cells and overlays are invalidated on metadata or ROM edits',()=>{
  const app=read('src/app.js');
  assert.match(app,/function clearMapGrid/);
  assert.match(app,/metadataCommit\(sources\)[\s\S]*?clearMapGrid\('Metadata changed/);
- assert.match(app,/function metadataReset\(\)\{clearWarpInspection/);
+ assert.match(app,/function metadataReset\(\)\{metadataImportSerial\+\+;metadataFingerprints=\[\];clearWarpInspection/);
  assert.match(app,/clearMapGrid\('ROM bytes changed/);
  assert.match(app,/clearMapGrid\('Edits discarded/);
 });
