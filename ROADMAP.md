@@ -1,5 +1,12 @@
 # Roadmap
 
+## Checkpoint — bounded local event-script smoke (28 October 2026)
+- [x] Add a capped read-only object/trigger script-prefix and branch-status audit for explicit vanilla map headers; no control-flow traversal or script ownership inference.
+- [x] Integrate bounded per-map script pointer and decoder-status counts into the opt-in, SHA-256-matched local ROM smoke report without exporting ROM bytes.
+- [x] Test synthetic valid/invalid pointer structures, script decode and non-mutating output.
+- [ ] Independently authenticate CUBE script layouts and test real-ROM/emulator/Android acceptance; strict parity remains unchanged. See [local script audit](docs/LOCAL_SCRIPT_AUDIT.md).
+
+
 ## Checkpoint — local authentic-ROM acceptance groundwork (28 October 2026)
 - [x] Add an opt-in, local-only CLI for independently supplied SHA-256 and explicit vanilla map declarations, with read-only atlas, event and pointer alias summaries.
 - [x] Reject mismatched hashes and malformed declarations; test against ephemeral synthetic ROM bytes without committing ROM fixtures. See [local map smoke](docs/LOCAL_MAP_SMOKE.md).

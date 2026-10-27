@@ -10,6 +10,7 @@ import {createHash} from 'node:crypto';
 import {inspectVanillaMapAtlas,auditVanillaAtlasPointerAliases}
  from '../src/map-atlas.js';
 import {inspectVanillaMapEvents} from '../src/map-events.js';
+import {auditVanillaMapEventScripts} from '../src/vanilla-map-script-audit.js';
 
 function fail(message){throw new RangeError(message);}
 function args(argv){
@@ -55,7 +56,15 @@ function main(){
   const events=inspectVanillaMapEvents(rom,{
    address:map.mapHeaderOffset,family:manifest.family
   });
+  const scriptAudit=auditVanillaMapEventScripts(rom,{
+   address:map.mapHeaderOffset,family:manifest.family,
+   maxRecords:32,maxBytes:64,maxCommands:16
+  });
   eventSummaries.push({
+   scriptPointersTotal:scriptAudit.totalRecords,
+   scriptPointersInspected:scriptAudit.inspectedRecords,
+   scriptPointersTruncated:scriptAudit.truncated,
+   scriptPointerStatuses:scriptAudit.counts,
    bankIndex:map.bankIndex,mapIndex:map.mapIndex,
    objects:events.counts.objects,warps:events.counts.warps,
    scripts:events.counts.scripts,signposts:events.counts.signposts
