@@ -102,6 +102,7 @@ export function summarizeBlockmapChunk(source,{
   positiveInt(maxCells,'Chunk size',4096);
   const scannedCells=Math.min(maxCells,totalCells-startCell);
   const rawHighBitCounts=new Array(64).fill(0);
+  const firstRawHighBitOffsets=new Array(64).fill(null);
   const tileCounts=new Map();
   for(let i=0;i<scannedCells;i++){
     const offset=address+(startCell+i)*2;
@@ -112,6 +113,7 @@ export function summarizeBlockmapChunk(source,{
     const word=low|(high<<8);
     const flag=word>>>10,tileId=word&0x3ff;
     rawHighBitCounts[flag]++;
+    if(firstRawHighBitOffsets[flag]===null)firstRawHighBitOffsets[flag]=offset;
     tileCounts.set(tileId,(tileCounts.get(tileId)||0)+1);
   }
   const commonTiles=[...tileCounts].sort((a,b)=>b[1]-a[1]||a[0]-b[0])
@@ -122,6 +124,7 @@ export function summarizeBlockmapChunk(source,{
     lastByteOffset:address+(startCell+scannedCells)*2-1,
     nextCell:startCell+scannedCells<totalCells?startCell+scannedCells:null,
     rawHighBitCounts:Object.freeze(rawHighBitCounts),
+    firstRawHighBitOffsets:Object.freeze(firstRawHighBitOffsets),
     distinctTiles:tileCounts.size,commonTiles:Object.freeze(commonTiles),
     readOnly:true,walkabilityVerified:false,layoutAuthenticated:false
   });
