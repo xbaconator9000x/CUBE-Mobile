@@ -79,7 +79,7 @@ test('bounded scan and route display limits fail closed',()=>{
  const {rom,atlas}=fixture();
  for(const opts of [
   {maxMaps:2},{maxLinks:4},{maxHops:0},
-  {targetBank:-1,targetMap:0},{targetBank:0},
+  {targetBank:-1,targetMap:0},{targetMap:undefined},
   {originBank:3,originMap:0,targetBank:0,targetMap:2},
   {originBank:0,originMap:1,targetBank:0,targetMap:0,maxHops:1}
  ])assert.throws(()=>route(rom,atlas,{targetBank:0,targetMap:2,...opts}),RangeError);
