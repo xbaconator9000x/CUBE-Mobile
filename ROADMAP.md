@@ -1,3 +1,8 @@
+## Checkpoint — opt-in local-ROM raw blockmap census (28 October 2026)
+- [x] Added a bounded source-validated vanilla map-cell high-bit census with exact shared blockmap deduplication and fail-closed overlap/budget checks.
+- [x] Added opt-in SHA-256-matched local-ROM aggregate reporting, with no ROM bytes or pointer addresses exported.
+- [ ] Mobile atlas census UI, authentic CUBE layouts, ROM save/reopen, emulator and Android acceptance remain outstanding. No strict parity credit. See [raw cell census](docs/VANILLA_ATLAS_RAW_CELL_CENSUS.md).
+
 ## Checkpoint — mixed-role script operand alias review (28 October 2026)
 - [x] Identify shared raw script operand targets referenced under different decoded command roles, without treating mixed roles as corruption or proven allocation conflict.
 - [x] Expose bounded warnings in mobile/offline hex navigation and aggregate-only local-ROM smoke; test same-role and mixed-role synthetic cases.
