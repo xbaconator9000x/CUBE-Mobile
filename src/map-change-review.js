@@ -120,3 +120,25 @@ export function reviewVanillaChangeSet(source,previews,{
   ownershipVerified:false,transactionCommitted:false
  });
 }
+
+
+/**
+ * Portable, review-only JSON summary of typed field changes.
+ * Revalidates all original ROM bytes before export, but intentionally omits
+ * both raw ROM byte arrays and patch/apply instructions. NOT a patch format.
+ */
+export function exportVanillaChangeReviewJson(source,previews){
+ const result=reviewVanillaChangeSet(source,previews,{maxChanges:64,maxBytes:2048});
+ const report={
+  schema:'cube-mobile-map-review/1',
+  previewOnly:true,writeAuthorized:false,layoutAuthenticated:false,
+  containsRomBytes:false,applicablePatch:false,
+  warning:'Review-only field summary; CUBE layout, ownership and runtime behavior are not authenticated. Do not apply as a ROM patch.',
+  count:result.count,totalBytesChecked:result.totalBytes,changedBytes:result.changedBytes,
+  entries:result.entries.map(e=>({
+   kind:e.kind,offset:e.offset,length:e.length,changed:e.changed,
+   fields:e.fieldChanges.map(f=>({field:f.field,before:f.before,after:f.after}))
+  }))
+ };
+ return JSON.stringify(report,null,2)+'\n';
+}
