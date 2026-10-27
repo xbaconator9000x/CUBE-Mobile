@@ -163,3 +163,24 @@ test('opt-in operand scan requires a boolean manifest flag',()=>{
  assert.notEqual(result.status,0);
  assert.equal(result.stdout,'');
 });
+
+test('opt-in raw-cell census reports only aggregate high-bit counts',()=>{
+ const rom=fixture();
+ // All four fixture blockmap words are 0xffff: raw high bits = 63.
+ const result=run(rom,{scanRawCellCensus:true});
+ assert.equal(result.status,0,result.stderr);
+ const report=JSON.parse(result.stdout);
+ assert.equal(report.rawCellCensus.mapsInspected,1);
+ assert.equal(report.rawCellCensus.uniqueBlockmaps,1);
+ assert.equal(report.rawCellCensus.uniqueCells,4);
+ assert.equal(report.rawCellCensus.rawHighBitCounts[63],4);
+ assert.equal(report.rawCellCensus.nonzeroRawHighBitCells,4);
+ assert.equal(report.rawCellCensus.walkabilityVerified,false);
+ assert.equal(report.independentParityEvidence,false);
+ assert.doesNotMatch(result.stdout,/blockmapOffset|firstByteOffset|fixture.gba/);
+});
+test('raw-cell census opt-in flag must be boolean',()=>{
+ const result=run(fixture(),{scanRawCellCensus:'yes'});
+ assert.notEqual(result.status,0);
+ assert.equal(result.stdout,'');
+});
