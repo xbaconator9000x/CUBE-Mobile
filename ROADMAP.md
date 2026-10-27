@@ -98,6 +98,13 @@
 - [ ] Verify actual upstream `resources/pcsReference.txt` overrides, per-game macros and CUBE-specific text mappings against licensed fixtures; add independent cross-language parity tests.
 - [ ] Complete ROM fingerprinting, semantic run ownership, non-destructive text edit transactions, emulator roundtrips and Android acceptance before permitting writes.
 
+## Watchdog checkpoint — explicit vanilla bank/warp inspection (27 October 2026)
+- [x] Follow a manually supplied vanilla bank pointer-table address and explicit bank/map counts to a bounded map header/layout; preserve source offsets and reject pointer-array overlaps.
+- [x] Inspect vanilla event counts and bounded 8-byte warp records read-only, with tap-to-hex mobile navigation and staged ROM support.
+- [x] Add synthetic RSE/FRLG, malformed-pointer, collision, immutability and offline integration regressions.
+- [ ] Authenticate CUBE map-bank layouts, discover real metadata-derived counts, resolve warp targets, inspect other events and render actual tiles.
+- [ ] No safe semantic map/collision/warp writes or Android device acceptance until version, ownership and roundtrip gates pass.
+
 ## Milestone 1 — semantic read-only CUBHMA engine
 - [ ] Parse HMA metadata and format DSL, beyond named-anchor fields.
 - [ ] Recognise ROM game/version and CUBE-specific metadata without false positives.
