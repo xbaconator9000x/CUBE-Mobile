@@ -223,3 +223,97 @@ export function auditVanillaAtlasEventCoordinateBatch(source,atlas,{
   readOnly:true,layoutAuthenticated:false,walkabilityVerified:false
  });
 }
+
+
+/**
+ * Reverse-reference scan of raw vanilla warp and connection destinations.
+ * This is a bounded page of the USER-DECLARED atlas, not a complete inbound
+ * index until every page is scanned. 0xFF destination fields are unresolved.
+ * Source: pinned CUBHMA MapModel.cs WarpsFormat and ConnectionsFormat.
+ * Pointer/layout provenance is re-read before interpreting each map.
+ */
+export function auditVanillaAtlasIncomingLinks(source,atlas,{
+ bankIndex,mapIndex,start=0,limit=16,maxResults=128
+}={}){
+ if(!atlas||atlas.readOnly!==true||atlas.layoutAuthenticated!==false||
+    !['RSE','FRLG'].includes(atlas.family)||!Array.isArray(atlas.maps)||
+    atlas.maps.length<1||atlas.maps.length>4096)
+  throw new TypeError('Expected an explicitly declared read-only vanilla atlas');
+ if(!Number.isSafeInteger(start)||start<0||start>=atlas.maps.length||
+    !Number.isSafeInteger(limit)||limit<1||limit>32||
+    !Number.isSafeInteger(maxResults)||maxResults<1||maxResults>256)
+  throw new RangeError('Incoming link page must select 1–32 maps and at most 256 results');
+ const target=lookupVanillaMapAtlasTarget(atlas,bankIndex,mapIndex);
+ if(!target)throw new RangeError('Destination map is outside the declared atlas');
+ const rom=source instanceof Uint8Array?{length:source.length,read:i=>source[i]}:source;
+ if(!rom||!Number.isSafeInteger(rom.length)||rom.length<0||typeof rom.read!=='function')
+  throw new TypeError('Expected ROM bytes or a staged read-only ROM accessor');
+ const byte=i=>{
+  if(!Number.isSafeInteger(i)||i<0||i>=rom.length)throw new RangeError('Pointer source outside ROM');
+  const value=rom.read(i);
+  if(!Number.isInteger(value)||value<0||value>255)throw new RangeError('Invalid ROM accessor byte');
+  return value;
+ };
+ const word=i=>(byte(i)|(byte(i+1)<<8)|(byte(i+2)<<16)|(byte(i+3)<<24))>>>0;
+ function verify(entry){
+  if(!Number.isSafeInteger(entry.mapPointerSource)||entry.mapPointerSource<0||
+     !Number.isSafeInteger(entry.mapHeaderOffset)||entry.mapHeaderOffset<0||
+     word(entry.mapPointerSource)!==(0x08000000+entry.mapHeaderOffset))
+   throw new RangeError('Declared atlas pointer changed; reinspect atlas');
+  const header=inspectVanillaMapHeader(rom,{address:entry.mapHeaderOffset,family:atlas.family});
+  if(header.layoutOffset!==entry.layoutOffset||
+     header.layout.blockmapOffset!==entry.blockmapOffset||
+     header.layout.width!==entry.width||header.layout.height!==entry.height)
+   throw new RangeError('Declared atlas layout changed; reinspect atlas');
+ }
+ verify(target);
+ const targetWarpCount=inspectVanillaMapEvents(rom,{
+  address:target.mapHeaderOffset,family:atlas.family
+ }).arrays.warps.length;
+ const end=Math.min(atlas.maps.length,start+limit);
+ const counts={warps:0,connections:0,validIndex:0,specialIndex:0,invalidIndex:0};
+ const records=[];let totalResults=0;
+ function collect(entry,kind,record,status){
+  totalResults++;
+  if(records.length<maxResults)records.push(Object.freeze({
+   sourceBank:entry.bankIndex,sourceMap:entry.mapIndex,
+   sourceHeaderOffset:entry.mapHeaderOffset,
+   kind,index:record.index,recordOffset:record.offset,
+   x:kind==='warp'?record.x:null,y:kind==='warp'?record.y:null,
+   targetWarpId:kind==='warp'?record.warpId:null,status
+  }));
+ }
+ for(let i=start;i<end;i++){
+  const entry=atlas.maps[i];
+  verify(entry);
+  const events=inspectVanillaMapEvents(rom,{
+   address:entry.mapHeaderOffset,family:atlas.family
+  });
+  for(const warp of events.arrays.warps){
+   if(warp.targetBank===255||warp.targetMap===255||
+      warp.targetBank!==bankIndex||warp.targetMap!==mapIndex)continue;
+   counts.warps++;
+   const status=warp.warpId===255?'special-index':
+    warp.warpId>=targetWarpCount?'invalid-index':'valid-index';
+   if(status==='special-index')counts.specialIndex++;
+   else if(status==='invalid-index')counts.invalidIndex++;
+   else counts.validIndex++;
+   collect(entry,'warp',warp,status);
+  }
+  const connections=inspectVanillaMapConnections(rom,{
+   address:entry.mapHeaderOffset,family:atlas.family
+  });
+  for(const connection of connections.connections){
+   if(connection.targetBank===255||connection.targetMap===255||
+      connection.targetBank!==bankIndex||connection.targetMap!==mapIndex)continue;
+   counts.connections++;
+   collect(entry,'connection',connection,'declared');
+  }
+ }
+ return Object.freeze({bankIndex,mapIndex,targetHeaderOffset:target.mapHeaderOffset,
+  targetWarpCount,start,end,totalMaps:atlas.maps.length,
+  nextStart:end<atlas.maps.length?end:null,totalResults,
+  truncated:totalResults>records.length,counts:Object.freeze(counts),
+  records:Object.freeze(records),readOnly:true,layoutAuthenticated:false,
+  runtimeBehaviorVerified:false});
+}
