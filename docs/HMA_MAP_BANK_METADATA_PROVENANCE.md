@@ -16,4 +16,4 @@ The map metadata gate now audits the number of `map<`, `layout<`, `events<`, `co
 
 A small MIT-licensed metadata-only excerpt from upstream `cube_emerald.toml` at commit `3044393183e01af2ae1e907fb37e4a75eda6a8dc` now exercises the parser against a real CUBE declaration. Its map header contains a legitimate nested `connections<... connections<...> ...>` hierarchy. Duplicate detection therefore counts pointer names at their **own structural bracket depth**, not across nested arrays, while still rejecting repeated fields at the same depth.
 
-The fixture includes no ROM bytes or proprietary graphics. The real upstream CUBE metadata still yields only an upstream `vanilla-marker` format heuristic, **not** proof that any supplied ROM matches it. Genuine ROM fingerprints, emulator validation and Android acceptance remain unverified.
+The fixture includes no ROM bytes or proprietary graphics. The real upstream CUBE metadata yields a `custom-candidate` format hint (the literal upstream vanilla marker is absent), **not** proof that any supplied ROM matches it. Genuine ROM fingerprints, emulator validation and Android acceptance remain unverified.
