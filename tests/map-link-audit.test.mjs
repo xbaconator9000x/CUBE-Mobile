@@ -21,6 +21,7 @@ function fixture(){
   u32(rom,layout+8,ptr(0x700));u32(rom,layout+12,ptr(blockmap));
   u32(rom,layout+16,ptr(0x800));u32(rom,layout+20,ptr(0x820));
  }
+ rom.fill(0,0x900,0x904);rom.fill(0,0x940,0x944);
  rom[0x901]=4;u32(rom,0x908,ptr(0xa00));
  rom[0x941]=1;u32(rom,0x948,ptr(0xa40));
  warp(rom,0xa00,{map:1,bank:0,id:0});
