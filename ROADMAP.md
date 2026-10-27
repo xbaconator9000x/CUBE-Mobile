@@ -1,5 +1,12 @@
 # Roadmap
 
+## Checkpoint — queued map visual previews (27 October 2026)
+- [x] Validate up to 64 proposed vanilla blockmap cells together; recheck original ROM bytes, reject overlap and forged map provenance, and render a bounded before/after viewport without writes.
+- [x] Add a stale-checked read-only staged ROM accessor for reviewed blockmap, warp and event changes.
+- [x] Add a touch-friendly queued comparison to modular and offline applications, with raw high-bit changes distinguished from visual changes.
+- [x] Cover synthetic composed edits, stale inputs, bounds, queue wiring and offline script syntax.
+- [ ] Authenticate CUBE-specific layouts, independently verify ROM/emulator/Android acceptance, then design safe transactional editing and rollback. See [queued comparison](docs/MAP_QUEUED_VISUAL_COMPARISON.md).
+
 ## Checkpoint — raw map colour inspection and visual edit comparisons (27 October 2026)
 - [x] Revalidate vanilla blockmap preview provenance and original bytes, then render bounded side-by-side before/after metatile images through a read-only two-byte accessor overlay.
 - [x] Show changed pixel counts and bounds, distinguish nonvisual raw high-bit changes, and keep ROM bytes immutable.
