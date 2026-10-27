@@ -184,3 +184,41 @@ test('raw-cell census opt-in flag must be boolean',()=>{
  assert.notEqual(result.status,0);
  assert.equal(result.stdout,'');
 });
+
+test('opt-in raw warp graph reports aggregate directed links without exporting ROM pointers',()=>{
+ const rom=fixture();
+ d(rom,0x144,ptr(0x240));
+ d(rom,0x240,ptr(0x340));d(rom,0x244,ptr(0x720));
+ for(const off of [8,12])d(rom,0x240+off,0);
+ d(rom,0x340,2);d(rom,0x344,2);
+ for(const [off,to] of [[8,0x500],[12,0x420],[16,0x600],[20,0x620]])
+  d(rom,0x340+off,ptr(to));
+ d(rom,0x204,ptr(0x700));
+ for(const [event,array,targetMap] of [[0x700,0x740,1],[0x720,0x760,0]]){
+  rom.fill(0,event,event+20);
+  rom[event+1]=1;d(rom,event+8,ptr(array));
+  rom.fill(0,array,array+8);
+  rom[array+6]=targetMap;
+ }
+ const result=run(rom,{bankMapCounts:[2],scanRawWarpGraph:true});
+ assert.equal(result.status,0,result.stderr);
+ const report=JSON.parse(result.stdout);
+ assert.equal(report.rawWarpGraph.mapsInspected,2);
+ assert.equal(report.rawWarpGraph.linksInspected,2);
+ assert.equal(report.rawWarpGraph.reachableByRawLinks,2);
+ assert.equal(report.rawWarpGraph.counts.resolved,2);
+ assert.equal(report.rawWarpGraph.counts.oneWayPairs,0);
+ assert.equal(report.rawWarpGraph.gameplayReachabilityVerified,false);
+ assert.equal(report.independentParityEvidence,false);
+ assert.doesNotMatch(result.stdout,/targetId|headerOffset|sourceOffset|fixture.gba|manifest.json/);
+});
+test('raw warp graph flag is opt-in and strictly boolean',()=>{
+ const base=run(fixture());
+ assert.equal(base.status,0,base.stderr);
+ assert.equal(JSON.parse(base.stdout).rawWarpGraph,null);
+ for(const bad of ['true',1,null,{}]){
+  const result=run(fixture(),{scanRawWarpGraph:bad});
+  assert.notEqual(result.status,0);
+  assert.equal(result.stdout,'');
+ }
+});

@@ -1,3 +1,8 @@
+## Checkpoint — opt-in local ROM raw warp graph smoke (28 October 2026)
+- [x] Add SHA-256-matched opt-in whole-atlas raw link graph aggregates with no exported edges, event bytes or map pointer sources.
+- [x] Strictly validate the manifest flag and test two-map directed synthetic roundtrips without writing ROM bytes.
+- [ ] Independently authenticate CUBE structures, gameplay travel, ROM save/reopen, emulator and Android acceptance. Strict parity unchanged.
+
 ## Checkpoint — mobile/offline raw warp graph explorer (28 October 2026)
 - [x] Add touch-first bounded graph inspection from the selected declared origin, with raw reachability, inbound/outbound counts and structural warnings.
 - [x] Revalidate ROM, atlas declarations and current graph before navigation to maps or raw source bytes; include standalone offline HTML and UI regression checks.
