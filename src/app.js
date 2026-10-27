@@ -10,17 +10,19 @@ import {inspectBlockMap} from './map-blocks.js';
 import {inspectVanillaMapLayout,inspectVanillaMapHeader} from './map-layouts.js';
 import {inspectVanillaMapBankEntry,inspectVanillaMapWarps} from './map-discovery.js';
 import {inspectVanillaMapConnections} from './map-connections.js';
+import {panMapViewport,indexMapWarpMarkers} from './map-viewport.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let pcsReference=null,pcsReferenceName='';
 let fingerprintResult=null,fingerprintAbort=null;
 let metadataFingerprints=[],metadataImportSerial=0;
+let inspectedWarpMap=null;
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
 ctx.imageSmoothingEnabled=false;
-const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-layout-inspect','map-bank-inspect','map-warp-inspect','map-connection-inspect','save-rom','save-project','export-ips','discard-button','edit-unlock'];
+const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-layout-inspect','map-bank-inspect','map-warp-inspect','map-connection-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','discard-button','edit-unlock'];
 const tabs={home:['YOUR WORKSPACE','ROM Workbench'],hex:['BINARY INSPECTOR','Hex editor'],anchors:['ROM SEMANTICS','Named data'],maps:['RAW MAP CELLS','Blockmap inspector'],graphics:['GBA GRAPHICS','Graphics explorer'],patches:['PATCH WORKFLOW','Patch tools'],changes:['REVIEW & EXPORT','Changes']};
 function toast(message,bad=false){const t=$('toast');t.textContent=message;t.classList.toggle('error',bad);t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),4300);}
 function safeRun(fn){try{const result=fn();if(result?.catch) result.catch(err=>toast(err.message||String(err),true));}catch(err){toast(err.message||String(err),true);}}
@@ -705,6 +707,7 @@ $('metadata-stock').addEventListener('click',async()=>{
 
 
 function clearWarpInspection(message='Select a vanilla map header to inspect warp events.'){
+  inspectedWarpMap=null;
   $('map-warp-list').replaceChildren();
   $('map-warp-status').textContent=message;
 }
@@ -746,7 +749,11 @@ $('map-warp-inspect').addEventListener('click',()=>safeRun(()=>{
   if($('map-layout-source').value!=='header')
     throw Error('Select a vanilla map header, not a layout, for warp inspection');
   const address=parseOffset($('map-layout-offset').value);
-  const result=inspectVanillaMapWarps(model,{address,family:$('map-layout-family').value});
+  const family=$('map-layout-family').value;
+  const result=inspectVanillaMapWarps(model,{address,family});
+  const layout=inspectVanillaMapHeader(model,{address,family}).layout;
+  inspectedWarpMap={address:layout.blockmapOffset,width:layout.width,
+    height:layout.height,warps:result.warps};
   const root=$('map-warp-list');
   $('map-warp-status').textContent=result.eventsOffset===null?
     'No vanilla events pointer. Read only; layout unverified.':
@@ -768,6 +775,12 @@ $('map-warp-inspect').addEventListener('click',()=>safeRun(()=>{
     button.addEventListener('click',()=>safeRun(()=>{setPageForOffset(warp.offset);gotoTab('hex');}));
     root.append(button);
   }
+  // Only annotate the blockmap when its exact selected offset/dimensions
+  // match the inspected header. Never overlay on an unrelated raw map.
+  if($('map-offset').value.trim().toUpperCase()===hex(layout.blockmapOffset) &&
+     Number($('map-width').value)===layout.width &&
+     Number($('map-height').value)===layout.height)
+    $('map-inspect').click();
 }));
 
 $('map-connection-inspect').addEventListener('click',()=>safeRun(()=>{
@@ -831,13 +844,22 @@ $('map-inspect').addEventListener('click',()=>safeRun(()=>{
   const width=Number($('map-width').value),height=Number($('map-height').value);
   const x=Number($('map-x').value),y=Number($('map-y').value);
   const preview=inspectBlockMap(model,{address,width,height,x,y,viewportWidth:12,viewportHeight:10});
+  const markerIndex=inspectedWarpMap&&inspectedWarpMap.address===address&&
+    inspectedWarpMap.width===width&&inspectedWarpMap.height===height?
+    indexMapWarpMarkers(inspectedWarpMap.warps,{width,height}):null;
   const grid=$('map-grid');grid.replaceChildren();
   const board=document.createElement('div');board.className='blockmap-grid';
   board.style.gridTemplateColumns='repeat('+preview.columns+', minmax(64px,1fr))';
   for(const row of preview.cells)for(const cell of row){
     const button=document.createElement('button');button.type='button';button.className='blockmap-cell';
-    button.textContent=cell.tileId+' / '+cell.collision;
-    button.title='('+cell.x+','+cell.y+') tile '+cell.tileId+', raw collision/elevation '+cell.collision+', ROM 0x'+hex(cell.byteOffset);
+    const warps=markerIndex?.[cell.x+','+cell.y]||[];
+    button.textContent=cell.tileId+' / '+cell.collision+
+      (warps.length?' · W'+warps.join(',W'):'');
+    button.classList.toggle('has-warp',warps.length>0);
+    button.title='('+cell.x+','+cell.y+') tile '+cell.tileId+
+      ', raw collision/elevation '+cell.collision+
+      (warps.length?', unverified warp(s) '+warps.join(', '):'')+
+      ', ROM 0x'+hex(cell.byteOffset);
     button.setAttribute('aria-label',button.title);
     button.addEventListener('click',()=>safeRun(()=>{setPageForOffset(cell.byteOffset);gotoTab('hex');}));
     board.append(button);
@@ -847,5 +869,20 @@ $('map-inspect').addEventListener('click',()=>safeRun(()=>{
     (preview.truncated?' (partial viewport)':'')+
     '. Each cell: tile ID / raw collision-elevation (0–63). Re-inspect after edits.';
 }));
+
+for(const [id,dx,dy] of [
+  ['map-pan-up',0,-10],['map-pan-down',0,10],
+  ['map-pan-left',-12,0],['map-pan-right',12,0]
+]){
+  $(id).addEventListener('click',()=>safeRun(()=>{
+    ensureModel();
+    const next=panMapViewport({
+      width:Number($('map-width').value),height:Number($('map-height').value),
+      x:Number($('map-x').value),y:Number($('map-y').value),dx,dy
+    });
+    $('map-x').value=String(next.x);$('map-y').value=String(next.y);
+    $('map-inspect').click();
+  }));
+}
 
 updateIndicators();drawGraphics();drawAnchors();renderTab(routeFromHash());
