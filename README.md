@@ -25,6 +25,10 @@ The Blockmaps screen now follows an **explicitly supplied vanilla bank pointer t
 
 A read-only map connections inspector now follows the selected vanilla header's connections pointer and displays raw direction codes, signed displacement, target bank/map and source offsets with tap-to-hex navigation. It rejects invalid counts, pointers, bounds and overlaps, but does not authenticate map topology or CUBE expansion formats. See [connections checkpoint](docs/VANILLA_CONNECTIONS_CHECKPOINT.md).
 
+## Development checkpoint — vanilla blockset pointers and raw tileset preview
+
+The Blockmaps screen can now inspect primary and secondary vanilla RSE/FRLG blockset headers and open their referenced 4bpp graphics and palette in the existing Graphics viewer. It preserves raw pointer provenance and compression flags, with bounds and overlap checks. **This is a raw tile-sheet preview, not assembled map rendering or verified CUBE compatibility.** See [blockset preview checkpoint](docs/VANILLA_BLOCKSET_PREVIEW_CHECKPOINT.md).
+
 ## Development checkpoint — raw event spatial hints
 
 The Blockmaps viewport now annotates cells with **O** (object), **S** (script trigger) and **P** (signpost) indexes from the same explicitly selected vanilla map header. Hints appear only when the inspected blockmap offset and dimensions exactly match, and are invalidated on ROM edits, ROM replacement and metadata changes. They are not sprite renders, collision/passability assertions or verified script semantics.

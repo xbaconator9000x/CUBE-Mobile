@@ -167,6 +167,9 @@
     <button type="button" id="map-event-inspect" class="subtle-button" disabled>Inspect vanilla objects, scripts and signposts</button>
     <output id="map-event-status" class="palette-note" aria-live="polite">Select a known vanilla map header to inspect raw object, script trigger and signpost records. Read only.</output>
     <div id="map-event-list" class="anchor-list" aria-label="Read-only object, script and signpost records"><div class="empty-state">No additional event records inspected.</div></div>
+    <button type="button" id="map-blockset-inspect" class="subtle-button" disabled>Inspect vanilla blocksets and tileset graphics</button>
+    <output id="map-blockset-status" class="palette-note" aria-live="polite">Select a known vanilla map header to inspect primary and secondary blockset pointers. Read only.</output>
+    <div id="map-blockset-list" class="anchor-list" aria-label="Read-only vanilla tileset pointers"><div class="empty-state">No blocksets inspected.</div></div>
     <button type="button" id="map-connection-inspect" class="subtle-button" disabled>Inspect vanilla map connections</button>
     <output id="map-connection-status" class="palette-note" aria-live="polite">Select a known vanilla map header to inspect connection records. Read only.</output>
     <div id="map-connection-list" class="anchor-list" aria-label="Read-only map connections"><div class="empty-state">No connections inspected.</div></div>
@@ -2552,6 +2555,75 @@ function inspectVanillaMapEvents(source,{address,family}={}){
 }
 
 /**
+ * Read-only vanilla RSE/FRLG map blockset headers.
+ * Source: kcradi/CUBHMA MapModel.cs Format.BlockDataFormat.
+ * 24-byte header: compressed, secondary, padding, tileset, palette, blocks,
+ * then attributes/animation (RSE) or animation/attributes (FRLG).
+ * This does NOT authenticate CUBE-specific layouts or render metatiles.
+ */
+function blocksetReader(source){
+  if(source instanceof Uint8Array)return {length:source.length,read:i=>source[i]};
+  if(source&&Number.isSafeInteger(source.length)&&source.length>=0&&typeof source.read==='function')return source;
+  throw new TypeError('Expected read-only ROM accessor');
+}
+function blocksetSpan(rom,offset,size,label,align=4){
+  if(!Number.isSafeInteger(offset)||offset<0||offset%align!==0||offset>rom.length-size)
+    throw new RangeError(label+' outside ROM bounds or unaligned');
+}
+function blocksetU8(rom,offset){
+  const n=rom.read(offset);
+  if(!Number.isInteger(n)||n<0||n>255)throw new RangeError('Invalid ROM accessor byte');
+  return n;
+}
+function blocksetU32(rom,offset){
+  return (blocksetU8(rom,offset)|(blocksetU8(rom,offset+1)<<8)|
+    (blocksetU8(rom,offset+2)<<16)|(blocksetU8(rom,offset+3)<<24))>>>0;
+}
+function blocksetPtr(rom,raw,label,{nullable=false,align=4,minBytes=1}={}){
+  if(nullable&&(raw===0||raw===0xffffffff))return null;
+  if(raw<0x08000000||raw>=0x0a000000)
+    throw new RangeError(label+' is not a conventional GBA ROM pointer');
+  const offset=raw-0x08000000;
+  blocksetSpan(rom,offset,minBytes,label,align);
+  return offset;
+}
+function blocksetOverlap(a,al,b,bl){return a<b+bl&&b<a+al;}
+function inspectVanillaMapBlocksets(source,{address,family}={}){
+  const rom=blocksetReader(source),header=inspectVanillaMapHeader(rom,{address,family});
+  const layout=header.layout;
+  const locations=[['primary',layout.primaryOffset],['secondary',layout.secondaryOffset]];
+  const claims=[{offset:address,size:28,name:'map header'},
+    {offset:header.layoutOffset,size:family==='FRLG'?28:24,name:'map layout'},
+    {offset:layout.blockmapOffset,size:layout.byteLength,name:'blockmap'}];
+  const result={};
+  for(const [name,offset] of locations){
+    blocksetSpan(rom,offset,24,name+' blockset header');
+    for(const claim of claims)if(blocksetOverlap(offset,24,claim.offset,claim.size))
+      throw new RangeError(name+' blockset header overlaps '+claim.name);
+    claims.push({offset,size:24,name:name+' blockset header'});
+    const compressed=blocksetU8(rom,offset),secondary=blocksetU8(rom,offset+1);
+    if(compressed>1||secondary>1)
+      throw new RangeError(name+' blockset flags are not vanilla boolean bytes');
+    const tilesetPointer=blocksetU32(rom,offset+4);
+    const palettePointer=blocksetU32(rom,offset+8);
+    const metatilePointer=blocksetU32(rom,offset+12);
+    const attributesPointer=blocksetU32(rom,offset+(family==='FRLG'?20:16));
+    const animationPointer=blocksetU32(rom,offset+(family==='FRLG'?16:20));
+    result[name]=Object.freeze({
+      headerOffset:offset,isCompressed:Boolean(compressed),isSecondary:Boolean(secondary),
+      tilesetPointer,tilesetOffset:blocksetPtr(rom,tilesetPointer,name+' tileset',{minBytes:32}),
+      palettePointer,paletteOffset:blocksetPtr(rom,palettePointer,name+' palette',{align:2,minBytes:32}),
+      metatilePointer,metatileOffset:blocksetPtr(rom,metatilePointer,name+' metatiles',{align:2,minBytes:2}),
+      attributesPointer,attributesOffset:blocksetPtr(rom,attributesPointer,name+' attributes',{align:2,minBytes:2}),
+      animationPointer,animationOffset:blocksetPtr(rom,animationPointer,name+' animation',{nullable:true}),
+      readOnly:true,layoutAuthenticated:false
+    });
+  }
+  return Object.freeze({headerAddress:address,family,primary:result.primary,secondary:result.secondary,
+    readOnly:true,layoutAuthenticated:false});
+}
+
+/**
  * Touch viewport helpers for the raw, read-only blockmap inspector.
  * Warps are spatial hints from explicitly selected vanilla headers, not
  * authenticated map topology or passability information.
@@ -2626,7 +2698,7 @@ let model=null, currentTab='home', page=0, selected=null, patchFile=null, palett
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
 ctx.imageSmoothingEnabled=false;
-const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-layout-inspect','map-bank-inspect','map-warp-inspect','map-connection-inspect','map-event-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','discard-button','edit-unlock'];
+const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-layout-inspect','map-bank-inspect','map-warp-inspect','map-connection-inspect','map-event-inspect','map-blockset-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','discard-button','edit-unlock'];
 const tabs={home:['YOUR WORKSPACE','ROM Workbench'],hex:['BINARY INSPECTOR','Hex editor'],anchors:['ROM SEMANTICS','Named data'],maps:['RAW MAP CELLS','Blockmap inspector'],graphics:['GBA GRAPHICS','Graphics explorer'],patches:['PATCH WORKFLOW','Patch tools'],changes:['REVIEW & EXPORT','Changes']};
 function toast(message,bad=false){const t=$('toast');t.textContent=message;t.classList.toggle('error',bad);t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),4300);}
 function safeRun(fn){try{const result=fn();if(result?.catch) result.catch(err=>toast(err.message||String(err),true));}catch(err){toast(err.message||String(err),true);}}
@@ -3323,6 +3395,7 @@ function clearMapGrid(message='Map structure changed; inspect again.'){
 }
 function clearWarpInspection(message='Select a vanilla map header to inspect warp events.'){
   clearEventInspection('Map or ROM changed; inspect vanilla event records again.');
+  clearBlocksetInspection('Map or ROM changed; inspect blockset headers again.');
   inspectedWarpMap=null;
   $('map-warp-list').replaceChildren();
   $('map-warp-status').textContent=message;
@@ -3331,6 +3404,10 @@ function clearEventInspection(message='Select a vanilla map header to inspect ob
   inspectedEventMap=null;
   $('map-event-list').replaceChildren();
   $('map-event-status').textContent=message;
+}
+function clearBlocksetInspection(message='Select a vanilla map header to inspect tileset pointers.'){
+  $('map-blockset-list').replaceChildren();
+  $('map-blockset-status').textContent=message;
 }
 function clearConnectionInspection(message='Select a vanilla map header to inspect connections.'){
   $('map-connection-list').replaceChildren();
@@ -3364,6 +3441,7 @@ $('map-bank-inspect').addEventListener('click',()=>safeRun(()=>{
   $('map-warp-inspect').click();
   $('map-connection-inspect').click();
   $('map-event-inspect').click();
+  $('map-blockset-inspect').click();
 }));
 $('map-warp-inspect').addEventListener('click',()=>safeRun(()=>{
   clearWarpInspection('Inspecting vanilla events…');
@@ -3483,6 +3561,43 @@ $('map-event-inspect').addEventListener('click',()=>safeRun(()=>{
      Number($('map-width').value)===layout.width &&
      Number($('map-height').value)===layout.height)
     $('map-inspect').click();
+}));
+
+// Blockset pointers are syntactically bounded, not proof of CUBE layout.
+// Preview uses the existing 4bpp/LZ viewer; no metatile assembly is claimed.
+$('map-blockset-inspect').addEventListener('click',()=>safeRun(()=>{
+  clearBlocksetInspection('Inspecting vanilla blockset headers…');
+  requireVanillaMapFormat();
+  if($('map-layout-source').value!=='header')
+    throw Error('Select a vanilla map header, not a layout, for blockset inspection');
+  const address=parseOffset($('map-layout-offset').value);
+  const result=inspectVanillaMapBlocksets(model,{address,family:$('map-layout-family').value});
+  $('map-blockset-status').textContent='Unverified vanilla primary/secondary blockset pointers. '+
+    'Tileset previews are raw 4bpp tile sheets, NOT assembled or collision-aware map graphics.';
+  const root=$('map-blockset-list');
+  for(const key of ['primary','secondary']){
+    const set=result[key];
+    const summary=document.createElement('div');summary.className='palette-note';
+    summary.textContent=key+' blockset at 0x'+hex(set.headerOffset)+
+      ': tileset 0x'+hex(set.tilesetOffset)+
+      ', palette 0x'+hex(set.paletteOffset)+
+      ', metatiles 0x'+hex(set.metatileOffset)+
+      ', attributes 0x'+hex(set.attributesOffset)+
+      ', '+(set.isCompressed?'LZ-compressed':'raw')+' tileset. All offsets unverified.';
+    root.append(summary);
+    const button=document.createElement('button');button.type='button';
+    button.className='secondary-button';button.style.margin='8px 0';
+    button.textContent='Preview '+key+' 4bpp tileset (not map rendering)';
+    button.addEventListener('click',()=>safeRun(()=>{
+      ensureModel();
+      $('graphics-offset').value=hex(set.tilesetOffset);
+      $('palette-offset').value=hex(set.paletteOffset);
+      gotoTab('graphics');
+      $('palette-show').click();
+      $(set.isCompressed?'graphics-decode':'graphics-show').click();
+    }));
+    root.append(button);
+  }
 }));
 
 // This is an explicit, unverified vanilla-format interpretation only.

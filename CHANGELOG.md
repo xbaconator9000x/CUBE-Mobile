@@ -1,3 +1,8 @@
+## Unreleased — vanilla blockset and raw tileset preview (27 October 2026)
+- Read vanilla primary/secondary tileset, palette, metatile and attribute pointers with family-specific layout, bounds and overlap guards.
+- Add touch-friendly preview of referenced 4bpp tile graphics; this does not yet assemble map metatiles or authenticate CUBE ROM layouts.
+- Add synthetic decoder and mobile/offline regression tests.
+
 ## Unreleased — spatial object/script/signpost hints (27 October 2026)
 - Overlay source-matched O/S/P record indexes in raw blockmap cells without treating them as verified sprites or walkability.
 - Add coordinate bounds, stale-state invalidation and mobile/offline regression tests.

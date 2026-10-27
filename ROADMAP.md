@@ -1,5 +1,11 @@
 # Roadmap
 
+## Watchdog checkpoint — vanilla blockset pointers and graphics preview (27 October 2026)
+- [x] Decode vanilla primary/secondary blockset headers, graphics/palette/metatile/attribute/animation pointers and RSE/FRLG field ordering read-only.
+- [x] Connect verified-offset pointer inspection to the existing raw/LZ 4bpp graphics viewer, with no semantic ROM writes.
+- [ ] Optimize compressed preview to avoid full-ROM snapshots; render actual metatiles and map layers with correct palette banks and collision semantics.
+- [ ] Authenticate CUBE blockset layouts and verify emulator/device roundtrips before editable maps.
+
 ## Watchdog checkpoint — source-matched raw event spatial hints (27 October 2026)
 - [x] Overlay raw object, script-trigger and signpost indexes only on an exact matching blockmap offset and dimensions.
 - [x] Validate coordinate/index bounds, suppress out-of-map hints, preserve immutable event arrays, and invalidate overlays on ROM/metadata changes.
