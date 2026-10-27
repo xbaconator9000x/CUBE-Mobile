@@ -18,6 +18,7 @@ import {inspectVanillaScriptCommandPrefix} from './vanilla-script-prefix.js';
 import {auditVanillaScriptBranchTargets} from './vanilla-script-branches.js';
 import {auditVanillaScriptOperandPointers} from './vanilla-script-operand-pointers.js';
 import {auditVanillaAtlasScriptAliases} from './vanilla-script-aliases.js';
+import {auditVanillaScriptAliasesAcrossPages} from './vanilla-script-alias-crosspage.js';
 import {inspectVanillaMapBlocksets} from './map-blocksets.js';
 import {panMapViewport,indexMapWarpMarkers,indexMapEventMarkers,inspectRenderedMapPixel,projectRenderedMapMarkers} from './map-viewport.js';
 import {renderVanillaMapViewport} from './map-render.js';
@@ -36,7 +37,7 @@ let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffs
 let pcsReference=null,pcsReferenceName='';
 let fingerprintResult=null,fingerprintAbort=null;
 let metadataFingerprints=[],metadataImportSerial=0;
-let inspectedWarpMap=null,selectedWarpPreview=null,selectedEventPreview=null,inspectedEventMap=null,inspectedMapAtlas=null,atlasBatchStart=0,atlasCoordinateBatchStart=0,atlasScriptAliasStart=0,atlasIncomingStart=0,atlasIncomingTarget=null;
+let inspectedWarpMap=null,selectedWarpPreview=null,selectedEventPreview=null,inspectedEventMap=null,inspectedMapAtlas=null,atlasBatchStart=0,atlasCoordinateBatchStart=0,atlasScriptAliasStart=0,atlasScriptCrossPageStart=0,atlasIncomingStart=0,atlasIncomingTarget=null;
 let activeRenderedMap=null,selectedRenderedHit=null;
 let mapReviewQueue=[],mapReviewRom=null,lastMapPreviews={cell:null,warp:null,event:null};
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
@@ -983,7 +984,7 @@ function requireVanillaMapFormat(){
     throw Error('Imported metadata declares a non-vanilla layout; vanilla map interpretation refused.');
 }
 function clearMapAtlas(message='Declared atlas invalidated; inspect again.') {
- inspectedMapAtlas=null;atlasBatchStart=0;atlasCoordinateBatchStart=0;atlasScriptAliasStart=0;atlasIncomingStart=0;atlasIncomingTarget=null;
+ inspectedMapAtlas=null;atlasBatchStart=0;atlasCoordinateBatchStart=0;atlasScriptAliasStart=0;atlasScriptCrossPageStart=0;atlasIncomingStart=0;atlasIncomingTarget=null;
  $('map-review-impact').disabled=true;
  $('map-review-roundtrip').disabled=true;
  $('map-review-roundtrip-list').replaceChildren();
@@ -998,6 +999,9 @@ function clearMapAtlas(message='Declared atlas invalidated; inspect again.') {
  $('map-script-alias-audit').disabled=true;
  $('map-script-alias-list').replaceChildren();
  $('map-script-alias-status').textContent='No shared script-target page reviewed.';
+ $('map-script-crosspage-audit').disabled=true;
+ $('map-script-crosspage-list').replaceChildren();
+ $('map-script-crosspage-status').textContent='No cross-page script target review run.';
  $('map-event-ownership-list').replaceChildren();
  $('map-event-ownership-status').textContent='No event ownership review run.';
  $('map-atlas-alias-list').replaceChildren();
@@ -1114,6 +1118,8 @@ $('map-atlas-inspect').addEventListener('click',()=>safeRun(()=>{
  $('map-event-ownership-audit').disabled=false;
  $('map-script-alias-audit').disabled=false;
  atlasScriptAliasStart=0;
+ $('map-script-crosspage-audit').disabled=false;
+ atlasScriptCrossPageStart=0;
  $('map-coordinate-batch-audit').disabled=false;
  $('map-atlas-status').textContent='Inspected '+atlas.mapCount+' explicitly declared maps across '+
   atlas.bankCount+' vanilla-format banks. Pointer/layout bounds checked; no ROM identity, CUBE layout or warp topology authenticated.';
@@ -1551,6 +1557,74 @@ $('map-script-alias-audit').addEventListener('click',()=>safeRun(()=>{
  if(!result.groups.length){
   const empty=document.createElement('div');empty.className='empty-state';
   empty.textContent='No shared script targets within this page. This does not rule out cross-page sharing.';
+  root.append(empty);
+ }
+}));
+
+$('map-script-crosspage-audit').addEventListener('click',()=>safeRun(()=>{
+ requireVanillaMapFormat();
+ if(!inspectedMapAtlas||inspectedMapAtlas.rom!==model)
+  throw Error('Reinspect the declared atlas before cross-page script review');
+ const atlas=inspectedMapAtlas.atlas;
+ function inputsUnchanged(){
+  const current=parseVanillaBankMapCounts($('map-atlas-counts').value);
+  return inspectedMapAtlas?.rom===model&&
+   parseOffset($('map-bank-offset').value)===atlas.address&&
+   $('map-layout-family').value===atlas.family&&
+   current.length===atlas.bankCount&&
+   current.every((n,i)=>n===atlas.bankMapCounts[i]);
+ }
+ if(!inputsUnchanged())
+  throw Error('Atlas inputs changed; reinspect before cross-page script review');
+ const opts={startMap:atlasScriptCrossPageStart,maxMaps:64,
+  maxPointerFields:4096,maxGroups:32,maxReferences:8};
+ const result=auditVanillaScriptAliasesAcrossPages(model,atlas,opts);
+ atlasScriptCrossPageStart=result.nextStartMap??0;
+ $('map-script-crosspage-audit').textContent=result.nextStartMap===null?
+  'Scan shared script targets across 64 maps (restart)':
+  'Scan shared script targets across next 64 maps';
+ const root=$('map-script-crosspage-list');root.replaceChildren();
+ $('map-script-crosspage-status').textContent='Reviewed declared maps '+
+  (result.startMap+1)+'–'+(result.startMap+result.mapsInspected)+
+  ' of '+result.totalMaps+': '+result.totalGroups+' shared script targets, '+
+  result.pointerFields+' pointer fields ('+result.inRomPointers+' in-ROM)'+
+  (result.truncated?' · groups truncated':'')+
+  '. Aliases outside this scan window are unknown; no CUBE ownership or writes.';
+ function navigate(label,offset,group,reference){
+  const button=document.createElement('button');button.type='button';
+  button.className='secondary-button';button.style.display='block';
+  button.style.margin='8px 0';button.style.textAlign='left';
+  button.textContent=label;
+  button.addEventListener('click',()=>safeRun(()=>{
+   requireVanillaMapFormat();
+   if(!inputsUnchanged())throw Error('Atlas inputs changed; reinspect before navigation');
+   const fresh=auditVanillaScriptAliasesAcrossPages(model,atlas,opts);
+   const match=fresh.groups.find(g=>g.targetOffset===group.targetOffset&&
+    g.referenceCount===group.referenceCount&&
+    g.crossesSixteenMapPage===group.crossesSixteenMapPage);
+   if(!match||reference&&!match.references.some(x=>
+     x.pointerSourceOffset===reference.pointerSourceOffset&&
+     x.bankIndex===reference.bankIndex&&x.mapIndex===reference.mapIndex&&
+     x.kind===reference.kind&&x.index===reference.index))
+    throw Error('Cross-page script aliases changed; rescan before navigation');
+   setPageForOffset(offset);gotoTab('hex');
+  }));
+  root.append(button);
+ }
+ for(const group of result.groups){
+  navigate('Shared script target ROM 0x'+hex(group.targetOffset)+
+   ' · '+group.referenceCount+' references'+
+   (group.crossesSixteenMapPage?' · crosses 16-map page boundary':'')+
+   (group.referencesTruncated?' · first 8 shown':'')+
+   ' · inspect target bytes',group.targetOffset,group,null);
+  for(const ref of group.references)
+   navigate('Bank '+ref.bankIndex+' / map '+ref.mapIndex+
+    ' · '+ref.kind+' '+ref.index+' · source ROM 0x'+
+    hex(ref.pointerSourceOffset),ref.pointerSourceOffset,group,ref);
+ }
+ if(!result.groups.length){
+  const empty=document.createElement('div');empty.className='empty-state';
+  empty.textContent='No shared targets in this scan window. Other windows were not inspected.';
   root.append(empty);
  }
 }));
