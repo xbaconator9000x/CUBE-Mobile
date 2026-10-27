@@ -196,6 +196,9 @@
     <button type="button" id="map-script-crosspage-audit" class="subtle-button" disabled>Scan shared script targets across next 64 maps</button>
     <output id="map-script-crosspage-status" class="palette-note" aria-live="polite">No cross-page script target review run.</output>
     <div id="map-script-crosspage-list" class="anchor-list" aria-label="Read-only cross-page script target references"></div>
+    <button type="button" id="map-script-atlas-audit" class="subtle-button" disabled>Scan all declared maps for shared script targets (read only)</button>
+    <output id="map-script-atlas-status" class="palette-note" aria-live="polite">No full-atlas script target review run.</output>
+    <div id="map-script-atlas-list" class="anchor-list" aria-label="Read-only full-atlas shared script target references"></div>
     <button type="button" id="map-bank-inspect" class="subtle-button" disabled>Follow vanilla bank → map (read only)</button>
     <output id="map-bank-status" class="palette-note" aria-live="polite">Requires independently verified vanilla bank table and explicit counts; no automatic CUBE map-bank discovery.</output>
     <div class="input-wrap"><label for="map-layout-offset">Optional known VANILLA map header/layout ROM offset (hex)</label><input id="map-layout-offset" inputmode="text" spellcheck="false" placeholder="e.g. 1A2B3C"></div>
@@ -5259,6 +5262,113 @@ function auditVanillaMapEventScripts(source,{
  });
 }
 
+/**
+ * Full declared-atlas, read-only vanilla object/trigger script target audit.
+ * Source: pinned CUBHMA MapModel.cs event records and map pointer layouts.
+ * Equal destinations are only structural aliases, never allocation ownership.
+ */
+function atlasAliasReader(source) {
+ if(source instanceof Uint8Array)return {length:source.length,read:i=>source[i]};
+ if(source&&Number.isSafeInteger(source.length)&&source.length>=0&&
+    typeof source.read==='function')return source;
+ throw new TypeError('Expected ROM bytes or read-only ROM accessor');
+}
+function atlasAliasPointer(rom,offset) {
+ if(!Number.isSafeInteger(offset)||offset<0||offset>rom.length-4)
+  throw new RangeError('Map pointer source outside ROM');
+ let value=0;
+ for(let i=0;i<4;i++){
+  const byte=rom.read(offset+i);
+  if(!Number.isInteger(byte)||byte<0||byte>255)
+   throw new RangeError('Invalid ROM accessor byte');
+  value+=byte*2**(8*i);
+ }
+ return value;
+}
+
+/**
+ * Scan every explicitly declared map in a single bounded operation, including
+ * aliases across arbitrary 64-map UI scan windows. Never infer map counts.
+ * Fail closed rather than silently returning a partial-atlas result.
+ */
+function auditVanillaAtlasWideScriptAliases(source,atlas,{
+ maxMaps=4096,maxPointerFields=32768,maxGroups=64,maxReferences=16
+}={}){
+ const rom=atlasAliasReader(source);
+ if(!atlas||atlas.readOnly!==true||atlas.layoutAuthenticated!==false||
+    !['RSE','FRLG'].includes(atlas.family)||!Array.isArray(atlas.maps)||
+    atlas.maps.length<1||atlas.maps.length>4096)
+  throw new TypeError('A declared read-only vanilla atlas is required');
+ if(!Number.isSafeInteger(maxMaps)||maxMaps<1||maxMaps>4096||
+    !Number.isSafeInteger(maxPointerFields)||maxPointerFields<1||maxPointerFields>65536||
+    !Number.isSafeInteger(maxGroups)||maxGroups<1||maxGroups>128||
+    !Number.isSafeInteger(maxReferences)||maxReferences<1||maxReferences>32)
+  throw new RangeError('Invalid atlas-wide alias audit limits');
+ if(atlas.maps.length>maxMaps)
+  throw new RangeError('Declared atlas exceeds scan map budget; no partial result');
+ const targets=new Map();
+ let pointerFields=0,inRomPointers=0;
+ for(let ordinal=0;ordinal<atlas.maps.length;ordinal++){
+  const map=atlas.maps[ordinal];
+  if(!map||![map.mapHeaderOffset,map.mapPointerSource,map.bankIndex,
+      map.mapIndex,map.layoutOffset,map.blockmapOffset,map.width,map.height]
+      .every(n=>Number.isSafeInteger(n)&&n>=0)||
+     map.mapHeaderOffset>=0x02000000)
+   throw new RangeError('Invalid declared map provenance');
+  if(atlasAliasPointer(rom,map.mapPointerSource)!==0x08000000+map.mapHeaderOffset)
+   throw new RangeError('Declared map pointer changed');
+  const header=inspectVanillaMapHeader(rom,{
+   address:map.mapHeaderOffset,family:atlas.family
+  });
+  if(header.layoutOffset!==map.layoutOffset||
+     header.layout.blockmapOffset!==map.blockmapOffset||
+     header.layout.width!==map.width||header.layout.height!==map.height)
+   throw new RangeError('Declared map layout changed');
+  const inspected=inspectVanillaEventScriptPointers(rom,{
+   address:map.mapHeaderOffset,family:atlas.family
+  });
+  pointerFields+=inspected.records.length;
+  if(pointerFields>maxPointerFields)
+   throw new RangeError('Script pointer budget exceeded; no partial result');
+  for(const record of inspected.records){
+   if(record.status!=='in-rom')continue;
+   inRomPointers++;
+   let group=targets.get(record.targetOffset);
+   if(!group){
+    group={targetOffset:record.targetOffset,referenceCount:0,
+     firstMapOrdinal:ordinal,lastMapOrdinal:ordinal,references:[]};
+    targets.set(record.targetOffset,group);
+   }
+   group.referenceCount++;
+   group.lastMapOrdinal=ordinal;
+   if(group.references.length<maxReferences)
+    group.references.push(Object.freeze({
+     bankIndex:map.bankIndex,mapIndex:map.mapIndex,kind:record.kind,
+     index:record.index,pointerSourceOffset:record.sourceOffset
+    }));
+  }
+ }
+ const shared=[...targets.values()].filter(g=>g.referenceCount>1)
+  .sort((a,b)=>a.targetOffset-b.targetOffset);
+ const groups=shared.slice(0,maxGroups).map(g=>Object.freeze({
+  targetOffset:g.targetOffset,referenceCount:g.referenceCount,
+  firstMapOrdinal:g.firstMapOrdinal,lastMapOrdinal:g.lastMapOrdinal,
+  crossesSixtyFourMapWindow:Math.floor(g.firstMapOrdinal/64)!==
+   Math.floor(g.lastMapOrdinal/64),
+  references:Object.freeze(g.references),
+  referencesTruncated:g.referenceCount>g.references.length
+ }));
+ return Object.freeze({
+  mapsInspected:atlas.maps.length,totalMaps:atlas.maps.length,
+  pointerFields,inRomPointers,distinctTargets:targets.size,
+  totalGroups:shared.length,groups:Object.freeze(groups),
+  truncated:shared.length>groups.length,wholeDeclaredAtlas:true,
+  readOnly:true,layoutAuthenticated:false,ownershipAuthenticated:false,
+  controlFlowFollowed:false,writeAuthorized:false,
+  independentParityEvidence:false
+ });
+}
+
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let pcsReference=null,pcsReferenceName='';
@@ -6229,6 +6339,9 @@ function clearMapAtlas(message='Declared atlas invalidated; inspect again.') {
  $('map-script-crosspage-audit').disabled=true;
  $('map-script-crosspage-list').replaceChildren();
  $('map-script-crosspage-status').textContent='No cross-page script target review run.';
+ $('map-script-atlas-audit').disabled=true;
+ $('map-script-atlas-list').replaceChildren();
+ $('map-script-atlas-status').textContent='No full-atlas script target review run.';
  $('map-event-ownership-list').replaceChildren();
  $('map-event-ownership-status').textContent='No event ownership review run.';
  $('map-atlas-alias-list').replaceChildren();
@@ -6346,6 +6459,7 @@ $('map-atlas-inspect').addEventListener('click',()=>safeRun(()=>{
  $('map-script-alias-audit').disabled=false;
  atlasScriptAliasStart=0;
  $('map-script-crosspage-audit').disabled=false;
+ $('map-script-atlas-audit').disabled=false;
  atlasScriptCrossPageStart=0;
  $('map-coordinate-batch-audit').disabled=false;
  $('map-atlas-status').textContent='Inspected '+atlas.mapCount+' explicitly declared maps across '+
@@ -6852,6 +6966,71 @@ $('map-script-crosspage-audit').addEventListener('click',()=>safeRun(()=>{
  if(!result.groups.length){
   const empty=document.createElement('div');empty.className='empty-state';
   empty.textContent='No shared targets in this scan window. Other windows were not inspected.';
+  root.append(empty);
+ }
+}));
+
+
+$('map-script-atlas-audit').addEventListener('click',()=>safeRun(()=>{
+ requireVanillaMapFormat();
+ if(!inspectedMapAtlas||inspectedMapAtlas.rom!==model)
+  throw Error('Reinspect the declared atlas before the full-atlas script review');
+ const atlas=inspectedMapAtlas.atlas;
+ function inputsUnchanged(){
+  const current=parseVanillaBankMapCounts($('map-atlas-counts').value);
+  return inspectedMapAtlas?.rom===model&&
+   parseOffset($('map-bank-offset').value)===atlas.address&&
+   $('map-layout-family').value===atlas.family&&
+   current.length===atlas.bankCount&&
+   current.every((n,i)=>n===atlas.bankMapCounts[i]);
+ }
+ if(!inputsUnchanged())
+  throw Error('Atlas inputs changed; reinspect before the full-atlas script review');
+ const opts={maxMaps:4096,maxPointerFields:32768,maxGroups:32,maxReferences:8};
+ const result=auditVanillaAtlasWideScriptAliases(model,atlas,opts);
+ const root=$('map-script-atlas-list');root.replaceChildren();
+ $('map-script-atlas-status').textContent='Reviewed all '+result.mapsInspected+
+  ' explicitly declared maps: '+result.pointerFields+' script pointer fields ('+
+  result.inRomPointers+' in-ROM), '+result.distinctTargets+' distinct targets, '+
+  result.totalGroups+' shared targets'+
+  (result.truncated?' (first 32 groups shown)':'')+
+  '. This is a complete declared-atlas scan, not CUBE layout or ownership verification.';
+ function navigate(label,offset,group,reference){
+  const button=document.createElement('button');button.type='button';
+  button.className='secondary-button';button.style.display='block';
+  button.style.margin='8px 0';button.style.textAlign='left';
+  button.textContent=label;
+  button.addEventListener('click',()=>safeRun(()=>{
+   requireVanillaMapFormat();
+   if(!inputsUnchanged())throw Error('Atlas inputs changed; reinspect before navigation');
+   const fresh=auditVanillaAtlasWideScriptAliases(model,atlas,opts);
+   const match=fresh.groups.find(g=>g.targetOffset===group.targetOffset&&
+    g.referenceCount===group.referenceCount&&
+    g.firstMapOrdinal===group.firstMapOrdinal&&
+    g.lastMapOrdinal===group.lastMapOrdinal);
+   if(!match||reference&&!match.references.some(x=>
+     x.pointerSourceOffset===reference.pointerSourceOffset&&
+     x.bankIndex===reference.bankIndex&&x.mapIndex===reference.mapIndex&&
+     x.kind===reference.kind&&x.index===reference.index))
+    throw Error('Atlas-wide script aliases changed; rescan before navigation');
+   setPageForOffset(offset);gotoTab('hex');
+  }));
+  root.append(button);
+ }
+ for(const group of result.groups){
+  navigate('Shared script target ROM 0x'+hex(group.targetOffset)+
+   ' · '+group.referenceCount+' references'+
+   (group.crossesSixtyFourMapWindow?' · crosses 64-map windows':'')+
+   (group.referencesTruncated?' · first 8 shown':'')+
+   ' · inspect target bytes',group.targetOffset,group,null);
+  for(const ref of group.references)
+   navigate('Bank '+ref.bankIndex+' / map '+ref.mapIndex+
+    ' · '+ref.kind+' '+ref.index+' · source ROM 0x'+
+    hex(ref.pointerSourceOffset),ref.pointerSourceOffset,group,ref);
+ }
+ if(!result.groups.length){
+  const empty=document.createElement('div');empty.className='empty-state';
+  empty.textContent='No shared script targets in the declared atlas; this is not proof of script ownership.';
   root.append(empty);
  }
 }));
