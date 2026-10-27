@@ -1,5 +1,10 @@
 # Roadmap
 
+## Checkpoint — mobile vanilla map script summary (28 October 2026)
+- [x] Show bounded object/trigger script pointer statuses, decoded-prefix stop reasons, branch counts and typed operand counts per selected vanilla map.
+- [x] Revalidate selected map and raw pointer findings before navigation; include modular/offline UI and tests.
+- [ ] CUBE grammar, script ownership, safe writes and genuine ROM/emulator/Android acceptance remain unverified. See [mobile map script audit](docs/MOBILE_MAP_SCRIPT_AUDIT.md).
+
 ## Checkpoint — mobile cross-page vanilla script aliases (28 October 2026)
 - [x] Show bounded 64-map shared script-target scans across 16-map UI page boundaries, with exact source/target hex navigation.
 - [x] Revalidate declared atlas inputs and raw pointer findings before navigation; include offline HTML and tests.
