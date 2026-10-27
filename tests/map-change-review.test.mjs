@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {reviewVanillaChangeSet} from '../src/map-change-review.js';
+import {reviewVanillaChangeSet,exportVanillaChangeReviewJson} from '../src/map-change-review.js';
 const flags={readOnly:true,previewOnly:true,writeAuthorized:false,layoutAuthenticated:false};
 const cell=(at,before,after)=>({...flags,byteOffset:at,
  before:{bytes:before},after:{bytes:after}});
@@ -79,4 +79,34 @@ test('forged event previews cannot modify script pointers, flags or reserved byt
  const ok=reviewVanillaChangeSet(rom,[event(32,'scripts',original,legal)]);
  assert.deepEqual(ok.entries[0].fieldChanges,
   [{field:'elevation',before:0,after:258}]);
+});
+
+test('review JSON exports typed fields in deterministic order without raw ROM byte arrays',()=>{
+ const rom=new Uint8Array(64),original=rom.slice();
+ const previews=[warp(24,Array(8).fill(0),[0,0,2,0,0,0,1,0]),cell(4,[0,0],[1,4])];
+ const json=exportVanillaChangeReviewJson(rom,previews);
+ assert.equal(json,exportVanillaChangeReviewJson(rom,previews));
+ const report=JSON.parse(json);
+ assert.equal(report.schema,'cube-mobile-map-review/1');
+ assert.equal(report.containsRomBytes,false);
+ assert.equal(report.applicablePatch,false);
+ assert.equal(report.writeAuthorized,false);
+ assert.deepEqual(report.entries.map(e=>e.offset),[4,24]);
+ assert.deepEqual(report.entries[0].fields,[
+  {field:'tileId',before:0,after:1},
+  {field:'rawCollision',before:0,after:1}
+ ]);
+ assert.equal(report.entries[0].before,undefined);
+ assert.equal(report.entries[0].after,undefined);
+ assert.equal(report.entries[1].fields[0].field,'y');
+ assert.deepEqual(rom,original);
+});
+test('review JSON fails closed for stale originals, forbidden fields and overlapping previews',()=>{
+ const rom=new Uint8Array(64);
+ assert.throws(()=>exportVanillaChangeReviewJson(rom,[cell(4,[1,0],[2,0])]),/changed/);
+ assert.throws(()=>exportVanillaChangeReviewJson(rom,[
+  cell(4,[0,0],[1,0]),cell(4,[0,0],[2,0])]),/overlap/);
+ const before=Array(24).fill(0),after=before.slice();after[16]=1;
+ assert.throws(()=>exportVanillaChangeReviewJson(rom,[
+  event(24,'objects',before,after)]),/non-editable/);
 });
