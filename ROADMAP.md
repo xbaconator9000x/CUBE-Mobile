@@ -1,5 +1,11 @@
 # Roadmap
 
+## Checkpoint — explicit vanilla map atlas (27 October 2026)
+- [x] Traverse explicitly counted vanilla bank/map pointer arrays and validate map header, layout and blockmap bounds, with a 4096-map cap.
+- [x] Add touch-friendly map catalog selection and conditional warp/connection target navigation; invalidate on ROM/metadata changes.
+- [ ] Authenticate CUBE-specific bank tables and map counts from trusted metadata, add source-owned semantic edits, and test device/emulator roundtrips.
+
+
 ## Checkpoint — raw metatile attributes (27 October 2026)
 - [x] Preserve RSE/FRLG metatile behavior, layer, terrain and encounter bytes with exact ROM source offsets.
 - [x] Display behavior/layer hints beside raw collision/elevation in the rendered map grid; no inferred walkability.
