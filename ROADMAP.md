@@ -1,5 +1,15 @@
 # Roadmap
 
+## Checkpoint — raw map colour inspection and visual edit comparisons (27 October 2026)
+- [x] Revalidate vanilla blockmap preview provenance and original bytes, then render bounded side-by-side before/after metatile images through a read-only two-byte accessor overlay.
+- [x] Show changed pixel counts and bounds, distinguish nonvisual raw high-bit changes, and keep ROM bytes immutable.
+- [x] Colour-code raw six-bit blockmap values, metatile behavior bytes and FRLG-only terrain/encounter attributes in the rendered map, with legends and existing warp/event markers preserved.
+- [x] Provide a matching raw high-bit colour legend and optional cell-grid borders even without metatile graphics.
+- [x] Test synthetic invariants, stale previews, UI wiring and standalone offline parity. See [visual diff](docs/MAP_VISUAL_DIFF.md) and [raw overlays](docs/MAP_RAW_OVERLAY.md).
+- [ ] Authenticate real CUBE map grammar, blocksets and metadata; test genuine ROM/emulator/Android workflows before claiming semantic editing or full feature parity.
+- [ ] Extend read-only multi-cell comparison to queued map proposals, then implement validated save/reopen transactions with rollback and verified pointer ownership.
+
+
 ## Checkpoint — queued immutable map change review (27 October 2026)
 - [x] Queue up to 64 byte-exact blockmap, warp and object/trigger/signpost previews in the touch-friendly map UI and inspect a sorted combined review.
 - [x] Reject stale source bytes, overlapping or duplicate ROM ranges and excessive byte budgets before queueing or reviewing; clear on ROM replacement and metadata reset; include offline UI and tests.
