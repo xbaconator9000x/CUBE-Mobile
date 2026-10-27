@@ -1,5 +1,12 @@
 # Roadmap
 
+## Checkpoint — shared vanilla event-script target hints (28 October 2026)
+- [x] Scan up to 32 explicitly declared vanilla maps per page for object/trigger script pointers sharing the same in-ROM destination.
+- [x] Revalidate source bank pointers and header/layout provenance, cap alias groups and reference lists, preserve exact pointer-field offsets.
+- [x] Add synthetic shared-target, page-boundary and stale-pointer regression tests. See [script aliases](docs/VANILLA_SCRIPT_ALIASES.md).
+- [ ] This is not proof of allocation ownership or CUBE script compatibility; genuine ROM/emulator/Android acceptance and safe shared-data transactions remain outstanding.
+
+
 ## Checkpoint — bounded local event-script smoke (28 October 2026)
 - [x] Add a capped read-only object/trigger script-prefix and branch-status audit for explicit vanilla map headers; no control-flow traversal or script ownership inference.
 - [x] Integrate bounded per-map script pointer and decoder-status counts into the opt-in, SHA-256-matched local ROM smoke report without exporting ROM bytes.
