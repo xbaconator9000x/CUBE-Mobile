@@ -7,6 +7,7 @@ import {fingerprintRomSha256,fingerprintMatchesRom} from './rom-fingerprint.js';
 import {compareRomIdentity} from './rom-compatibility.js';
 import {fingerprintMetadataFiles,compareRomMetadataFingerprintRecords} from './metadata-fingerprint.js';
 import {inspectBlockMap} from './map-blocks.js';
+import {inspectVanillaMapLayout,inspectVanillaMapHeader} from './map-layouts.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
@@ -17,7 +18,7 @@ let model=null, currentTab='home', page=0, selected=null, patchFile=null, palett
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
 ctx.imageSmoothingEnabled=false;
-const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','save-rom','save-project','export-ips','discard-button','edit-unlock'];
+const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-layout-inspect','save-rom','save-project','export-ips','discard-button','edit-unlock'];
 const tabs={home:['YOUR WORKSPACE','ROM Workbench'],hex:['BINARY INSPECTOR','Hex editor'],anchors:['ROM SEMANTICS','Named data'],maps:['RAW MAP CELLS','Blockmap inspector'],graphics:['GBA GRAPHICS','Graphics explorer'],patches:['PATCH WORKFLOW','Patch tools'],changes:['REVIEW & EXPORT','Changes']};
 function toast(message,bad=false){const t=$('toast');t.textContent=message;t.classList.toggle('error',bad);t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),4300);}
 function safeRun(fn){try{const result=fn();if(result?.catch) result.catch(err=>toast(err.message||String(err),true));}catch(err){toast(err.message||String(err),true);}}
@@ -97,7 +98,7 @@ function updateIndicators(){
   if(active)showRomInfo();
   drawMetadataFingerprintStatus();
 }
-function installModel(name,bytes){metadataImportSerial++;metadataFingerprints=[];$('map-grid').innerHTML='<div class="empty-state">No blockmap inspected.</div>';$('map-status').textContent='ROM replaced. Enter a verified offset and inspect again.';pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
+function installModel(name,bytes){metadataImportSerial++;metadataFingerprints=[];$('map-grid').innerHTML='<div class="empty-state">No blockmap inspected.</div>';$('map-layout-status').textContent='ROM replaced. No vanilla-format layout inspected.';$('map-status').textContent='ROM replaced. Enter a verified offset and inspect again.';pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
 $('rom-picker').addEventListener('change',async e=>{
   const file=e.target.files?.[0];e.target.value='';if(!file)return;
   if(file.size<0xC0 || file.size>MAX_BYTES)return toast('ROM must be 192 bytes to 128 MiB',true);
@@ -700,6 +701,29 @@ $('metadata-stock').addEventListener('click',async()=>{
   }catch(err){toast('Stock metadata: '+err.message,true);}finally{$('metadata-stock').disabled=false;}
 });
 
+
+// This is an explicit, unverified vanilla-format interpretation only.
+$('map-layout-inspect').addEventListener('click',()=>safeRun(()=>{
+  ensureModel();
+  if(metadataLayoutKind==='expansion'||metadataLayoutKind==='custom')
+    throw Error('Imported metadata declares a non-vanilla layout; vanilla structure interpretation refused.');
+  const address=parseOffset($('map-layout-offset').value);
+  const family=$('map-layout-family').value,kind=$('map-layout-source').value;
+  const parsed=kind==='header'?
+    inspectVanillaMapHeader(model,{address,family}):
+    inspectVanillaMapLayout(model,{address,family});
+  const layout=kind==='header'?parsed.layout:parsed;
+  $('map-offset').value=hex(layout.blockmapOffset);
+  $('map-width').value=String(layout.width);$('map-height').value=String(layout.height);
+  $('map-x').value='0';$('map-y').value='0';
+  $('map-grid').replaceChildren();
+  $('map-layout-status').textContent=
+    'Unverified '+family+' vanilla-format '+kind+' at 0x'+hex(address)+
+    ' → layout 0x'+hex(layout.address)+', blockmap 0x'+hex(layout.blockmapOffset)+
+    ', '+layout.width+' × '+layout.height+
+    '. Pointers and dimensions are syntactically bounded only. NOT CUBE-authenticated; no edits enabled.';
+  $('map-inspect').click();
+}));
 
 // A manually supplied blockmap address is NOT a verified map layout. This
 // view deliberately never interprets the high six bits as walkability.
