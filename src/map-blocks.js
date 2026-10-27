@@ -74,3 +74,55 @@ export function inspectBlockMap(bytes, {
     walkabilityVerified: false,
   });
 }
+
+
+/**
+ * Summarise one bounded, contiguous page of raw vanilla blockmap words.
+ * Source: CUBHMA MapModel.BlockCells (word & 0x3FF, word >> 10).
+ * High six bits are NOT a verified walkability flag. This routine does not
+ * infer collision rules, authenticate layout, mutate ROM or follow pointers.
+ * Pages let mobile devices inspect large maps without allocating a full map.
+ */
+export function summarizeBlockmapChunk(source,{
+  address,width,height,startCell=0,maxCells=4096
+}={}){
+  if(!(source instanceof Uint8Array)&&!(source&&Number.isSafeInteger(source.length)&&
+    source.length>=0&&typeof source.read==='function'))
+    throw new TypeError('Expected ROM bytes or a read-only staged accessor');
+  const read=source instanceof Uint8Array?i=>source[i]:i=>source.read(i);
+  if(!Number.isSafeInteger(address)||address<0||address%2)
+    throw new RangeError('Blockmap offset must be a non-negative even ROM offset');
+  positiveInt(width,'Map width',1024);
+  positiveInt(height,'Map height',1024);
+  const totalCells=width*height;
+  if(address>source.length-totalCells*2)
+    throw new RangeError('Complete declared blockmap exceeds ROM bounds');
+  if(!Number.isSafeInteger(startCell)||startCell<0||startCell>=totalCells)
+    throw new RangeError('Chunk start must select a blockmap cell');
+  positiveInt(maxCells,'Chunk size',4096);
+  const scannedCells=Math.min(maxCells,totalCells-startCell);
+  const rawHighBitCounts=new Array(64).fill(0);
+  const tileCounts=new Map();
+  for(let i=0;i<scannedCells;i++){
+    const offset=address+(startCell+i)*2;
+    const low=read(offset),high=read(offset+1);
+    if(!Number.isInteger(low)||low<0||low>255||
+       !Number.isInteger(high)||high<0||high>255)
+      throw new RangeError('ROM accessor returned an invalid byte');
+    const word=low|(high<<8);
+    const flag=word>>>10,tileId=word&0x3ff;
+    rawHighBitCounts[flag]++;
+    tileCounts.set(tileId,(tileCounts.get(tileId)||0)+1);
+  }
+  const commonTiles=[...tileCounts].sort((a,b)=>b[1]-a[1]||a[0]-b[0])
+    .slice(0,8).map(([tileId,count])=>Object.freeze({tileId,count}));
+  return Object.freeze({
+    address,width,height,totalCells,startCell,scannedCells,
+    firstByteOffset:address+startCell*2,
+    lastByteOffset:address+(startCell+scannedCells)*2-1,
+    nextCell:startCell+scannedCells<totalCells?startCell+scannedCells:null,
+    rawHighBitCounts:Object.freeze(rawHighBitCounts),
+    distinctTiles:tileCounts.size,commonTiles:Object.freeze(commonTiles),
+    readOnly:true,walkabilityVerified:false,layoutAuthenticated:false
+  });
+}
