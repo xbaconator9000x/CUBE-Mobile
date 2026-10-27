@@ -100,7 +100,8 @@ export function inspectVanillaScriptCommandPrefix(source,{
   stopReason=cursor>=rom.length?'rom-end':'byte-budget';
  else if(commands.length>=maxCommands&&stopReason==='byte-budget')
   stopReason='command-budget';
- stopOffset=cursor;\n return Object.freeze({address,family,requestedBytes:maxBytes,
+ stopOffset=cursor;
+ return Object.freeze({address,family,requestedBytes:maxBytes,
   inspectedBytes:cursor-address,stopOffset,stopReason,
   commands:Object.freeze(commands),readOnly:true,
   layoutAuthenticated:false,grammarAuthenticated:false,
