@@ -123,6 +123,7 @@
     <button type="button" id="map-layout-inspect" class="subtle-button" disabled>Read vanilla structure (no writes)</button>
     <output id="map-layout-status" class="palette-note" aria-live="polite">This optional decoder is ONLY for independently verified vanilla-format structures, not CUBE expansion layouts. ROM header identity does not verify a structure.</output>
     <button type="button" id="map-inspect" class="subtle-button" disabled>Inspect 12 × 10 cells</button>
+    <label class="control-label"><input type="checkbox" id="map-grid-raw-colors" checked> Colour-code raw cell high bits in the grid (not passability)</label>
     <label class="control-label"><input type="checkbox" id="map-render-enabled"> Show rendered vanilla metatiles (read-only)</label>
     <div class="input-wrap"><label for="map-raw-overlay-mode">Raw map attribute colours (not passability)</label>
       <select id="map-raw-overlay-mode">
@@ -233,7 +234,7 @@
     <div id="map-connection-list" class="anchor-list" aria-label="Read-only map connections"><div class="empty-state">No connections inspected.</div></div>
   </div>
   <div class="editor-card"><output id="map-render-status" class="palette-note" aria-live="polite">Rendered preview disabled; vanilla layout is unverified.</output><output id="map-overlay-status" class="palette-note" aria-live="polite">No raw attribute overlay. Enable rendered metatiles to inspect.</output><div id="map-overlay-legend" class="map-overlay-legend" aria-label="Raw map attribute colour legend"></div><div class="blockmap-scroller"><canvas id="map-render-canvas" hidden aria-label="Composed vanilla map viewport; tap a metatile for raw inspection"></canvas></div><output id="map-render-selection" class="palette-note" aria-live="polite">Tap a rendered metatile to inspect its raw source offsets.</output><button type="button" id="map-render-jump" class="subtle-button" disabled>Inspect selected metatile bytes in hex</button></div>
-  <div class="editor-card"><div id="map-grid" class="blockmap-scroller" aria-label="Read-only map block cells"><div class="empty-state">No blockmap inspected.</div></div></div>
+  <div class="editor-card"><output id="map-grid-color-status" class="palette-note" aria-live="polite">No raw cell colours inspected.</output><div id="map-grid-legend" class="map-overlay-legend" aria-label="Raw blockmap cell colour legend"></div><div id="map-grid" class="blockmap-scroller" aria-label="Read-only map block cells"><div class="empty-state">No blockmap inspected.</div></div></div>
 </section>
 <section class="view" id="view-graphics">
  <div class="tool-heading"><div><div class="eyebrow">GBA GRAPHICS EXPLORER</div><h2>Graphics explorer</h2><p>Search for LZ77-compressed tile data, or inspect a known raw offset. Read-only, with no guessed colours.</p></div><span class="pill">Inspect only</span></div>

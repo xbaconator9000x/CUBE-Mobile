@@ -24,7 +24,7 @@ import {previewVanillaEventCoordinateChange} from './map-event-edit-preview.js';
 import {reviewVanillaChangeSet,exportVanillaChangeReviewJson} from './map-change-review.js';
 import {auditVanillaChangeImpact} from './map-change-impact.js';
 import {compareVanillaBlockmapVisualChange} from './map-visual-diff.js';
-import {buildVanillaRawMapOverlay} from './map-raw-overlay.js';
+import {buildVanillaRawMapOverlay,buildRawBlockmapGridOverlay} from './map-raw-overlay.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
@@ -748,6 +748,8 @@ function clearMapGrid(message='Map structure changed; inspect again.'){
   lastMapPreviews.cell=null;$('map-review-cell-add').disabled=true;
   clearMapAtlas(message+' Reinspect declared bank counts.');
   clearRenderedMap();
+  $('map-grid-legend').replaceChildren();
+  $('map-grid-color-status').textContent='No raw cell colours inspected.';
   const root=$('map-grid');root.replaceChildren();
   const empty=document.createElement('div');empty.className='empty-state';
   empty.textContent=message;root.append(empty);
@@ -1928,10 +1930,14 @@ $('map-inspect').addEventListener('click',()=>safeRun(()=>{
     indexMapEventMarkers(inspectedEventMap.arrays,{width,height}):null;
   clearRenderedMap('Rendered preview disabled or awaiting inspection.');
   const grid=$('map-grid');grid.replaceChildren();
+  const rawGridOverlay=$('map-grid-raw-colors').checked?buildRawBlockmapGridOverlay(preview):null;
+  let rawGridIndex=0;
   const board=document.createElement('div');board.className='blockmap-grid';
   board.style.gridTemplateColumns='repeat('+preview.columns+', minmax(64px,1fr))';
   for(const row of preview.cells)for(const cell of row){
     const button=document.createElement('button');button.type='button';button.className='blockmap-cell';
+    const rawColour=rawGridOverlay?.cells[rawGridIndex];rawGridIndex++;
+    if(rawColour)button.style.borderLeft='5px solid rgb('+rawColour.rgb.join(',')+')';
     const warps=markerIndex?.[cell.x+','+cell.y]||[];
     const events=eventMarkerIndex?.[cell.x+','+cell.y]||[];
     button.textContent=cell.tileId+' / '+cell.collision+
@@ -1949,6 +1955,20 @@ $('map-inspect').addEventListener('click',()=>safeRun(()=>{
     board.append(button);
   }
   grid.append(board);
+  const gridLegend=$('map-grid-legend');gridLegend.replaceChildren();
+  if(rawGridOverlay){
+    for(const entry of rawGridOverlay.legend){
+      const item=document.createElement('span');item.className='map-overlay-legend-item';
+      const swatch=document.createElement('span');swatch.className='map-overlay-swatch';
+      swatch.style.backgroundColor='rgb('+entry.rgb.join(',')+')';
+      item.append(swatch,document.createTextNode(entry.value+' × '+entry.count));
+      gridLegend.append(item);
+    }
+    $('map-grid-color-status').textContent=rawGridOverlay.distinctValues+
+      ' distinct raw high-bit value(s) in this grid'+
+      (rawGridOverlay.legendTruncated?' (top 12 shown)':'')+
+      '. Coloured borders are raw byte categories, NOT passability.';
+  }else $('map-grid-color-status').textContent='Raw grid colour coding disabled.';
   if($('map-render-enabled').checked){
     try{
       requireVanillaMapFormat();
@@ -2019,6 +2039,7 @@ $('map-inspect').addEventListener('click',()=>safeRun(()=>{
 }));
 
 $('map-render-enabled').addEventListener('change',()=>{clearRenderedMap();if(model)$('map-inspect').click();});
+$('map-grid-raw-colors').addEventListener('change',()=>{if(model)$('map-inspect').click();});
 $('map-raw-overlay-mode').addEventListener('change',()=>{clearRenderedMap();if(model)$('map-inspect').click();});
 $('map-render-canvas').addEventListener('click',event=>safeRun(()=>{
  if(!activeRenderedMap||activeRenderedMap.rom!==model)

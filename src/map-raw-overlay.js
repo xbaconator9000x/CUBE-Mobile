@@ -41,3 +41,19 @@ export function buildVanillaRawMapOverlay(rendered,{mode='highBits',maxLegend=12
   readOnly:true,layoutAuthenticated:false,walkabilityVerified:false
  });
 }
+
+/**
+ * Reuse the exact same categorical colours for a raw blockmap grid, even
+ * when palette/tile graphics are missing or rendering is unavailable.
+ */
+export function buildRawBlockmapGridOverlay(preview,{maxLegend=12}={}){
+ if(!preview||!Array.isArray(preview.cells)||
+    !Number.isSafeInteger(preview.columns)||!Number.isSafeInteger(preview.rows))
+  throw new TypeError('Expected a bounded raw blockmap viewport');
+ const attributes=preview.cells.map(row=>{
+  if(!Array.isArray(row))throw new TypeError('Invalid raw blockmap row');
+  return row.map(cell=>({x:cell.x,y:cell.y,collision:cell.collision}));
+ });
+ return buildVanillaRawMapOverlay({columns:preview.columns,rows:preview.rows,attributes},
+  {mode:'highBits',maxLegend});
+}
