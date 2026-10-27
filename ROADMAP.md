@@ -2,7 +2,8 @@
 - [x] Audit all explicitly declared vanilla maps in a single capped, fail-closed pass, including aliases separated by arbitrary 64-map scan windows.
 - [x] Preserve exact event pointer-field provenance, count all references while capping displayed groups, and reject stale map pointers/layouts and oversized audits.
 - [x] Add synthetic regression coverage; no ROM writes, CUBE ownership authentication or strict parity credit. See [atlas-wide script aliases](docs/VANILLA_SCRIPT_ALIAS_ATLAS.md).
-- [ ] Add touch-friendly navigation and independently verify genuine CUBE ROM, emulator and Android acceptance.
+- [x] Add touch-friendly full-atlas scan, exact source/target navigation, stale-finding revalidation, and offline HTML with regression tests.
+- [ ] Independently verify genuine CUBE ROM, emulator and Android acceptance.
 
 # Roadmap
 
