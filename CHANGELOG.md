@@ -1,3 +1,9 @@
+## Unreleased — map visual comparison and raw attribute colours (27 October 2026)
+- Add read-only, byte-exact before/after metatile appearance comparison for proposed vanilla blockmap cell edits, with changed-pixel reporting.
+- Add categorical raw attribute colour overlays to rendered maps and an independent raw high-bit grid fallback with visible-cell legends.
+- Keep script/event markers visible, preserve ROM bytes, reject stale previews and unauthenticated family-specific fields.
+- Include offline/mobile integration and synthetic regression tests; no authenticated CUBE editing, emulator or hardware parity is claimed.
+
 ## Unreleased — vanilla blockset and raw tileset preview (27 October 2026)
 - Read vanilla primary/secondary tileset, palette, metatile and attribute pointers with family-specific layout, bounds and overlap guards.
 - Add touch-friendly preview of referenced 4bpp tile graphics; this does not yet assemble map metatiles or authenticate CUBE ROM layouts.
