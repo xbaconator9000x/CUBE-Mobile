@@ -16,7 +16,9 @@ test('LZ10 overlapping backreference remains byte exact',()=>{
  assert.deepEqual([...decodeLz10(accessor(bytes)).data],Array(8).fill(0x61));
 });
 test('scan accepts candidate crossing chunk boundary without snapshots',()=>{
- const r=new Uint8Array(256);r.set(sample,30);
+ const r=new Uint8Array(256);
+ const stream=Uint8Array.from([0x10,32,0,0,...Array.from({length:4},()=>[0,1,2,3,4,5,6,7,8]).flat()]);
+ r.set(stream,30);
  const found=scanLz10Graphics(accessor(r),{start:28,end:32,minBytes:8});
  assert.equal(found.length,1);assert.equal(found[0].offset,30);
 });
