@@ -17,6 +17,10 @@ Local and pinned-upstream TOML imports now hash **raw bytes before UTF-8 decodin
 
 The Blockmaps screen can now resolve a **manually supplied, independently verified vanilla RSE/FRLG map header or layout offset** into bounded blockmap dimensions and a ROM offset, then inspect the existing raw tile/collision cells. The decoder follows the upstream CUBHMA vanilla map formats and preserves source pointer provenance. It refuses declared custom/expansion metadata and never infers layout authenticity from a ROM header. This is **not** CUBE map-bank discovery, rendering, editing or warp/event interpretation. See [vanilla map layout checkpoint](docs/VANILLA_MAP_LAYOUT_CHECKPOINT.md).
 
+## Development checkpoint — explicit vanilla bank and warp inspection
+
+The Blockmaps screen now follows an **explicitly supplied vanilla bank pointer table** and selected bank/map indices, using separately supplied counts, into a bounded map header/layout. A read-only warp inspector displays event counts and raw warp coordinates/destination IDs with tap-to-hex navigation. The current staged ROM bytes are read without modifying the source. This is not authenticated CUBE map-bank discovery, event editing or walkability rendering. See [vanilla bank/warp checkpoint](docs/VANILLA_BANK_WARP_CHECKPOINT.md).
+
 ## Current working code
 
 - **Exact ROM comparison (unreleased):** after computing the local staged-ROM SHA-256, optionally paste a published expected SHA-256 to compare exact bytes. A matching user-provided digest does **not** authenticate its provenance, CUBE layout or TOML. The bundled curated-profile registry is intentionally **empty** until independently verified CUBE ROM and matching metadata digests exist; no semantic writes are unlocked. See [ROM fingerprint registry requirements](docs/ROM_FINGERPRINT_REGISTRY.md).
