@@ -105,6 +105,12 @@
 - [ ] Authenticate CUBE map-bank layouts, discover real metadata-derived counts, resolve warp targets, inspect other events and render actual tiles.
 - [ ] No safe semantic map/collision/warp writes or Android device acceptance until version, ownership and roundtrip gates pass.
 
+## Watchdog checkpoint — vanilla map connections (27 October 2026)
+- [x] Inspect bounded vanilla map connection headers and 12-byte records, preserving signed displacement and raw target IDs.
+- [x] Add mobile and offline connection list with tap-to-hex navigation and staged ROM support.
+- [x] Test bounds, overlaps, empty/null arrays, signed values and ROM immutability.
+- [ ] Authenticate target maps, connection directions and CUBE-specific structures; render actual maps and implement safe writes only after acceptance gates.
+
 ## Milestone 1 — semantic read-only CUBHMA engine
 - [ ] Parse HMA metadata and format DSL, beyond named-anchor fields.
 - [ ] Recognise ROM game/version and CUBE-specific metadata without false positives.
