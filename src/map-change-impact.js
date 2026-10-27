@@ -77,7 +77,7 @@ export function auditVanillaChangeImpact(source,atlas,previews,{
    claims.push(claim('events-group',events.eventsOffset,20,null));
    for(const [kind,size] of Object.entries(EVENT_SIZES))
     if(events.counts[kind]>0)
-     claims.push(claim(kind,events.offsets[kind],events.counts[kind]*size,ref,size));
+     claims.push(claim(kind==='warps'?'warp':kind,events.offsets[kind],events.counts[kind]*size,ref,size));
   }
  }
  const results=[];
