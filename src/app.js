@@ -36,6 +36,7 @@ import {compareVanillaBlockmapVisualChange,compareVanillaBlockmapVisualChangeSet
 import {buildVanillaRawMapOverlay,buildRawBlockmapGridOverlay} from './map-raw-overlay.js';
 import {auditVanillaAtlasRawCells} from './map-cell-census.js';
 import {auditVanillaAtlasWarpGraph} from './map-warp-graph.js';
+import {inspectVanillaAtlasRawRoute} from './map-route-explorer.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
@@ -1002,6 +1003,11 @@ function clearMapAtlas(message='Declared atlas invalidated; inspect again.') {
  $('map-atlas-alias-audit').disabled=true;
  $('map-atlas-raw-census').disabled=true;
  $('map-atlas-graph').disabled=true;
+ $('map-atlas-route').disabled=true;
+ $('map-atlas-route-target').disabled=true;
+ $('map-atlas-route-target').replaceChildren(new Option('Inspect an atlas first',''));
+ $('map-atlas-route-list').replaceChildren();
+ $('map-atlas-route-status').textContent='No raw map route inspected.';
  $('map-atlas-graph-list').replaceChildren();
  $('map-atlas-graph-status').textContent='No declared raw map network reviewed.';
  $('map-atlas-raw-census-list').replaceChildren();
@@ -1134,6 +1140,10 @@ $('map-atlas-inspect').addEventListener('click',()=>safeRun(()=>{
  $('map-atlas-alias-audit').disabled=false;
  $('map-atlas-raw-census').disabled=false;
  $('map-atlas-graph').disabled=false;
+ $('map-atlas-route').disabled=false;
+ const routeTarget=$('map-atlas-route-target');
+ routeTarget.replaceChildren(...Array.from(select.options,o=>new Option(o.textContent,o.value)));
+ routeTarget.disabled=false;
  $('map-event-ownership-audit').disabled=false;
  $('map-script-alias-audit').disabled=false;
  atlasScriptAliasStart=0;
@@ -1544,6 +1554,85 @@ $('map-atlas-graph').addEventListener('click',()=>safeRun(()=>{
    setPageForOffset(match.offset);gotoTab('hex');
   }));
   root.append(line);
+ }
+}));
+
+$('map-atlas-route').addEventListener('click',()=>safeRun(()=>{
+ requireVanillaMapFormat();
+ if(!inspectedMapAtlas||inspectedMapAtlas.rom!==model)
+  throw Error('Inspect a declared vanilla atlas before raw route inspection');
+ const atlas=inspectedMapAtlas.atlas;
+ function inputsUnchanged(){
+  const counts=parseVanillaBankMapCounts($('map-atlas-counts').value);
+  return inspectedMapAtlas?.rom===model&&
+   parseOffset($('map-bank-offset').value)===atlas.address&&
+   $('map-layout-family').value===atlas.family&&
+   counts.length===atlas.bankCount&&
+   counts.every((n,i)=>n===atlas.bankMapCounts[i]);
+ }
+ if(!inputsUnchanged())throw Error('Atlas inputs changed; reinspect first');
+ const sourceIndex=Number($('map-atlas-select').value);
+ const targetIndex=Number($('map-atlas-route-target').value);
+ if(!Number.isSafeInteger(sourceIndex)||!Number.isSafeInteger(targetIndex)||
+    sourceIndex<0||targetIndex<0||
+    sourceIndex>=atlas.maps.length||targetIndex>=atlas.maps.length)
+  throw Error('Select a declared origin and destination');
+ const origin=atlas.maps[sourceIndex],target=atlas.maps[targetIndex];
+ const opts={originBank:origin.bankIndex,originMap:origin.mapIndex,
+  targetBank:target.bankIndex,targetMap:target.mapIndex,
+  maxMaps:128,maxLinks:8192,maxHops:128};
+ const result=inspectVanillaAtlasRawRoute(model,atlas,opts);
+ const root=$('map-atlas-route-list');root.replaceChildren();
+ $('map-atlas-route-status').textContent=
+  'Raw '+origin.bankIndex+'/'+origin.mapIndex+' → '+
+  target.bankIndex+'/'+target.mapIndex+': '+
+  (result.status==='raw-reachable'?result.hops+' link(s) in the shortest raw path':
+   'no directed path through structurally resolved raw links')+
+  '. '+result.eligibleLinks+' structurally resolved of '+
+  result.linksInspected+' raw links. NOT verified gameplay travel or CUBE compatibility.';
+ function freshRoute(){
+  requireVanillaMapFormat();
+  if(!inputsUnchanged()||
+     Number($('map-atlas-select').value)!==sourceIndex||
+     Number($('map-atlas-route-target').value)!==targetIndex)
+   throw Error('Route selection or atlas changed; rescan first');
+  const fresh=inspectVanillaAtlasRawRoute(model,atlas,opts);
+  if(fresh.status!==result.status||
+     JSON.stringify(fresh.steps)!==JSON.stringify(result.steps))
+   throw Error('Raw route changed; rescan before navigation');
+  return fresh;
+ }
+ for(const [i,step] of result.steps.entries()){
+  const sourceButton=document.createElement('button');
+  sourceButton.type='button';sourceButton.className='secondary-button';
+  sourceButton.style.display='block';sourceButton.style.margin='8px 0';
+  sourceButton.style.textAlign='left';
+  sourceButton.textContent='Step '+(i+1)+': '+step.source+' → '+
+   step.target+' via '+step.kind+' '+step.index+
+   ' · inspect ROM 0x'+hex(step.sourceOffset);
+  sourceButton.addEventListener('click',()=>safeRun(()=>{
+   freshRoute();setPageForOffset(step.sourceOffset);gotoTab('hex');
+  }));
+  root.append(sourceButton);
+  const targetButton=document.createElement('button');
+  targetButton.type='button';targetButton.className='secondary-button';
+  targetButton.style.margin='0 0 8px 8px';
+  targetButton.textContent='Open declared destination '+step.target;
+  targetButton.addEventListener('click',()=>safeRun(()=>{
+   freshRoute();
+   const destination=atlas.maps.find(m=>
+    m.bankIndex+','+m.mapIndex===step.target);
+   if(!destination)throw Error('Declared destination changed');
+   openDeclaredAtlasMap(destination);
+  }));
+  root.append(targetButton);
+ }
+ if(!result.steps.length){
+  const empty=document.createElement('div');empty.className='empty-state';
+  empty.textContent=result.status==='raw-reachable'?
+   'Origin and destination are the same declared map.':
+   'No structurally resolved directed raw route found in this declared atlas.';
+  root.append(empty);
  }
 }));
 
