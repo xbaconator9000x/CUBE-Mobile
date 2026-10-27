@@ -1,5 +1,10 @@
 # Roadmap
 
+## Checkpoint — read-only vanilla event coordinate review (27 October 2026)
+- [x] Audit warp/object/trigger/signpost coordinates against selected declared vanilla blockmap dimensions; flag out-of-map and shared-cell records without assuming errors.
+- [x] Preserve exact source record/cell offsets and raw tile/high-bit values, bounded findings, staged reads, stale-layout rejection, mobile and offline UI, synthetic regression tests.
+- [ ] Authenticate CUBE-specific event layouts, interpret collision behavior only with engine evidence, and prove semantic edit/save/emulator/Android roundtrips before claiming parity.
+
 ## Checkpoint — read-only vanilla event script pointer fields (27 October 2026)
 - [x] Classify object and trigger script pointer fields, preserve exact source offsets and allow touch-to-hex navigation for conventional in-ROM targets.
 - [x] Reject malformed event structures, retain null/non-ROM/out-of-ROM distinctions and test staged ROM immutability.
