@@ -18,3 +18,7 @@ This is a read-only structural alias hint, **not** proof of shared allocation,
 valid message/movement data, CUBE script grammar, or safe editing. It follows
 no control-flow branches, does not mutate ROM bytes and cannot count toward
 strict parity without authentic ROM/emulator/Android acceptance.
+
+Targets with different decoded pointer roles are labelled **mixed operand
+roles: review**. They may be intentional. The local smoke JSON exposes
+only the aggregate `mixedRoleTargets` count, not ROM pointer addresses.
