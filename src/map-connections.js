@@ -33,11 +33,11 @@ export function inspectVanillaMapConnections(source,{address,family}={}){
       arrayOffset:null,connections:Object.freeze([]),readOnly:true,layoutAuthenticated:false});
   const connectionsOffset=header.connectionsOffset;
   connectionSpan(rom,connectionsOffset,8,'Connection header');
-  const count=connectionU32(rom,connectionsOffset);
-  if(count>1024)throw new RangeError('Connection count exceeds read-only inspection cap');
   if(connectionIntersects(connectionsOffset,8,address,28)||
      connectionIntersects(connectionsOffset,8,header.layoutOffset,family==='FRLG'?28:24))
     throw new RangeError('Connection header overlaps map header/layout');
+  const count=connectionU32(rom,connectionsOffset);
+  if(count>1024)throw new RangeError('Connection count exceeds read-only inspection cap');
   const pointer=connectionU32(rom,connectionsOffset+4);
   let arrayOffset=null;
   const connections=[];
