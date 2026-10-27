@@ -12,7 +12,8 @@ Create a private, local JSON manifest (do not commit it):
   "expectedSha256": "64 lowercase hex characters from a separately checked ROM",
   "family": "RSE",
   "bankTableOffset": 256,
-  "bankMapCounts": [2, 1]
+  "bankMapCounts": [2, 1],
+  "scanAllScriptAliases": true
 }
 ```
 
@@ -26,6 +27,8 @@ Run:
 ```sh
 npm run smoke:local -- --rom /local/path/to/your.gba --manifest /local/path/to/your.json
 ```
+
+Set `scanAllScriptAliases` to `true` to additionally scan all declared vanilla maps for shared object/trigger script targets. The report includes aggregate counts only, never script target offsets, pointer-source bytes or local paths. The opt-in scan fails closed if the 32768-pointer budget is exceeded; omit the flag to keep the existing smaller smoke test.
 
 On success, the command prints JSON with the matched SHA-256, declared
 map counts, up to 16 event-map summaries, shared pointer alias counts,

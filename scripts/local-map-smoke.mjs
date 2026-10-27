@@ -11,6 +11,7 @@ import {inspectVanillaMapAtlas,auditVanillaAtlasPointerAliases}
  from '../src/map-atlas.js';
 import {inspectVanillaMapEvents} from '../src/map-events.js';
 import {auditVanillaMapEventScripts} from '../src/vanilla-map-script-audit.js';
+import {auditVanillaAtlasWideScriptAliases} from '../src/vanilla-script-alias-atlas.js';
 
 function fail(message){throw new RangeError(message);}
 function args(argv){
@@ -30,7 +31,8 @@ function manifestFromText(text){
     !Array.isArray(m.bankMapCounts)||m.bankMapCounts.length<1||
     m.bankMapCounts.length>256||
     m.bankMapCounts.some(n=>!Number.isSafeInteger(n)||n<1||n>1024)||
-    m.bankMapCounts.reduce((a,n)=>a+n,0)>4096)
+    m.bankMapCounts.reduce((a,n)=>a+n,0)>4096||
+    m.scanAllScriptAliases!==undefined&&typeof m.scanAllScriptAliases!=='boolean')
   fail('Manifest requires schema, SHA-256, family, aligned bank offset and bounded explicit counts');
  return m;
 }
@@ -72,6 +74,10 @@ function main(){
    scripts:events.counts.scripts,signposts:events.counts.signposts
   });
  }
+ const scriptAliasAtlas=manifest.scanAllScriptAliases===true?
+  auditVanillaAtlasWideScriptAliases(rom,atlas,{
+   maxMaps:4096,maxPointerFields:32768,maxGroups:16,maxReferences:8
+  }):null;
  const report={
   schema:'cube-mobile-local-map-smoke-report/1',
   romSha256:actualSha256,romSize:size,family:manifest.family,
@@ -80,6 +86,15 @@ function main(){
   eventMapsInspected:eventSummaries.length,eventSummaries,
   aliasGroups:aliases.totalGroups,aliasCounts:aliases.counts,
   aliasesTruncated:aliases.truncated,
+  scriptAliasAtlas:scriptAliasAtlas?{
+   mapsInspected:scriptAliasAtlas.mapsInspected,
+   pointerFields:scriptAliasAtlas.pointerFields,
+   inRomPointers:scriptAliasAtlas.inRomPointers,
+   distinctTargets:scriptAliasAtlas.distinctTargets,
+   sharedTargets:scriptAliasAtlas.totalGroups,
+   groupsTruncated:scriptAliasAtlas.truncated,
+   layoutAuthenticated:false,ownershipAuthenticated:false
+  }:null,
   readOnly:true,romModified:false,romExported:false,
   hashMatchedUserDeclaration:true,
   layoutAuthenticated:false,cubeCompatibilityVerified:false,

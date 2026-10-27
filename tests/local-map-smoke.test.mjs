@@ -93,3 +93,36 @@ test('local smoke includes bounded script-prefix status without exporting script
  assert.equal(report.cubeCompatibilityVerified,false);
  assert.doesNotMatch(result.stdout,/preparemsg|scriptPointer\\":|fixture.gba/);
 });
+
+
+test('opt-in full-atlas script alias smoke counts distant map references without exporting pointers',()=>{
+ const rom=fixture();
+ d(rom,0x144,ptr(0x240));
+ d(rom,0x240,ptr(0x340));
+ for(const o of [8,12])d(rom,0x240+o,0);
+ d(rom,0x340,2);d(rom,0x344,2);
+ for(const [o,target] of [[8,0x500],[12,0x400],[16,0x600],[20,0x620]])
+  d(rom,0x340+o,ptr(target));
+ for(const [header,event,object] of [[0x200,0x700,0x740],[0x240,0x720,0x760]]){
+  d(rom,header+4,ptr(event));
+  rom[event]=1;rom[event+1]=0;rom[event+2]=0;rom[event+3]=0;
+  d(rom,event+4,ptr(object));d(rom,event+8,0);
+  d(rom,event+12,0);d(rom,event+16,0);
+  d(rom,object+16,ptr(0x900));
+ }
+ rom[0x900]=0x02;
+ const result=run(rom,{bankMapCounts:[2],scanAllScriptAliases:true});
+ assert.equal(result.status,0,result.stderr);
+ const report=JSON.parse(result.stdout);
+ assert.equal(report.scriptAliasAtlas.mapsInspected,2);
+ assert.equal(report.scriptAliasAtlas.pointerFields,2);
+ assert.equal(report.scriptAliasAtlas.sharedTargets,1);
+ assert.equal(report.scriptAliasAtlas.ownershipAuthenticated,false);
+ assert.equal(report.independentParityEvidence,false);
+ assert.doesNotMatch(result.stdout,/pointerSourceOffset|targetOffset|fixture.gba/);
+});
+test('opt-in alias smoke rejects non-boolean flag without inspecting ROM',()=>{
+ const result=run(fixture(),{scanAllScriptAliases:'yes'});
+ assert.notEqual(result.status,0);
+ assert.equal(result.stdout,'');
+});
