@@ -190,10 +190,13 @@
       <p class="palette-note">Queue up to 64 previews from any selected vanilla maps. Check stale original bytes, overlapping ranges and proposed changes before any future authenticated editing. This cannot apply or export ROM changes.</p>
       <div class="input-row">
         <button type="button" id="map-review-run" class="subtle-button" disabled>Check queued changes</button>
+        <button type="button" id="map-review-impact" class="subtle-button" disabled>Audit shared map impact</button>
         <button type="button" id="map-review-clear" class="secondary-button" disabled>Clear review queue</button>
       </div>
       <output id="map-review-status" class="palette-note" aria-live="polite">No proposed changes queued.</output>
       <div id="map-review-list" class="anchor-list" aria-label="Immutable proposed byte change review"></div>
+      <output id="map-review-impact-status" class="palette-note" aria-live="polite">No structural impact audit run.</output>
+      <div id="map-review-impact-list" class="anchor-list" aria-label="Shared map ownership and structural impact warnings"></div>
     </div>
     <button type="button" id="map-script-pointer-inspect" class="subtle-button" disabled>Inspect raw object/trigger script pointer fields (read only)</button>
     <output id="map-script-pointer-status" class="palette-note" aria-live="polite">No raw script pointer fields inspected.</output>
