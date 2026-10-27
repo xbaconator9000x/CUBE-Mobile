@@ -1,5 +1,10 @@
 # Roadmap
 
+## Checkpoint — mobile vanilla script operand role review (28 October 2026)
+- [x] Display bounded pointer-role hints from selected vanilla object/trigger scripts, with exact source and in-ROM target navigation.
+- [x] Revalidate selected event pointer and decoded operand bytes before navigation; include standalone offline build and regression tests.
+- [ ] No CUBE script ownership, authentic ROM/emulator/Android acceptance or semantic writing permission. See [mobile operand review](docs/MOBILE_SCRIPT_OPERAND_POINTERS.md).
+
 ## Checkpoint — conservative vanilla trainerbattle subtype parsing (28 October 2026)
 - [x] Decode upstream-defined trainerbattle subtypes 00–08 with exact operand widths, byte budgets and bounded raw pointer inspection.
 - [x] Stop on subtype 09+ or incomplete commands without guessing game-specific extensions; cover FRLG/RSE and pointer role summaries with synthetic tests.

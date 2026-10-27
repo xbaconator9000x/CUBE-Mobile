@@ -16,6 +16,7 @@ import {auditVanillaAtlasEventOwnership} from './map-event-ownership.js';
 import {inspectVanillaMapEvents,inspectVanillaEventScriptPointers,previewVanillaEventScriptBytes} from './map-events.js';
 import {inspectVanillaScriptCommandPrefix} from './vanilla-script-prefix.js';
 import {auditVanillaScriptBranchTargets} from './vanilla-script-branches.js';
+import {auditVanillaScriptOperandPointers} from './vanilla-script-operand-pointers.js';
 import {inspectVanillaMapBlocksets} from './map-blocksets.js';
 import {panMapViewport,indexMapWarpMarkers,indexMapEventMarkers,inspectRenderedMapPixel,projectRenderedMapMarkers} from './map-viewport.js';
 import {renderVanillaMapViewport} from './map-render.js';
@@ -2019,6 +2020,70 @@ $('map-script-pointer-inspect').addEventListener('click',()=>safeRun(()=>{
       '. Targets outside decoded prefix are unresolved, not invalid. No CUBE script ownership, control-flow following or write permission.';
    }));
    root.append(branches);
+   const operandButton=document.createElement('button');
+   operandButton.type='button';operandButton.className='secondary-button';
+   operandButton.style.margin='0 0 8px 8px';
+   operandButton.textContent='Review vanilla script operand pointer roles';
+   operandButton.addEventListener('click',()=>safeRun(()=>{
+    requireVanillaMapFormat();
+    if(model!==original||$('map-layout-source').value!=='header'||
+       parseOffset($('map-layout-offset').value)!==address||
+       $('map-layout-family').value!==family)
+      throw Error('Map/ROM selection changed; reinspect script pointers');
+    const pointer=previewVanillaEventScriptBytes(model,{
+      address,family,kind:record.kind,index:record.index,byteCount:1
+    });
+    if(pointer.targetOffset!==record.targetOffset)
+      throw Error('Script pointer changed; reinspect');
+    const auditOptions={address:pointer.targetOffset,family,maxBytes:128,
+      maxCommands:32,maxFindings:32};
+    const audit=auditVanillaScriptOperandPointers(model,auditOptions);
+    const list=$('map-script-preview-list');list.replaceChildren();
+    for(const finding of audit.findings){
+      const line=document.createElement('div');
+      line.className='palette-note';
+      line.textContent=finding.commandName+' · '+finding.role+
+        ' · '+finding.status+' · pointer ROM 0x'+hex(finding.pointerSourceOffset)+
+        (finding.targetOffset===null?'':' → ROM 0x'+hex(finding.targetOffset));
+      function navigateOperand(offset,label){
+        const button=document.createElement('button');button.type='button';
+        button.className='secondary-button';button.textContent=label;
+        button.addEventListener('click',()=>safeRun(()=>{
+          if(model!==original||$('map-layout-source').value!=='header'||
+             parseOffset($('map-layout-offset').value)!==address||
+             $('map-layout-family').value!==family)
+            throw Error('Map/ROM selection changed; reinspect script pointers');
+          const freshPointer=previewVanillaEventScriptBytes(model,{
+            address,family,kind:record.kind,index:record.index,byteCount:1
+          });
+          if(freshPointer.targetOffset!==record.targetOffset)
+            throw Error('Script pointer changed; reinspect');
+          const fresh=auditVanillaScriptOperandPointers(model,auditOptions);
+          if(!fresh.findings.some(item=>
+            item.pointerSourceOffset===finding.pointerSourceOffset&&
+            item.rawPointer===finding.rawPointer&&
+            item.targetOffset===finding.targetOffset&&
+            item.role===finding.role&&item.status===finding.status))
+            throw Error('Script operand bytes changed; reinspect');
+          setPageForOffset(offset);gotoTab('hex');
+        }));
+        line.append(button);
+      }
+      navigateOperand(finding.pointerSourceOffset,'Inspect pointer bytes');
+      if(finding.targetOffset!==null)
+        navigateOperand(finding.targetOffset,'Inspect raw target');
+      list.append(line);
+    }
+    $('map-script-preview-status').textContent=
+      'Vanilla operand hints: '+audit.total+' pointer fields ('+
+      audit.findings.length+' shown); '+audit.statuses.inRom+
+      ' conventional in-ROM, '+audit.statuses.outsideRom+
+      ' outside ROM, '+audit.statuses.nonRom+' non-ROM, '+
+      audit.statuses.null+' null · stopped: '+audit.stopReason+
+      (audit.truncated?' · findings truncated':'')+
+      '. Roles are unverified command hints, not target formats or script ownership. No CUBE grammar, traversal or writes.';
+   }));
+   root.append(operandButton);
   }
  }
  if(!result.records.length){
