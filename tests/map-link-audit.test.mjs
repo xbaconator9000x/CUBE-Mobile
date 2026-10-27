@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {inspectVanillaMapAtlas} from '../src/map-atlas.js';
-import {auditVanillaMapLinks,auditVanillaAtlasLinkBatch,auditVanillaMapEventCoordinates} from '../src/map-link-audit.js';
+import {auditVanillaMapLinks,auditVanillaAtlasLinkBatch,auditVanillaMapEventCoordinates,auditVanillaAtlasEventCoordinateBatch} from '../src/map-link-audit.js';
 
 const ptr=n=>0x08000000+n;
 function u32(rom,at,value){for(let i=0;i<4;i++)rom[at+i]=(value>>>(8*i))&255;}
@@ -159,4 +159,38 @@ test('coordinate audit rejects stale layouts, invalid caps and malformed staged 
   bankIndex:0,mapIndex:0
  }),/layout changed/);
  assert.deepEqual(before.slice(0,0x300),rom.slice(0,0x300));
+});
+
+test('atlas coordinate batches aggregate all records while bounding retained findings',()=>{
+ const rom=fixture(),before=rom.slice(),catalog=atlas(rom);
+ const first=auditVanillaAtlasEventCoordinateBatch(rom,catalog,{
+  start:0,limit:1,maxFindings:2
+ });
+ assert.equal(first.scannedMaps,1);
+ assert.equal(first.nextStart,1);
+ assert.deepEqual(first.counts,{total:4,withinMap:4,outsideMap:0,sharedCell:4});
+ assert.equal(first.totalFindings,4);
+ assert.equal(first.findings.length,2);
+ assert.equal(first.truncated,true);
+ assert.deepEqual(first.findings.map(x=>[x.bankIndex,x.mapIndex,x.offset]),
+  [[0,0,0xa00],[0,0,0xa08]]);
+ const second=auditVanillaAtlasEventCoordinateBatch(rom,catalog,{start:1,limit:16});
+ assert.equal(second.nextStart,null);
+ assert.deepEqual(second.counts,{total:1,withinMap:1,outsideMap:0,sharedCell:0});
+ assert.equal(second.totalFindings,0);
+ assert.ok(Object.isFrozen(first.findings)&&Object.isFrozen(first.findings[0]));
+ assert.deepEqual(rom,before);
+});
+test('atlas coordinate batches reject invalid ranges, stale layouts and staged changes',()=>{
+ const rom=fixture(),catalog=atlas(rom),before=rom.slice();
+ for(const options of [{start:-1},{start:2},{limit:0},{limit:33},
+  {maxFindings:0},{maxFindings:257}])
+  assert.throws(()=>auditVanillaAtlasEventCoordinateBatch(rom,catalog,options));
+ const staged={length:rom.length,read:i=>i===0xa00?9:rom[i]};
+ const result=auditVanillaAtlasEventCoordinateBatch(staged,catalog,{limit:2});
+ assert.deepEqual(result.counts,{total:5,withinMap:4,outsideMap:1,sharedCell:3});
+ assert.equal(result.totalFindings,4);
+ u32(rom,0x340,3);
+ assert.throws(()=>auditVanillaAtlasEventCoordinateBatch(rom,catalog,{limit:2}),/layout changed/);
+ assert.deepEqual(rom.slice(0,0x340),before.slice(0,0x340));
 });
