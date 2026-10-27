@@ -23,6 +23,7 @@ import {previewVanillaWarpRecordChange} from './map-warp-edit-preview.js';
 import {previewVanillaEventCoordinateChange} from './map-event-edit-preview.js';
 import {reviewVanillaChangeSet,exportVanillaChangeReviewJson} from './map-change-review.js';
 import {auditVanillaChangeImpact} from './map-change-impact.js';
+import {auditVanillaQueuedChangeRoundtrip} from './map-change-roundtrip.js';
 import {compareVanillaBlockmapVisualChange,compareVanillaBlockmapVisualChangeSet} from './map-visual-diff.js';
 import {buildVanillaRawMapOverlay,buildRawBlockmapGridOverlay} from './map-raw-overlay.js';
 
@@ -788,9 +789,11 @@ function clearMapChangeReview(){
  for(const id of ['map-compare-before','map-compare-after'])$(id).hidden=true;
  $('map-compare-status').textContent='Review queue cleared; preview a cell again.';
  for(const id of ['map-review-cell-add','map-review-warp-add','map-review-event-add',
-  'map-review-run','map-review-clear','map-review-impact','map-review-export'])$(id).disabled=true;
+  'map-review-run','map-review-clear','map-review-impact','map-review-roundtrip','map-review-export'])$(id).disabled=true;
  $('map-review-list').replaceChildren();
  $('map-review-impact-list').replaceChildren();
+ $('map-review-roundtrip-list').replaceChildren();
+ $('map-review-roundtrip-status').textContent='Queue or atlas changed; rerun typed roundtrip.';
  $('map-review-impact-status').textContent='No structural impact audit run.';
  $('map-review-status').textContent='No proposed changes queued. No ROM writes.';
 }
@@ -803,10 +806,13 @@ function removeQueuedMapPreview(index){
  if(!mapReviewQueue.length){clearMapChangeReview();return;}
  $('map-review-list').replaceChildren();
  $('map-review-impact-list').replaceChildren();
+ $('map-review-roundtrip-list').replaceChildren();
+ $('map-review-roundtrip-status').textContent='Queue or atlas changed; rerun typed roundtrip.';
  $('map-review-impact-status').textContent='Queue changed; rerun impact audit.';
  $('map-review-status').textContent=mapReviewQueue.length+
   ' proposed record(s) remain. Rerun review before relying on these previews; no writes.';
  $('map-review-impact').disabled=!inspectedMapAtlas||inspectedMapAtlas.rom!==model;
+ $('map-review-roundtrip').disabled=$('map-review-impact').disabled;
 }
 function queueMapChangePreview(kind){
  ensureModel();
@@ -821,7 +827,10 @@ function queueMapChangePreview(kind){
  $('map-review-run').disabled=false;$('map-review-clear').disabled=false;
  $('map-review-export').disabled=false;
  $('map-review-impact').disabled=!inspectedMapAtlas||inspectedMapAtlas.rom!==model;
+ $('map-review-roundtrip').disabled=$('map-review-impact').disabled;
  $('map-review-impact-list').replaceChildren();
+ $('map-review-roundtrip-list').replaceChildren();
+ $('map-review-roundtrip-status').textContent='Queue or atlas changed; rerun typed roundtrip.';
  $('map-review-impact-status').textContent='Queue changed; rerun impact audit.';
  $('map-review-list').replaceChildren();
  $('map-review-status').textContent=next.length+
@@ -915,6 +924,45 @@ $('map-review-impact').addEventListener('click',()=>safeRun(()=>{
   root.append(item);
  }
 }));
+$('map-review-roundtrip').addEventListener('click',()=>safeRun(()=>{
+ requireVanillaMapFormat();
+ if(!mapReviewQueue.length||mapReviewRom!==model||
+    !inspectedMapAtlas||inspectedMapAtlas.rom!==model)
+  throw Error('Queue changes and inspect a vanilla atlas for this ROM first');
+ const atlas=inspectedMapAtlas.atlas;
+ const counts=parseVanillaBankMapCounts($('map-atlas-counts').value);
+ if(parseOffset($('map-bank-offset').value)!==atlas.address||
+    $('map-layout-family').value!==atlas.family||
+    counts.length!==atlas.bankCount||
+    counts.some((n,i)=>n!==atlas.bankMapCounts[i]))
+  throw Error('Atlas inputs changed; inspect again before roundtrip audit');
+ const result=auditVanillaQueuedChangeRoundtrip(model,atlas,mapReviewQueue,{
+  maxChanges:64,maxBytes:2048,maxOwners:32});
+ const root=$('map-review-roundtrip-list');root.replaceChildren();
+ $('map-review-roundtrip-status').textContent=result.records+' proposed record(s), '+
+  result.changedFields+' decoded field change(s), '+result.checkedOwners+
+  ' declared map owner(s) checked. Typed overlay roundtrip passed; '+
+  'NOT a ROM save/reopen, CUBE authentication or write permission.';
+ for(const entry of result.entries){
+  const item=document.createElement('button');item.type='button';
+  item.className='secondary-button';item.style.display='block';
+  item.style.margin='8px 0';item.style.textAlign='left';
+  const fields=entry.fields.map(f=>f.field+': '+f.before+' → '+f.after).join(', ');
+  const owners=entry.owners.map(o=>'bank '+o.bankIndex+'/map '+o.mapIndex+
+   (o.coordinatesInMap?'':' (coordinates outside map)')+
+   (o.warpArrivalStatus?' (warp: '+o.warpArrivalStatus+')':'')).join('; ');
+  item.textContent=entry.kind+' at 0x'+hex(entry.offset)+' · '+fields+
+   ' · '+owners+' · inspect original hex';
+  item.addEventListener('click',()=>safeRun(()=>{
+   if(mapReviewRom!==model||!inspectedMapAtlas||inspectedMapAtlas.rom!==model)
+    throw Error('Roundtrip review belongs to a different ROM or atlas');
+   auditVanillaQueuedChangeRoundtrip(model,inspectedMapAtlas.atlas,mapReviewQueue,{
+    maxChanges:64,maxBytes:2048,maxOwners:32});
+   setPageForOffset(entry.offset);gotoTab('hex');
+  }));
+  root.append(item);
+ }
+}));
 $('map-review-clear').addEventListener('click',()=>clearMapChangeReview());
 
 function clearBlocksetInspection(message='Select a vanilla map header to inspect tileset pointers.'){
@@ -933,7 +981,12 @@ function requireVanillaMapFormat(){
 function clearMapAtlas(message='Declared atlas invalidated; inspect again.') {
  inspectedMapAtlas=null;atlasBatchStart=0;atlasCoordinateBatchStart=0;atlasIncomingStart=0;atlasIncomingTarget=null;
  $('map-review-impact').disabled=true;
+ $('map-review-roundtrip').disabled=true;
+ $('map-review-roundtrip-list').replaceChildren();
+ $('map-review-roundtrip-status').textContent='Declared atlas invalidated; inspect again.';
  $('map-review-impact-list').replaceChildren();
+ $('map-review-roundtrip-list').replaceChildren();
+ $('map-review-roundtrip-status').textContent='Queue or atlas changed; rerun typed roundtrip.';
  $('map-review-impact-status').textContent='Declared atlas invalidated; inspect again.';
  $('map-atlas-batch-audit').disabled=true;
  $('map-atlas-alias-audit').disabled=true;
@@ -1036,6 +1089,7 @@ $('map-atlas-inspect').addEventListener('click',()=>safeRun(()=>{
  });
  inspectedMapAtlas={atlas,rom:model};
  $('map-review-impact').disabled=!mapReviewQueue.length||mapReviewRom!==model;
+ $('map-review-roundtrip').disabled=$('map-review-impact').disabled;
  const select=$('map-atlas-select'),options=document.createDocumentFragment();
  for(let i=0;i<atlas.maps.length;i++){
   const entry=atlas.maps[i];
