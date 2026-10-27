@@ -71,3 +71,19 @@ test('inspection never modifies ROM and does not expose writable row arrays',()=
 test('wrong ROM input fails closed',()=>{
  assert.throws(()=>inspectBlockMap([0,1,2],{address:0,width:1,height:1}),TypeError);
 });
+
+test('ROM accessor reads staged bytes without full-ROM snapshot',()=>{
+ const rom=fixture(),edits=new Map([[8,0xAA],[9,0xFC]]);
+ let reads=0;
+ const accessor={length:rom.length,read(offset){reads++;return edits.has(offset)?edits.get(offset):rom[offset];}};
+ const result=inspectBlockMap(accessor,{address:8,width:3,height:2,viewportWidth:1,viewportHeight:1});
+ assert.equal(result.cells[0][0].raw,0xFCAA);
+ assert.equal(result.cells[0][0].tileId,0xAA);
+ assert.equal(result.cells[0][0].collision,63);
+ assert.equal(reads,2);
+ assert.equal(rom[8],0);
+});
+test('invalid accessor bytes fail closed',()=>{
+ const accessor={length:64,read(){return 256;}};
+ assert.throws(()=>inspectBlockMap(accessor,{address:8,width:1,height:1}),/invalid byte/);
+});

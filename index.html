@@ -12,6 +12,7 @@
     <button class="tab active" data-tab="home"><span class="nav-icon">▦</span><span>Workspace</span></button>
     <button class="tab" data-tab="hex"><span class="nav-icon">⌗</span><span>Hex editor</span></button>
     <button class="tab" data-tab="anchors"><span class="nav-icon">⌕</span><span>Named data</span></button>
+    <button class="tab" data-tab="maps"><span class="nav-icon">▤</span><span>Blockmaps</span></button>
     <button class="tab" data-tab="graphics"><span class="nav-icon">◈</span><span>Graphics</span></button>
     <button class="tab" data-tab="patches"><span class="nav-icon">⇄</span><span>Patches</span></button>
     <button class="tab" data-tab="changes"><span class="nav-icon">≡</span><span>Changes</span><span class="nav-counter" id="changes-tab-count" hidden>0</span></button>
@@ -39,6 +40,7 @@
   <div class="dashboard-grid">
     <button class="feature-card" data-go="hex"><div class="feature-icon violet">⌗</div><strong>Hex editor</strong><p>Browse bytes, search patterns, use pointers and stage edits.</p><span>Open tool ↗</span></button>
     <button class="feature-card" data-go="anchors"><div class="feature-icon green">⌕</div><strong>Named ROM data</strong><p>Import CUBHMA TOML metadata and inspect verified-offset anchors, pointers and formats.</p><span>Open tool ↗</span></button>
+    <button class="feature-card" data-go="maps"><div class="feature-icon blue">▤</div><strong>Blockmap inspector</strong><p>Inspect raw map tiles and collision/elevation bits at a supplied ROM offset. Read-only.</p><span>Open tool ↗</span></button>
     <button class="feature-card" data-go="graphics"><div class="feature-icon blue">◈</div><strong>Graphics inspector</strong><p>Find LZ77-compressed tile candidates and inspect palettes.</p><span>Open tool ↗</span></button>
     <button class="feature-card" data-go="patches"><div class="feature-icon green">⇄</div><strong>Patch tools</strong><p>Apply validated BPS/IPS patches or export an IPS diff.</p><span>Open tool ↗</span></button>
     <button class="feature-card" data-go="changes"><div class="feature-icon amber">≡</div><strong>Change history</strong><p>Review every staged edit and save a safe copy.</p><span>Open tool ↗</span></button>
@@ -57,6 +59,22 @@
  <div class="toolbar-card"><div class="input-wrap"><label for="anchor-find">Search named anchors</label><input id="anchor-find" placeholder="e.g. pokemon.stats, maps, trainers, sound…" spellcheck="false"></div><div class="input-wrap"><label for="anchor-group">Category</label><select id="anchor-group"><option value="all">All categories</option></select></div></div>
  <div class="semantic-grid"><div class="semantic-card"><div class="card-caption"><b>ANCHOR DIRECTORY</b><span id="anchor-count">0 loaded</span></div><div id="anchor-list" class="anchor-list"><div class="empty-state">Load ROM metadata to browse named data.</div></div></div><div class="semantic-card"><div class="card-caption"><b>DATA INSPECTION</b><span>Never writes ROM data</span></div><div id="anchor-detail" class="anchor-detail"><div class="empty-state">Choose an anchor to inspect its address, format and bytes.</div></div><div class="input-row"><button id="anchor-to-hex" class="secondary-button" disabled>Open in hex</button><button id="anchor-follow-pointer" class="secondary-button" disabled>Follow pointer</button><button id="anchor-to-graphics" class="secondary-button" disabled>View LZ graphic</button></div></div></div>
  <div class="safety-strip"><span class="safety-icon">!</span><div><strong>Metadata ≠ verified ROM compatibility.</strong><p>HMA named anchors can describe tables, text, graphics and scripts, but reading their addresses does not establish that an expanded CUBE ROM uses those locations. Full writable format decoding, repointing and map/collision editing are not implemented here.</p></div></div>
+</section>
+<section class="view" id="view-maps">
+  <div class="tool-heading"><div><div class="eyebrow">RAW MAP CELLS · UNVERIFIED LAYOUT</div><h2>Blockmap inspector</h2><p>Read-only 10-bit tile IDs and 6-bit collision/elevation values. This does not infer walkability, discover map pointers, or edit maps.</p></div><span class="pill">Read only</span></div>
+  <div class="toolbar-card">
+    <div class="input-wrap"><label for="map-offset">Blockmap ROM offset (hex; GBA pointer accepted)</label><input id="map-offset" inputmode="text" placeholder="e.g. 1A2B3C" spellcheck="false"></div>
+    <div class="input-row">
+      <div class="input-wrap"><label for="map-width">Width (decimal)</label><input id="map-width" type="number" min="1" max="1024" value="16"></div>
+      <div class="input-wrap"><label for="map-height">Height (decimal)</label><input id="map-height" type="number" min="1" max="1024" value="16"></div>
+      <div class="input-wrap"><label for="map-x">Start X</label><input id="map-x" type="number" min="0" value="0"></div>
+      <div class="input-wrap"><label for="map-y">Start Y</label><input id="map-y" type="number" min="0" value="0"></div>
+    </div>
+    <button type="button" id="map-inspect" class="subtle-button" disabled>Inspect 12 × 10 cells</button>
+    <p class="palette-note">You must independently verify the map's blockmap offset and dimensions. Header identity alone cannot verify CUBE layouts. No bytes are changed. Collision values are raw metadata, not passability colours.</p>
+    <output id="map-status" class="palette-note" aria-live="polite">Open a ROM and enter a known blockmap offset.</output>
+  </div>
+  <div class="editor-card"><div id="map-grid" class="blockmap-scroller" aria-label="Read-only map block cells"><div class="empty-state">No blockmap inspected.</div></div></div>
 </section>
 <section class="view" id="view-graphics">
  <div class="tool-heading"><div><div class="eyebrow">GBA GRAPHICS EXPLORER</div><h2>Graphics explorer</h2><p>Search for LZ77-compressed tile data, or inspect a known raw offset. Read-only, with no guessed colours.</p></div><span class="pill">Inspect only</span></div>

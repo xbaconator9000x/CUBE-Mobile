@@ -1,8 +1,8 @@
 import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 const read=path=>readFileSync(new URL(path,import.meta.url),'utf8');
-const base=read('index.html'),styles=read('src/styles.css'),core=read('src/core.js'),app=read('src/app.js'),semantic=read('src/semantic.js'),textInspection=read('src/text-inspection.js'),pcsDefault=read('src/pcs-default.js'),pcsReference=read('src/pcs-reference.js'),romFingerprint=read('src/rom-fingerprint.js'),romCompatibility=read('src/rom-compatibility.js'),metadataFingerprint=read('src/metadata-fingerprint.js');
+const base=read('index.html'),styles=read('src/styles.css'),core=read('src/core.js'),app=read('src/app.js'),semantic=read('src/semantic.js'),textInspection=read('src/text-inspection.js'),pcsDefault=read('src/pcs-default.js'),pcsReference=read('src/pcs-reference.js'),romFingerprint=read('src/rom-fingerprint.js'),romCompatibility=read('src/rom-compatibility.js'),metadataFingerprint=read('src/metadata-fingerprint.js'),mapBlocks=read('src/map-blocks.js');
 const stripExports=core.replace(/\bexport (const|class|function)\b/g,'$1');
-const stripImports=app.replace(/^import \{.*?\} from '\.\/(?:core|semantic|text-inspection|pcs-default|pcs-reference|rom-fingerprint|rom-compatibility|metadata-fingerprint)\.js';\s*/gm,'');
+const stripImports=app.replace(/^import \{.*?\} from '\.\/(?:core|semantic|text-inspection|pcs-default|pcs-reference|rom-fingerprint|rom-compatibility|metadata-fingerprint|map-blocks)\.js';\s*/gm,'');
 const stripSemantic=semantic.replace(/\bexport (const|class|function)\b/g,'$1');
 const stripPcsDefault=pcsDefault.replace(/\bexport (const|class|function)\b/g,'$1');
 const stripPcsReference=pcsReference.replace(/\bexport (const|class|function)\b/g,'$1');
@@ -10,7 +10,8 @@ const stripTextInspection=textInspection.replace(/\bexport (const|class|function
 const stripRomFingerprint=romFingerprint.replace(/\bexport (async )?(const|class|function)\b/g,'$1$2');
 const stripRomCompatibility=romCompatibility.replace(/^import \{.*?\} from '\.\/rom-fingerprint\.js';\s*/gm,'').replace(/\bexport (const|class|function)\b/g,'$1');
 const stripMetadataFingerprint=metadataFingerprint.replace(/^import \{.*?\} from '\.\/(?:rom-fingerprint|rom-compatibility)\.js';\s*/gm,'').replace(/\bexport (const|class|function)\b/g,'$1');
-const html=base.replace(/<link rel="icon"[^>]*>/,'').replace(/<link rel="manifest"[^>]*>/,'').replace(/<link rel="apple-touch-icon"[^>]*>/,'').replace(/<link rel="stylesheet" href="src\/styles.css">/,'<style>'+styles+'</style>').replace(/<script type="module" src="src\/app\.js"><\/script>/,"<script>\n'use strict';\n"+stripExports+"\n"+stripSemantic+"\n"+stripPcsDefault+"\n"+stripPcsReference+"\n"+stripTextInspection+"\n"+stripRomFingerprint+"\n"+stripRomCompatibility+"\n"+stripMetadataFingerprint+"\n"+stripImports+"\n</script>");
+const stripMapBlocks=mapBlocks.replace(/\bexport (const|class|function)\b/g,'$1');
+const html=base.replace(/<link rel="icon"[^>]*>/,'').replace(/<link rel="manifest"[^>]*>/,'').replace(/<link rel="apple-touch-icon"[^>]*>/,'').replace(/<link rel="stylesheet" href="src\/styles.css">/,'<style>'+styles+'</style>').replace(/<script type="module" src="src\/app\.js"><\/script>/,"<script>\n'use strict';\n"+stripExports+"\n"+stripSemantic+"\n"+stripPcsDefault+"\n"+stripPcsReference+"\n"+stripTextInspection+"\n"+stripRomFingerprint+"\n"+stripRomCompatibility+"\n"+stripMetadataFingerprint+"\n"+stripMapBlocks+"\n"+stripImports+"\n</script>");
 if(html.includes('src/app.js')||html.includes('src/styles.css'))throw Error('Standalone file still references source assets');
 mkdirSync(new URL('app/',import.meta.url),{recursive:true});
 writeFileSync(new URL('app/CUBHMA_Mobile_Lab_Offline.html',import.meta.url),html);

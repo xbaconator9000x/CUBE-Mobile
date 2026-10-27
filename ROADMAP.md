@@ -188,3 +188,9 @@
 - [x] Reject unverified offsets, unaligned starts, out-of-ROM full maps and oversized dimensions; verify ROM immutability with synthetic tests.
 - [ ] Connect to authenticated map-bank/layout pointers and named metadata; implement mobile blockmap preview, rendering, event/warp overlays and editor roundtrips.
 - [ ] Independently verify CUBE layout variants and map collision semantics before any write operation.
+
+## Watchdog checkpoint — mobile blockmap viewport (27 October 2026)
+- [x] Add read-only Blockmaps tab and workspace card with manual ROM offset/dimensions, 12×10 bounded cell preview, raw collision/elevation values and tap-to-hex navigation.
+- [x] Read current staged ROM bytes through a bounded accessor rather than copying up to 128 MiB; reject malformed map layouts and invalid bytes.
+- [x] Bundle in offline HTML and add mobile/offline wiring and staged-read regression tests.
+- [ ] Authenticated map-bank/header/layout discovery, tile graphics, collision semantics, warps/events, save-roundtrip, CUBE layouts and Android hardware validation remain unfinished.
