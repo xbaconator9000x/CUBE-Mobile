@@ -1520,7 +1520,7 @@ $('map-atlas-graph').addEventListener('click',()=>safeRun(()=>{
     x.incoming===row.incoming&&x.outgoing===row.outgoing&&
     x.reachableByRawLinks===row.reachableByRawLinks);
    if(!match)throw Error('Raw map network changed; rescan first');
-   openDeclaredAtlasMap(match);
+   openDeclaredAtlasMap(atlas.maps.find(m=>m.bankIndex===match.bankIndex&&m.mapIndex===match.mapIndex));
   }));
   root.append(button);
  }
