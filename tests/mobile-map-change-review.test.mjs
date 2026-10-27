@@ -16,7 +16,8 @@ test('mobile and standalone map preview queue has real review and clear handlers
  assert.match(app,/reviewVanillaChangeSet\(model,mapReviewQueue/);
  assert.match(app,/map-review-clear'\)\.addEventListener/);
  assert.match(app,/clearMapChangeReview\(\);clearMapAtlas/);
- assert.match(app,/function metadataReset\(\)\{clearMapChangeReview\(\)/);
+ assert.match(app,/function metadataReset\(\)\{metadataImportSerial\+\+;metadataFingerprints=\[\];clearWarpInspection/);
+ assert.match(app,/clearWarpInspection\('Metadata reset; inspect warps again.'\);clearMapChangeReview\(\)/);
  assert.match(app,/map-review-cell-add'\)\.disabled=false/);
  assert.match(app,/map-review-warp-add'\)\.disabled=false/);
  assert.match(app,/map-review-event-add'\)\.disabled=false/);
