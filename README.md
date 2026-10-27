@@ -4,6 +4,10 @@
 
 > **Status: v0.5.9 — early foundation, NOT a complete port.** The working code today is an offline ROM inspection / patching workbench and a limited read-only CUBHMA TOML named-anchor inspector. The desktop editor's semantic engine, map/collision/event editors, scripts, sprites, trainers, Pokémon, sound and CUBE upgrades are **not yet ported**.
 
+## Development checkpoint — rendered vanilla map canvas
+
+An opt-in read-only canvas now composes 16×16 RSE/FRLG metatiles with palette banks, flips and layers from explicitly selected vanilla headers. The raw collision/elevation grid remains separate. This is not CUBE-authenticated map editing. See [rendering checkpoint](docs/VANILLA_METATILE_RENDER_CHECKPOINT.md).
+
 ## Development checkpoint — streamed LZ10 graphics
 
 The graphics inspector now reads staged ROM bytes directly for bounded LZ10 decoding and candidate scans, avoiding a full-ROM snapshot. See [checkpoint](docs/LZ_ACCESSOR_CHECKPOINT.md). Map rendering and CUBE authentication remain unfinished.

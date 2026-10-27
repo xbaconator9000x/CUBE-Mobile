@@ -13,6 +13,7 @@ import {inspectVanillaMapConnections} from './map-connections.js';
 import {inspectVanillaMapEvents} from './map-events.js';
 import {inspectVanillaMapBlocksets} from './map-blocksets.js';
 import {panMapViewport,indexMapWarpMarkers,indexMapEventMarkers} from './map-viewport.js';
+import {renderVanillaMapViewport} from './map-render.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
@@ -104,7 +105,7 @@ function updateIndicators(){
   if(active)showRomInfo();
   drawMetadataFingerprintStatus();
 }
-function installModel(name,bytes){metadataImportSerial++;metadataFingerprints=[];$('map-grid').innerHTML='<div class="empty-state">No blockmap inspected.</div>';$('map-bank-status').textContent='ROM replaced. Re-enter independently verified vanilla bank location and counts.';clearWarpInspection('ROM replaced. Select a vanilla map header again.');clearConnectionInspection('ROM replaced. Select a vanilla map header again.');$('map-layout-status').textContent='ROM replaced. No vanilla-format layout inspected.';$('map-status').textContent='ROM replaced. Enter a verified offset and inspect again.';pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
+function installModel(name,bytes){clearRenderedMap('ROM replaced. Select vanilla header again.');metadataImportSerial++;metadataFingerprints=[];$('map-grid').innerHTML='<div class="empty-state">No blockmap inspected.</div>';$('map-bank-status').textContent='ROM replaced. Re-enter independently verified vanilla bank location and counts.';clearWarpInspection('ROM replaced. Select a vanilla map header again.');clearConnectionInspection('ROM replaced. Select a vanilla map header again.');$('map-layout-status').textContent='ROM replaced. No vanilla-format layout inspected.';$('map-status').textContent='ROM replaced. Enter a verified offset and inspect again.';pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
 $('rom-picker').addEventListener('change',async e=>{
   const file=e.target.files?.[0];e.target.value='';if(!file)return;
   if(file.size<0xC0 || file.size>MAX_BYTES)return toast('ROM must be 192 bytes to 128 MiB',true);
@@ -711,7 +712,12 @@ $('metadata-stock').addEventListener('click',async()=>{
 });
 
 
+function clearRenderedMap(message='Rendered preview invalidated; inspect again.'){
+ $('map-render-canvas').hidden=true;
+ $('map-render-status').textContent=message;
+}
 function clearMapGrid(message='Map structure changed; inspect again.'){
+  clearRenderedMap();
   const root=$('map-grid');root.replaceChildren();
   const empty=document.createElement('div');empty.className='empty-state';
   empty.textContent=message;root.append(empty);
@@ -964,6 +970,7 @@ $('map-inspect').addEventListener('click',()=>safeRun(()=>{
   const eventMarkerIndex=inspectedEventMap&&inspectedEventMap.address===address&&
     inspectedEventMap.width===width&&inspectedEventMap.height===height?
     indexMapEventMarkers(inspectedEventMap.arrays,{width,height}):null;
+  clearRenderedMap('Rendered preview disabled or awaiting inspection.');
   const grid=$('map-grid');grid.replaceChildren();
   const board=document.createElement('div');board.className='blockmap-grid';
   board.style.gridTemplateColumns='repeat('+preview.columns+', minmax(64px,1fr))';
@@ -986,10 +993,34 @@ $('map-inspect').addEventListener('click',()=>safeRun(()=>{
     board.append(button);
   }
   grid.append(board);
+  if($('map-render-enabled').checked){
+    try{
+      requireVanillaMapFormat();
+      if($('map-layout-source').value!=='header')throw Error('Select an explicit vanilla map header');
+      const headerAddress=parseOffset($('map-layout-offset').value);
+      const family=$('map-layout-family').value;
+      const header=inspectVanillaMapHeader(model,{address:headerAddress,family});
+      if(header.layout.blockmapOffset!==address||header.layout.width!==width||header.layout.height!==height)
+        throw Error('Selected header does not match blockmap offset and dimensions');
+      const rendered=renderVanillaMapViewport(model,{address:headerAddress,family,
+        x,y,viewportWidth:12,viewportHeight:10});
+      const canvas=$('map-render-canvas'),context=canvas.getContext('2d');
+      canvas.width=rendered.width;canvas.height=rendered.height;
+      const image=context.createImageData(rendered.width,rendered.height);
+      image.data.set(rendered.pixels);context.putImageData(image,0,0);
+      canvas.style.width=(rendered.width*2)+'px';
+      canvas.style.height=(rendered.height*2)+'px';
+      canvas.hidden=false;
+      $('map-render-status').textContent='Rendered '+rendered.columns+' × '+rendered.rows+
+        ' vanilla metatiles, including palette banks and layers. Read-only; CUBE layout and walkability unverified.';
+    }catch(err){clearRenderedMap('Cannot render selected map: '+err.message);}
+  }
   $('map-status').textContent=preview.columns+' × '+preview.rows+' cells from 0x'+hex(address)+
     (preview.truncated?' (partial viewport)':'')+
     '. Each cell: tile ID / raw collision-elevation (0–63). Re-inspect after edits.';
 }));
+
+$('map-render-enabled').addEventListener('change',()=>{clearRenderedMap();if(model)$('map-inspect').click();});
 
 for(const [id,dx,dy] of [
   ['map-pan-up',0,-10],['map-pan-down',0,10],
