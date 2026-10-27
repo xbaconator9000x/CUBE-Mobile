@@ -133,6 +133,15 @@
       <div class="input-wrap"><label for="map-x">Start X</label><input id="map-x" type="number" min="0" value="0"></div>
       <div class="input-wrap"><label for="map-y">Start Y</label><input id="map-y" type="number" min="0" value="0"></div>
     </div>
+    <div class="input-wrap"><label for="map-bank-offset">Optional known VANILLA bank pointer-table offset (hex)</label><input id="map-bank-offset" inputmode="text" placeholder="Verified data.maps.banks address" spellcheck="false"></div>
+    <div class="input-row">
+      <div class="input-wrap"><label for="map-bank-count">Bank count (declared)</label><input id="map-bank-count" type="number" min="1" max="256" value="1"></div>
+      <div class="input-wrap"><label for="map-bank-index">Bank index (0-based)</label><input id="map-bank-index" type="number" min="0" value="0"></div>
+      <div class="input-wrap"><label for="map-bank-map-count">Maps in bank (declared)</label><input id="map-bank-map-count" type="number" min="1" max="1024" value="1"></div>
+      <div class="input-wrap"><label for="map-bank-map-index">Map index (0-based)</label><input id="map-bank-map-index" type="number" min="0" value="0"></div>
+    </div>
+    <button type="button" id="map-bank-inspect" class="subtle-button" disabled>Follow vanilla bank → map (read only)</button>
+    <output id="map-bank-status" class="palette-note" aria-live="polite">Requires independently verified vanilla bank table and explicit counts; no automatic CUBE map-bank discovery.</output>
     <div class="input-wrap"><label for="map-layout-offset">Optional known VANILLA map header/layout ROM offset (hex)</label><input id="map-layout-offset" inputmode="text" spellcheck="false" placeholder="e.g. 1A2B3C"></div>
     <div class="input-row">
       <div class="input-wrap"><label for="map-layout-source">Source structure</label><select id="map-layout-source"><option value="header">Vanilla map header</option><option value="layout">Vanilla map layout</option></select></div>
@@ -143,6 +152,11 @@
     <button type="button" id="map-inspect" class="subtle-button" disabled>Inspect 12 × 10 cells</button>
     <p class="palette-note">You must independently verify the map's blockmap offset and dimensions. Header identity alone cannot verify CUBE layouts. No bytes are changed. Collision values are raw metadata, not passability colours.</p>
     <output id="map-status" class="palette-note" aria-live="polite">Open a ROM and enter a known blockmap offset.</output>
+  </div>
+  <div class="toolbar-card">
+    <button type="button" id="map-warp-inspect" class="subtle-button" disabled>Inspect vanilla warps for selected header</button>
+    <output id="map-warp-status" class="palette-note" aria-live="polite">Select a known vanilla map header to inspect event counts and warp destinations. Read only.</output>
+    <div id="map-warp-list" class="anchor-list" aria-label="Read-only warp events"><div class="empty-state">No warp events inspected.</div></div>
   </div>
   <div class="editor-card"><div id="map-grid" class="blockmap-scroller" aria-label="Read-only map block cells"><div class="empty-state">No blockmap inspected.</div></div></div>
 </section>
@@ -2213,6 +2227,135 @@ function inspectVanillaMapHeader(source,{address,family}={}) {
   });
 }
 
+/**
+ * Read-only, explicitly located vanilla map-bank and warp inspection.
+ * Source: kcradi/CUBHMA src/HexManiac.Core/Models/Map/MapModel.cs
+ * AllMapsModel -> MapBankModel -> MapModel, Format.EventsFormat/WarpsFormat.
+ *
+ * A GBA header, a TOML filename, or a plausible pointer chain does NOT
+ * authenticate CUBE/stock layout. The caller must independently establish
+ * that these structures use vanilla formats. Never write ROM bytes here.
+ */
+function reader(source) {
+  if(source instanceof Uint8Array) return {length:source.length,read:i=>source[i]};
+  if(source&&Number.isSafeInteger(source.length)&&source.length>=0&&typeof source.read==='function')
+    return source;
+  throw new TypeError('Expected read-only ROM accessor or Uint8Array');
+}
+function bounded(rom,address,size,label,alignment=4) {
+  if(!Number.isSafeInteger(address)||address<0||address%alignment!==0||
+     !Number.isSafeInteger(size)||size<0||address>rom.length-size)
+    throw new RangeError(label+' is unaligned or outside ROM bounds');
+}
+function byte(rom,i) {
+  const n=rom.read(i);
+  if(!Number.isInteger(n)||n<0||n>255)throw new RangeError('Invalid ROM accessor byte');
+  return n;
+}
+function word(rom,i) {return byte(rom,i)|(byte(rom,i+1)<<8);}
+function dword(rom,i) {
+  return (byte(rom,i)|(byte(rom,i+1)<<8)|(byte(rom,i+2)<<16)|(byte(rom,i+3)<<24))>>>0;
+}
+function ptr(rom,raw,label) {
+  if(raw<0x08000000||raw>=0x0A000000)
+    throw new RangeError(label+' is not a conventional GBA ROM pointer');
+  const address=raw-0x08000000;
+  bounded(rom,address,4,label);
+  return address;
+}
+function count(n,label,max) {
+  if(!Number.isSafeInteger(n)||n<1||n>max)
+    throw new RangeError(label+' must be 1–'+max);
+}
+function index(n,label,limit) {
+  if(!Number.isSafeInteger(n)||n<0||n>=limit)
+    throw new RangeError(label+' must be inside declared table');
+}
+function overlaps(a,as,b,bs){return a<b+bs&&b<a+as;}
+
+/**
+ * Resolve ONE bank/map pair, not a heuristic ROM scan. Counts are supplied
+ * by the user, not inferred from sentinel bytes or ROM headers.
+ */
+function inspectVanillaMapBankEntry(source,{
+  address,bankCount,bankIndex,mapCount,mapIndex,family
+}={}) {
+  const rom=reader(source);
+  count(bankCount,'Bank count',256);
+  count(mapCount,'Map count',1024);
+  index(bankIndex,'Bank index',bankCount);
+  index(mapIndex,'Map index',mapCount);
+  bounded(rom,address,bankCount*4,'Bank pointer table');
+  const bankPointerSource=address+bankIndex*4;
+  const bankPointer=dword(rom,bankPointerSource);
+  const bankOffset=ptr(rom,bankPointer,'Bank map-pointer array');
+  bounded(rom,bankOffset,mapCount*4,'Bank map-pointer array');
+  if(overlaps(address,bankCount*4,bankOffset,mapCount*4))
+    throw new RangeError('Bank and map pointer arrays overlap');
+  const mapPointerSource=bankOffset+mapIndex*4;
+  const mapPointer=dword(rom,mapPointerSource);
+  const mapHeaderOffset=ptr(rom,mapPointer,'Map header');
+  if(overlaps(mapHeaderOffset,28,address,bankCount*4)||
+     overlaps(mapHeaderOffset,28,bankOffset,mapCount*4))
+    throw new RangeError('Map header overlaps bank pointer arrays');
+  const header=inspectVanillaMapHeader(rom,{address:mapHeaderOffset,family});
+  if(overlaps(header.layoutOffset,header.layout.family==='FRLG'?28:24,address,bankCount*4)||
+     overlaps(header.layoutOffset,header.layout.family==='FRLG'?28:24,bankOffset,mapCount*4))
+    throw new RangeError('Map layout overlaps bank pointer arrays');
+  if(overlaps(header.layout.blockmapOffset,header.layout.byteLength,address,bankCount*4)||
+     overlaps(header.layout.blockmapOffset,header.layout.byteLength,bankOffset,mapCount*4))
+    throw new RangeError('Blockmap overlaps bank pointer arrays');
+  return Object.freeze({
+    address,bankCount,bankIndex,mapCount,mapIndex,bankPointerSource,
+    bankPointer,bankOffset,mapPointerSource,mapPointer,mapHeaderOffset,header,
+    readOnly:true,layoutAuthenticated:false
+  });
+}
+
+/**
+ * Vanilla events group: four count bytes then four 32-bit pointers;
+ * warps are eight-byte records: x:u16 y:u16 elevation:u8 warpID:u8
+ * map:u8 bank:u8. Coordinates are retained without passability inference.
+ * A nonzero warp count requires a valid bounded warp array.
+ */
+function inspectVanillaMapWarps(source,{address,family}={}) {
+  const rom=reader(source);
+  const header=inspectVanillaMapHeader(rom,{address,family});
+  if(header.eventsOffset===null)
+    return Object.freeze({headerAddress:address,eventsOffset:null,warpCount:0,
+      warpOffset:null,warps:Object.freeze([]),readOnly:true,layoutAuthenticated:false});
+  const eventsOffset=header.eventsOffset;
+  bounded(rom,eventsOffset,20,'Vanilla events group');
+  if(overlaps(eventsOffset,20,address,28)||
+     overlaps(eventsOffset,20,header.layoutOffset,family==='FRLG'?28:24))
+    throw new RangeError('Events group overlaps map header/layout');
+  const objectCount=byte(rom,eventsOffset),warpCount=byte(rom,eventsOffset+1),
+    scriptCount=byte(rom,eventsOffset+2),signpostCount=byte(rom,eventsOffset+3);
+  const warpPointer=dword(rom,eventsOffset+8);
+  let warpOffset=null;
+  const warps=[];
+  if(warpCount) {
+    warpOffset=ptr(rom,warpPointer,'Warp array');
+    bounded(rom,warpOffset,warpCount*8,'Warp array',2);
+    if(overlaps(warpOffset,warpCount*8,eventsOffset,20)||
+       overlaps(warpOffset,warpCount*8,address,28)||
+       overlaps(warpOffset,warpCount*8,header.layoutOffset,family==='FRLG'?28:24)||
+       overlaps(warpOffset,warpCount*8,header.layout.blockmapOffset,header.layout.byteLength))
+      throw new RangeError('Warp array overlaps map structures');
+    for(let i=0;i<warpCount;i++){
+      const offset=warpOffset+i*8;
+      warps.push(Object.freeze({index:i,offset,x:word(rom,offset),y:word(rom,offset+2),
+        elevation:byte(rom,offset+4),warpId:byte(rom,offset+5),
+        targetMap:byte(rom,offset+6),targetBank:byte(rom,offset+7)}));
+    }
+  }
+  return Object.freeze({
+    headerAddress:address,eventsOffset,objectCount,warpCount,scriptCount,signpostCount,
+    warpPointer:warpCount?warpPointer:null,warpOffset,warps:Object.freeze(warps),
+    readOnly:true,layoutAuthenticated:false
+  });
+}
+
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let pcsReference=null,pcsReferenceName='';
@@ -2222,7 +2365,7 @@ let model=null, currentTab='home', page=0, selected=null, patchFile=null, palett
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
 ctx.imageSmoothingEnabled=false;
-const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-layout-inspect','save-rom','save-project','export-ips','discard-button','edit-unlock'];
+const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-layout-inspect','map-bank-inspect','map-warp-inspect','save-rom','save-project','export-ips','discard-button','edit-unlock'];
 const tabs={home:['YOUR WORKSPACE','ROM Workbench'],hex:['BINARY INSPECTOR','Hex editor'],anchors:['ROM SEMANTICS','Named data'],maps:['RAW MAP CELLS','Blockmap inspector'],graphics:['GBA GRAPHICS','Graphics explorer'],patches:['PATCH WORKFLOW','Patch tools'],changes:['REVIEW & EXPORT','Changes']};
 function toast(message,bad=false){const t=$('toast');t.textContent=message;t.classList.toggle('error',bad);t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),4300);}
 function safeRun(fn){try{const result=fn();if(result?.catch) result.catch(err=>toast(err.message||String(err),true));}catch(err){toast(err.message||String(err),true);}}
@@ -2302,7 +2445,7 @@ function updateIndicators(){
   if(active)showRomInfo();
   drawMetadataFingerprintStatus();
 }
-function installModel(name,bytes){metadataImportSerial++;metadataFingerprints=[];$('map-grid').innerHTML='<div class="empty-state">No blockmap inspected.</div>';$('map-layout-status').textContent='ROM replaced. No vanilla-format layout inspected.';$('map-status').textContent='ROM replaced. Enter a verified offset and inspect again.';pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
+function installModel(name,bytes){metadataImportSerial++;metadataFingerprints=[];$('map-grid').innerHTML='<div class="empty-state">No blockmap inspected.</div>';$('map-bank-status').textContent='ROM replaced. Re-enter independently verified vanilla bank location and counts.';clearWarpInspection('ROM replaced. Select a vanilla map header again.');$('map-layout-status').textContent='ROM replaced. No vanilla-format layout inspected.';$('map-status').textContent='ROM replaced. Enter a verified offset and inspect again.';pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
 $('rom-picker').addEventListener('change',async e=>{
   const file=e.target.files?.[0];e.target.value='';if(!file)return;
   if(file.size<0xC0 || file.size>MAX_BYTES)return toast('ROM must be 192 bytes to 128 MiB',true);
@@ -2386,10 +2529,10 @@ $('edit-unlock').addEventListener('change',()=>{if(!$('edit-unlock').checked)toa
 $('write-byte').addEventListener('click',()=>safeRun(()=>{
   ensureModel();if(!$('edit-unlock').checked)throw Error('Unlock raw editing first');if(selected===null)throw Error('Tap a byte first');
   const val=$('selected-value').value.trim();if(!/^[0-9a-f]{1,2}$/i.test(val))throw Error('Enter a 1–2 digit hexadecimal byte');
-  if(model.write(selected,parseInt(val,16))){invalidateDecodedGraphic();toast(`Staged edit at 0x${hex(selected)}`);}drawHex();updateIndicators();
+  if(model.write(selected,parseInt(val,16))){invalidateDecodedGraphic();clearWarpInspection('ROM bytes changed; inspect warps again.');toast(`Staged edit at 0x${hex(selected)}`);}drawHex();updateIndicators();
 }));
-$('undo-button').addEventListener('click',()=>safeRun(()=>{if(model.undo()){invalidateDecodedGraphic();drawHex();drawGraphics();updateIndicators();}}));
-$('redo-button').addEventListener('click',()=>safeRun(()=>{if(model.redo()){invalidateDecodedGraphic();drawHex();drawGraphics();updateIndicators();}}));
+$('undo-button').addEventListener('click',()=>safeRun(()=>{if(model.undo()){invalidateDecodedGraphic();clearWarpInspection('ROM bytes changed; inspect warps again.');drawHex();drawGraphics();updateIndicators();}}));
+$('redo-button').addEventListener('click',()=>safeRun(()=>{if(model.redo()){invalidateDecodedGraphic();clearWarpInspection('ROM bytes changed; inspect warps again.');drawHex();drawGraphics();updateIndicators();}}));
 $('selected-value').addEventListener('keydown',e=>{if(e.key==='Enter')$('write-byte').click();});
 // The graphic source and the colour palette are deliberately independent:
 // a generic ROM offset has no known sprite layout or matching palette.
@@ -2906,11 +3049,73 @@ $('metadata-stock').addEventListener('click',async()=>{
 });
 
 
+function clearWarpInspection(message='Select a vanilla map header to inspect warp events.'){
+  $('map-warp-list').replaceChildren();
+  $('map-warp-status').textContent=message;
+}
+function requireVanillaMapFormat(){
+  ensureModel();
+  if(metadataLayoutKind==='expansion'||metadataLayoutKind==='custom')
+    throw Error('Imported metadata declares a non-vanilla layout; vanilla map interpretation refused.');
+}
+$('map-bank-inspect').addEventListener('click',()=>safeRun(()=>{
+  clearWarpInspection();
+  requireVanillaMapFormat();
+  const family=$('map-layout-family').value;
+  const result=inspectVanillaMapBankEntry(model,{
+    address:parseOffset($('map-bank-offset').value),
+    bankCount:Number($('map-bank-count').value),
+    bankIndex:Number($('map-bank-index').value),
+    mapCount:Number($('map-bank-map-count').value),
+    mapIndex:Number($('map-bank-map-index').value),
+    family
+  });
+  $('map-layout-offset').value=hex(result.mapHeaderOffset);
+  $('map-layout-source').value='header';
+  $('map-bank-status').textContent='Unverified '+family+' bank '+result.bankIndex+
+    ' / map '+result.mapIndex+' → header 0x'+hex(result.mapHeaderOffset)+
+    ' (bank pointer at 0x'+hex(result.bankPointerSource)+
+    ', map pointer at 0x'+hex(result.mapPointerSource)+
+    '). No CUBE layout authentication; read only.';
+  $('map-layout-inspect').click();
+  $('map-warp-inspect').click();
+}));
+$('map-warp-inspect').addEventListener('click',()=>safeRun(()=>{
+  clearWarpInspection('Inspecting vanilla events…');
+  requireVanillaMapFormat();
+  if($('map-layout-source').value!=='header')
+    throw Error('Select a vanilla map header, not a layout, for warp inspection');
+  const address=parseOffset($('map-layout-offset').value);
+  const result=inspectVanillaMapWarps(model,{address,family:$('map-layout-family').value});
+  const root=$('map-warp-list');
+  $('map-warp-status').textContent=result.eventsOffset===null?
+    'No vanilla events pointer. Read only; layout unverified.':
+    'Events 0x'+hex(result.eventsOffset)+': '+result.objectCount+' objects, '+
+    result.warpCount+' warps, '+result.scriptCount+' script triggers, '+
+    result.signpostCount+' signposts. Destinations are raw IDs, NOT verified links.';
+  if(!result.warps.length){
+    const empty=document.createElement('div');empty.className='empty-state';
+    empty.textContent='No warp records in this map.';root.append(empty);
+  }
+  for(const warp of result.warps){
+    const button=document.createElement('button');button.type='button';
+    button.className='secondary-button';button.style.display='block';
+    button.style.margin='8px 0';button.style.textAlign='left';
+    button.textContent='Warp '+warp.index+' ('+warp.x+', '+warp.y+
+      ', elevation '+warp.elevation+') → bank '+warp.targetBank+
+      ', map '+warp.targetMap+', warp '+warp.warpId+' · ROM 0x'+hex(warp.offset);
+    button.setAttribute('aria-label',button.textContent+'; inspect raw hex');
+    button.addEventListener('click',()=>safeRun(()=>{setPageForOffset(warp.offset);gotoTab('hex');}));
+    root.append(button);
+  }
+}));
+
 // This is an explicit, unverified vanilla-format interpretation only.
 $('map-layout-inspect').addEventListener('click',()=>safeRun(()=>{
   ensureModel();
   if(metadataLayoutKind==='expansion'||metadataLayoutKind==='custom')
     throw Error('Imported metadata declares a non-vanilla layout; vanilla structure interpretation refused.');
+  clearWarpInspection();
   const address=parseOffset($('map-layout-offset').value);
   const family=$('map-layout-family').value,kind=$('map-layout-source').value;
   const parsed=kind==='header'?
