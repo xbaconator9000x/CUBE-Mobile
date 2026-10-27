@@ -1,5 +1,10 @@
 # Roadmap
 
+## Checkpoint — vanilla script operand pointer hints (28 October 2026)
+- [x] Classify fixed-width command pointer operands as branch, generic data, ASM/code, movement or message hints with exact ROM provenance and capped output.
+- [x] Aggregate statuses in map event-script audits and expose counts only in SHA-256-checked local-ROM smoke reports; add synthetic tests.
+- [ ] Independently authenticate CUBE target formats and test genuine ROM/emulator/Android acceptance. No write authorization or strict parity credit. See [operand pointer hints](docs/VANILLA_SCRIPT_OPERAND_POINTERS.md).
+
 ## Checkpoint — shared vanilla event-script target hints (28 October 2026)
 - [x] Scan up to 32 explicitly declared vanilla maps per page for object/trigger script pointers sharing the same in-ROM destination.
 - [x] Revalidate source bank pointers and header/layout provenance, cap alias groups and reference lists, preserve exact pointer-field offsets.

@@ -77,7 +77,7 @@ test('local smoke includes bounded script-prefix status without exporting script
  d(rom,0x704,ptr(0x740));d(rom,0x708,0);
  d(rom,0x70c,0);d(rom,0x710,0);
  d(rom,0x750,ptr(0x900));
- rom.set([0x16,0,0x40,1,0,0x02],0x900);
+ rom.set([0x67,0x20,0x09,0,0x08,0x02],0x900);
  const result=run(rom);
  assert.equal(result.status,0,result.stderr);
  const report=JSON.parse(result.stdout);
@@ -88,6 +88,8 @@ test('local smoke includes bounded script-prefix status without exporting script
  assert.equal(first.scriptPointerStatuses.inRom,1);
  assert.equal(first.scriptPointerStatuses.decoded,1);
  assert.equal(first.scriptPointerStatuses.terminal,1);
+ assert.equal(first.scriptOperandPointerStatuses.inRom,1);
+ assert.equal(first.scriptOperandPointerRoles.messageText,1);
  assert.equal(report.cubeCompatibilityVerified,false);
- assert.doesNotMatch(result.stdout,/setvar|scriptPointer\\":|fixture.gba/);
+ assert.doesNotMatch(result.stdout,/preparemsg|scriptPointer\\":|fixture.gba/);
 });

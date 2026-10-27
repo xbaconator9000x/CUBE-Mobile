@@ -7,6 +7,7 @@
 import {inspectVanillaEventScriptPointers} from './map-events.js';
 import {inspectVanillaScriptCommandPrefix} from './vanilla-script-prefix.js';
 import {auditVanillaScriptBranchTargets} from './vanilla-script-branches.js';
+import {auditVanillaScriptOperandPointers} from './vanilla-script-operand-pointers.js';
 
 export function auditVanillaMapEventScripts(source,{
  address,family,maxRecords=32,maxBytes=64,maxCommands=16
@@ -16,6 +17,9 @@ export function auditVanillaMapEventScripts(source,{
  const pointers=inspectVanillaEventScriptPointers(source,{address,family});
  const records=[],counts={inRom:0,null:0,nonRom:0,outsideRom:0,
   decoded:0,unknownOpcode:0,truncatedCommand:0,terminal:0};
+ const operandPointerStatuses={inRom:0,outsideRom:0,nonRom:0,null:0};
+ const operandPointerRoles={scriptBranch:0,genericData:0,asm:0,code:0,
+  movementData:0,messageText:0};
  for(const record of pointers.records.slice(0,maxRecords)){
   counts[record.status==='in-rom'?'inRom':record.status==='outside-rom'?
    'outsideRom':record.status==='non-rom'?'nonRom':'null']++;
@@ -25,6 +29,12 @@ export function auditVanillaMapEventScripts(source,{
     address:record.targetOffset,family,maxBytes,maxCommands});
    const branches=auditVanillaScriptBranchTargets(source,{
     address:record.targetOffset,family,maxBytes,maxCommands,maxFindings:16});
+   const operands=auditVanillaScriptOperandPointers(source,{
+    address:record.targetOffset,family,maxBytes,maxCommands,maxFindings:16});
+   for(const key of Object.keys(operandPointerStatuses))
+    operandPointerStatuses[key]+=operands.statuses[key];
+   for(const key of Object.keys(operandPointerRoles))
+    operandPointerRoles[key]+=operands.roles[key];
    if(decoded.commands.length)counts.decoded++;
    if(decoded.stopReason==='unknown-opcode')counts.unknownOpcode++;
    if(decoded.stopReason==='truncated-command'||decoded.stopReason==='rom-end')
@@ -36,7 +46,10 @@ export function auditVanillaMapEventScripts(source,{
     stopReason:decoded.stopReason,stopOffset:decoded.stopOffset,
     branchCount:branches.total,
     branchStatuses:branches.counts,
-    branchesTruncated:branches.truncated
+    branchesTruncated:branches.truncated,
+    operandPointerCount:operands.total,
+    operandPointerStatuses:operands.statuses,
+    operandPointerRoles:operands.roles
    });
   }
   records.push(Object.freeze({
@@ -51,6 +64,8 @@ export function auditVanillaMapEventScripts(source,{
   inspectedRecords:records.length,
   truncated:pointers.records.length>records.length,
   counts:Object.freeze(counts),records:Object.freeze(records),
+  operandPointerStatuses:Object.freeze(operandPointerStatuses),
+  operandPointerRoles:Object.freeze(operandPointerRoles),
   readOnly:true,layoutAuthenticated:false,grammarAuthenticated:false,
   ownershipVerified:false,controlFlowFollowed:false,
   writeAuthorized:false,independentParityEvidence:false
