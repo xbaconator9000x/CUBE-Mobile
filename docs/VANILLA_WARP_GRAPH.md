@@ -1,0 +1,11 @@
+# Declared vanilla warp/connection graph (read-only)
+
+`auditVanillaAtlasWarpGraph(source, atlas, options)` derives a directed graph from raw vanilla RSE/FRLG warp and map-connection records, following the pinned upstream [CUBHMA MapModel.cs](https://github.com/kcradi/CUBHMA/blob/3044393183e01af2ae1e907fb37e4a75eda6a8dc/src/HexManiac.Core/Models/Map/MapModel.cs). The caller must independently supply the vanilla bank-table address, all bank map counts and the family. This is **not** a map-bank discovery heuristic or CUBE expansion authentication.
+
+Every declared map is re-derived from its canonical bank-table pointer source, with header, layout, blockmap dimensions and offsets checked against the inspected atlas. Raw event/connection arrays are decoded from the current read-only ROM accessor. Malformed pointers, changed atlas declarations and exceeded map/link budgets fail closed rather than producing partial coverage.
+
+Only links with declared destinations and valid raw destination warp indexes become directed graph edges. Special `0xFF` targets, undeclared bank/map destinations and out-of-range warp indexes are separately counted. The report includes directed incoming/outgoing reference counts, a breadth-first reachability summary from a user-selected declared origin, and missing *direct* reverse links. Those last two are **informational only**: scripted travel, hidden maps, conditions, connection geometry and special warp semantics are not modeled, so neither a non-reached map nor a one-way reference proves an inaccessible or broken map.
+
+Defaults: at most 256 declared maps, 16,384 raw links, 128 displayed map rows and 128 displayed findings. Explicit upper limits: 4,096 maps, 65,536 links, 4,096 rows and 1,024 findings. Display truncation never changes aggregate counts. Supports Uint8Array and read-only ROM accessors. The ROM is never mutated or exported.
+
+The synthetic regression suite covers directed reachability, valid and invalid raw warp indexes, special targets, missing reverse references, canonical provenance, bounded outputs, accessor validation and immutability. This is not independent parity evidence: authentic CUBE layouts, emulator acceptance, real ROM save/reopen and Android hardware testing are outstanding.
