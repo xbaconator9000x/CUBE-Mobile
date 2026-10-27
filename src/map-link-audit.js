@@ -178,3 +178,48 @@ export function auditVanillaMapEventCoordinates(source,atlas,{
   findings:Object.freeze(findings),readOnly:true,
   layoutAuthenticated:false,walkabilityVerified:false});
 }
+
+/**
+ * Scan one bounded page of the declared vanilla atlas for raw event-coordinate
+ * anomalies. Aggregate counts include every record even if findings truncate.
+ * All map layouts are revalidated against current staged ROM bytes.
+ */
+export function auditVanillaAtlasEventCoordinateBatch(source,atlas,{
+ start=0,limit=16,maxFindings=128
+}={}){
+ if(!atlas||atlas.readOnly!==true||atlas.layoutAuthenticated!==false||
+    !Array.isArray(atlas.maps)||!['RSE','FRLG'].includes(atlas.family))
+  throw new TypeError('A read-only declared vanilla atlas is required');
+ if(!Number.isSafeInteger(start)||start<0||start>=atlas.maps.length)
+  throw new RangeError('Batch start must select a declared map');
+ if(!Number.isSafeInteger(limit)||limit<1||limit>32)
+  throw new RangeError('Batch size must be 1–32 maps');
+ if(!Number.isSafeInteger(maxFindings)||maxFindings<1||maxFindings>256)
+  throw new RangeError('Finding limit must be 1–256');
+ const end=Math.min(atlas.maps.length,start+limit);
+ const counts={total:0,withinMap:0,outsideMap:0,sharedCell:0};
+ const findings=[];let totalFindings=0;
+ for(let i=start;i<end;i++){
+  const map=atlas.maps[i];
+  const result=auditVanillaMapEventCoordinates(source,atlas,{
+   bankIndex:map.bankIndex,mapIndex:map.mapIndex,maxFindings
+  });
+  for(const key of Object.keys(counts))counts[key]+=result.counts[key];
+  totalFindings+=result.totalFindings;
+  for(const finding of result.findings){
+   if(findings.length>=maxFindings)break;
+   findings.push(Object.freeze({
+    bankIndex:map.bankIndex,mapIndex:map.mapIndex,
+    headerOffset:map.mapHeaderOffset,...finding
+   }));
+  }
+ }
+ return Object.freeze({
+  start,end,scannedMaps:end-start,totalMaps:atlas.maps.length,
+  nextStart:end<atlas.maps.length?end:null,
+  counts:Object.freeze(counts),totalFindings,
+  truncated:totalFindings>findings.length,
+  findings:Object.freeze(findings),
+  readOnly:true,layoutAuthenticated:false,walkabilityVerified:false
+ });
+}

@@ -1,5 +1,9 @@
 # CUBE Mobile
 
+## Development checkpoint — atlas-wide coordinate review
+
+The read-only vanilla atlas can now review up to 16 declared maps per tap for out-of-map event coordinates and shared cells, retaining up to 128 findings with exact ROM provenance. Counts cover all inspected records even when findings truncate. This is not CUBE-authenticated or a collision/walkability editor. See [coordinate audit](docs/VANILLA_EVENT_COORDINATE_AUDIT.md).
+
 ## Development checkpoint — raw event coordinate review
 
 The declared vanilla map atlas now offers a read-only coordinate integrity review for warps, objects, triggers and signposts. It highlights out-of-blockmap records and shared coordinates, with raw block-cell bytes and touch-to-hex provenance. Shared cells can be intentional; no CUBE layout or walkability is authenticated. See [coordinate checkpoint](docs/VANILLA_EVENT_COORDINATE_AUDIT.md).
