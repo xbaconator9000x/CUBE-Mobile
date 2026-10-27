@@ -167,6 +167,9 @@
     <button type="button" id="map-coordinate-batch-audit" class="subtle-button" disabled>Review next 16 maps for raw event coordinate issues (read only)</button>
     <output id="map-coordinate-batch-status" class="palette-note" aria-live="polite">No atlas-wide coordinate batch inspected.</output>
     <div id="map-coordinate-batch-list" class="anchor-list" aria-label="Read-only atlas coordinate batch findings"></div>
+    <button type="button" id="map-atlas-alias-audit" class="subtle-button" disabled>Review shared map header/layout/blockmap pointers (read only)</button>
+    <output id="map-atlas-alias-status" class="palette-note" aria-live="polite">No shared pointer aliases reviewed.</output>
+    <div id="map-atlas-alias-list" class="anchor-list" aria-label="Shared vanilla map pointer references"></div>
     <button type="button" id="map-bank-inspect" class="subtle-button" disabled>Follow vanilla bank → map (read only)</button>
     <output id="map-bank-status" class="palette-note" aria-live="polite">Requires independently verified vanilla bank table and explicit counts; no automatic CUBE map-bank discovery.</output>
     <div class="input-wrap"><label for="map-layout-offset">Optional known VANILLA map header/layout ROM offset (hex)</label><input id="map-layout-offset" inputmode="text" spellcheck="false" placeholder="e.g. 1A2B3C"></div>
@@ -2523,6 +2526,59 @@ function probeVanillaMapBankTables(source,{
 }
 
 /**
+ * Read-only pointer alias inventory for an already inspected vanilla atlas.
+ * Shared headers/layouts/blockmaps can be intentional; this reports ownership
+ * questions before any future semantic write or relocation.
+ * Source pointers: bank map-pointer entry, map header +0, layout +12.
+ */
+function auditVanillaAtlasPointerAliases(atlas,{
+ maxGroups=64,maxReferences=16
+}={}){
+ if(!atlas||atlas.readOnly!==true||atlas.layoutAuthenticated!==false||
+    !Array.isArray(atlas.maps)||atlas.maps.length<1||atlas.maps.length>4096||
+    !['RSE','FRLG'].includes(atlas.family))
+  throw new TypeError('A read-only declared vanilla atlas is required');
+ if(!Number.isSafeInteger(maxGroups)||maxGroups<1||maxGroups>256)
+  throw new RangeError('Group limit must be 1–256');
+ if(!Number.isSafeInteger(maxReferences)||maxReferences<1||maxReferences>32)
+  throw new RangeError('Reference limit must be 1–32');
+ const fields=[
+  ['header','mapHeaderOffset',m=>m.mapPointerSource],
+  ['layout','layoutOffset',m=>m.mapHeaderOffset],
+  ['blockmap','blockmapOffset',m=>m.layoutOffset+12]
+ ];
+ const counts={header:0,layout:0,blockmap:0};
+ const groups=[];let totalGroups=0;
+ for(const [kind,field,sourceOffset] of fields){
+  const buckets=new Map();
+  for(const m of atlas.maps){
+   for(const n of [m.bankIndex,m.mapIndex,m[field],sourceOffset(m)])
+    if(!Number.isSafeInteger(n)||n<0)
+     throw new RangeError('Invalid map pointer provenance');
+   const refs=buckets.get(m[field])||[];
+   refs.push(Object.freeze({bankIndex:m.bankIndex,mapIndex:m.mapIndex,
+    sourceOffset:sourceOffset(m)}));
+   buckets.set(m[field],refs);
+  }
+  for(const [offset,refs] of buckets){
+   if(refs.length<2)continue;
+   counts[kind]++;totalGroups++;
+   if(groups.length<maxGroups)groups.push(Object.freeze({
+    kind,offset,referenceCount:refs.length,
+    references:Object.freeze(refs.slice(0,maxReferences)),
+    referencesTruncated:refs.length>maxReferences
+   }));
+  }
+ }
+ return Object.freeze({
+  totalMaps:atlas.maps.length,counts:Object.freeze(counts),
+  totalGroups,truncated:totalGroups>groups.length,
+  groups:Object.freeze(groups),readOnly:true,layoutAuthenticated:false,
+  ownershipAuthenticated:false
+ });
+}
+
+/**
  * Read-only vanilla map connections (NOT CUBE expansion layout).
  * kcradi/CUBHMA MapModel.cs Format.ConnectionsFormat:
  * [count:: connections<[direction:: offset:: mapGroup. mapNum. unused:]/count>]1
@@ -3994,6 +4050,9 @@ function requireVanillaMapFormat(){
 function clearMapAtlas(message='Declared atlas invalidated; inspect again.') {
  inspectedMapAtlas=null;atlasBatchStart=0;atlasCoordinateBatchStart=0;
  $('map-atlas-batch-audit').disabled=true;
+ $('map-atlas-alias-audit').disabled=true;
+ $('map-atlas-alias-list').replaceChildren();
+ $('map-atlas-alias-status').textContent='No shared pointer aliases reviewed.';
  $('map-coordinate-batch-audit').disabled=true;
  $('map-coordinate-batch-list').replaceChildren();
  $('map-coordinate-batch-status').textContent='No atlas-wide coordinate batch inspected.';
@@ -4092,6 +4151,7 @@ $('map-atlas-inspect').addEventListener('click',()=>safeRun(()=>{
  $('map-atlas-audit').disabled=false;
  $('map-event-coordinate-audit').disabled=false;
  $('map-atlas-batch-audit').disabled=false;
+ $('map-atlas-alias-audit').disabled=false;
  $('map-coordinate-batch-audit').disabled=false;
  $('map-atlas-status').textContent='Inspected '+atlas.mapCount+' explicitly declared maps across '+
   atlas.bankCount+' vanilla-format banks. Pointer/layout bounds checked; no ROM identity, CUBE layout or warp topology authenticated.';
@@ -4286,6 +4346,51 @@ $('map-coordinate-batch-audit').addEventListener('click',()=>safeRun(()=>{
  }
  atlasCoordinateBatchStart=result.nextStart??0;
  $('map-coordinate-batch-audit').disabled=result.nextStart===null;
+}));
+
+
+$('map-atlas-alias-audit').addEventListener('click',()=>safeRun(()=>{
+ requireVanillaMapFormat();
+ if(!inspectedMapAtlas||inspectedMapAtlas.rom!==model)
+  throw Error('Reinspect the declared atlas before reviewing shared pointers');
+ const atlas=inspectedMapAtlas.atlas;
+ const counts=parseVanillaBankMapCounts($('map-atlas-counts').value);
+ if(parseOffset($('map-bank-offset').value)!==atlas.address||
+    $('map-layout-family').value!==atlas.family||
+    counts.length!==atlas.bankCount||
+    counts.some((n,i)=>n!==atlas.bankMapCounts[i]))
+  throw Error('Atlas inputs changed; reinspect before shared pointer review');
+ const result=auditVanillaAtlasPointerAliases(atlas,{
+  maxGroups:64,maxReferences:8
+ });
+ const root=$('map-atlas-alias-list');root.replaceChildren();
+ $('map-atlas-alias-status').textContent='Across '+result.totalMaps+
+  ' declared maps: '+result.counts.header+' shared header groups, '+
+  result.counts.layout+' shared layout groups, '+result.counts.blockmap+
+  ' shared blockmap groups. '+result.totalGroups+' total groups'+
+  (result.truncated?' (first 64 shown)':'')+
+  '. Shared pointers may be intentional; ownership and CUBE layout unverified.';
+ for(const group of result.groups){
+  const button=document.createElement('button');button.type='button';
+  button.className='secondary-button';button.style.display='block';
+  button.style.margin='8px 0';button.style.textAlign='left';
+  button.textContent='Shared '+group.kind+' at 0x'+hex(group.offset)+
+   ' · '+group.referenceCount+' map references: '+
+   group.references.map(x=>x.bankIndex+'/'+x.mapIndex+
+    ' pointer 0x'+hex(x.sourceOffset)).join(', ')+
+   (group.referencesTruncated?' (first 8 shown)':'')+
+   ' · tap to inspect first pointer source';
+  button.addEventListener('click',()=>safeRun(()=>{
+   if(inspectedMapAtlas?.rom!==model)throw Error('Atlas expired; reinspect');
+   setPageForOffset(group.references[0].sourceOffset);gotoTab('hex');
+  }));
+  root.append(button);
+ }
+ if(!result.groups.length){
+  const empty=document.createElement('div');empty.className='empty-state';
+  empty.textContent='No exact shared header, layout or blockmap pointers in the declared atlas.';
+  root.append(empty);
+ }
 }));
 
 $('map-atlas-select').addEventListener('change',()=>{
