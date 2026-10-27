@@ -6,7 +6,7 @@ import {parseHmaPcsReference,decodeHmaPcsReference} from './pcs-reference.js';
 import {fingerprintRomSha256,fingerprintMatchesRom} from './rom-fingerprint.js';
 import {compareRomIdentity} from './rom-compatibility.js';
 import {fingerprintMetadataFiles,compareRomMetadataFingerprintRecords} from './metadata-fingerprint.js';
-import {inspectBlockMap} from './map-blocks.js';
+import {inspectBlockMap,summarizeBlockmapChunk} from './map-blocks.js';
 import {inspectVanillaMapLayout,inspectVanillaMapHeader} from './map-layouts.js';
 import {inspectVanillaMapBankEntry,inspectVanillaMapWarps} from './map-discovery.js';
 import {parseVanillaBankMapCounts,inspectVanillaMapAtlas,lookupVanillaMapAtlasTarget,probeVanillaMapBankTables,auditVanillaAtlasPointerAliases} from './map-atlas.js';
@@ -28,7 +28,7 @@ let model=null, currentTab='home', page=0, selected=null, patchFile=null, palett
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
 ctx.imageSmoothingEnabled=false;
-const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-layout-inspect','map-bank-inspect','map-atlas-inspect','map-atlas-probe','map-warp-inspect','map-connection-inspect','map-event-inspect','map-script-pointer-inspect','map-blockset-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','discard-button','edit-unlock'];
+const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-summary-scan','map-layout-inspect','map-bank-inspect','map-atlas-inspect','map-atlas-probe','map-warp-inspect','map-connection-inspect','map-event-inspect','map-script-pointer-inspect','map-blockset-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','discard-button','edit-unlock'];
 const tabs={home:['YOUR WORKSPACE','ROM Workbench'],hex:['BINARY INSPECTOR','Hex editor'],anchors:['ROM SEMANTICS','Named data'],maps:['RAW MAP CELLS','Blockmap inspector'],graphics:['GBA GRAPHICS','Graphics explorer'],patches:['PATCH WORKFLOW','Patch tools'],changes:['REVIEW & EXPORT','Changes']};
 function toast(message,bad=false){const t=$('toast');t.textContent=message;t.classList.toggle('error',bad);t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),4300);}
 function safeRun(fn){try{const result=fn();if(result?.catch) result.catch(err=>toast(err.message||String(err),true));}catch(err){toast(err.message||String(err),true);}}
@@ -715,7 +715,13 @@ $('metadata-stock').addEventListener('click',async()=>{
 });
 
 
+function clearRawBlockmapSummary(message='Raw blockmap statistics invalidated; scan again.'){
+ $('map-summary-list').replaceChildren();
+ $('map-summary-status').textContent=message;
+ $('map-summary-next').disabled=true;
+}
 function clearRenderedMap(message='Rendered preview invalidated; inspect again.'){
+ clearRawBlockmapSummary();
  activeRenderedMap=null;selectedRenderedHit=null;
  $('map-render-selection').textContent='Tap a rendered metatile to inspect its raw source offsets.';
  $('map-render-jump').disabled=true;
@@ -1515,5 +1521,56 @@ for(const [id,dx,dy] of [
     $('map-inspect').click();
   }));
 }
+
+
+$('map-summary-scan').addEventListener('click',()=>safeRun(()=>{
+ requireVanillaMapFormat();
+ if($('map-layout-source').value!=='header')
+  throw Error('Select an independently verified vanilla map header first');
+ const family=$('map-layout-family').value;
+ const headerAddress=parseOffset($('map-layout-offset').value);
+ const header=inspectVanillaMapHeader(model,{address:headerAddress,family});
+ const address=parseOffset($('map-offset').value);
+ const width=Number($('map-width').value),height=Number($('map-height').value);
+ if(header.layout.blockmapOffset!==address||
+    header.layout.width!==width||header.layout.height!==height)
+  throw Error('Selected vanilla header does not match the blockmap offset and dimensions');
+ const result=summarizeBlockmapChunk(model,{
+  address,width,height,startCell:Number($('map-summary-start').value),maxCells:4096
+ });
+ const original=model,root=$('map-summary-list');
+ root.replaceChildren();
+ const flags=result.rawHighBitCounts.map((count,flag)=>({
+  flag,count,offset:result.firstRawHighBitOffsets[flag]
+ })).filter(entry=>entry.count>0).sort((a,b)=>b.count-a.count||a.flag-b.flag);
+ $('map-summary-status').textContent='Raw cells '+result.startCell+'–'+
+  (result.startCell+result.scannedCells-1)+' of '+result.totalCells+
+  ' ('+result.scannedCells+' scanned). '+flags.length+
+  ' distinct six-bit values, '+result.distinctTiles+' distinct tile IDs. '+
+  'Top tile IDs: '+result.commonTiles.map(x=>x.tileId+' × '+x.count).join(', ')+
+  '. First 16 flag values below; these are NOT verified walkability or CUBE collision rules.';
+ for(const entry of flags.slice(0,16)){
+  const button=document.createElement('button');button.type='button';
+  button.className='secondary-button';button.style.display='block';
+  button.style.margin='8px 0';button.style.textAlign='left';
+  button.textContent='Raw high bits '+entry.flag+' · '+entry.count+
+   ' cells · first ROM 0x'+hex(entry.offset)+' · tap for hex';
+  button.addEventListener('click',()=>safeRun(()=>{
+   if(model!==original)throw Error('ROM replaced; scan again');
+   setPageForOffset(entry.offset);gotoTab('hex');
+  }));
+  root.append(button);
+ }
+ $('map-summary-next').disabled=result.nextCell===null;
+ $('map-summary-next').dataset.nextCell=result.nextCell===null?'':String(result.nextCell);
+}));
+$('map-summary-next').addEventListener('click',()=>safeRun(()=>{
+ const next=$('map-summary-next').dataset.nextCell;
+ if($('map-summary-next').disabled||!/^\d+$/.test(next))
+  throw Error('Scan the current map page before continuing');
+ $('map-summary-start').value=next;
+ $('map-summary-scan').click();
+}));
+$('map-summary-start').addEventListener('change',()=>clearRawBlockmapSummary('Start cell changed; scan again.'));
 
 updateIndicators();drawGraphics();drawAnchors();renderTab(routeFromHash());
