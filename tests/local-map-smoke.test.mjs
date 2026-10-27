@@ -69,3 +69,25 @@ test('hash-matched ROM with invalid map pointers fails without report',()=>{
  assert.notEqual(result.status,0);
  assert.equal(result.stdout,'');
 });
+
+test('local smoke includes bounded script-prefix status without exporting script bytes',()=>{
+ const rom=fixture();
+ d(rom,0x204,ptr(0x700));
+ rom[0x700]=1;rom[0x701]=0;rom[0x702]=0;rom[0x703]=0;
+ d(rom,0x704,ptr(0x740));d(rom,0x708,0);
+ d(rom,0x70c,0);d(rom,0x710,0);
+ d(rom,0x750,ptr(0x900));
+ rom.set([0x16,0,0x40,1,0,0x02],0x900);
+ const result=run(rom);
+ assert.equal(result.status,0,result.stderr);
+ const report=JSON.parse(result.stdout);
+ const first=report.eventSummaries[0];
+ assert.equal(first.scriptPointersTotal,1);
+ assert.equal(first.scriptPointersInspected,1);
+ assert.equal(first.scriptPointersTruncated,false);
+ assert.equal(first.scriptPointerStatuses.inRom,1);
+ assert.equal(first.scriptPointerStatuses.decoded,1);
+ assert.equal(first.scriptPointerStatuses.terminal,1);
+ assert.equal(report.cubeCompatibilityVerified,false);
+ assert.doesNotMatch(result.stdout,/setvar|scriptPointer\\":|fixture.gba/);
+});
