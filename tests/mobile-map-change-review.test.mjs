@@ -41,3 +41,15 @@ test('typed field changes are shown in modular and standalone review',()=>{
  assert.match(offline,/function reviewFieldChanges\(/);
  assert.match(offline,/non-editable pointer, flag or reserved field/);
 });
+
+test('individual proposal removal invalidates review and impact without mutating ROM',()=>{
+ const app=read('src/app.js'),offline=read('app/CUBHMA_Mobile_Lab_Offline.html');
+ for(const source of [app,offline]){
+  assert.match(source,/function removeQueuedMapPreview\(index\)/);
+  assert.match(source,/mapReviewQueue=mapReviewQueue\.filter\(\(_,i\)=>i!==index\)/);
+  assert.match(source,/removeQueuedMapPreview\(entry\.sourceIndex\)/);
+  assert.match(source,/map-review-impact-list'\)\.replaceChildren\(\)/);
+  assert.match(source,/Remove this proposal from queue/);
+  assert.match(source,/if\(!mapReviewQueue\.length\)\{clearMapChangeReview\(\);return;\}/);
+ }
+});

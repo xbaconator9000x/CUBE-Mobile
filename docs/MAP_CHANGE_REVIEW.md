@@ -7,3 +7,7 @@ This is an **in-memory review only**, not a patch writer, semantic editor or tra
 ## Field-scoped review validation
 
 Queued previews now produce immutable typed field differences (tile ID/raw six-bit collision, warp coordinates/destination, and exposed event coordinates/elevation). The review rejects even a forged preview object if it attempts to change object script pointers, event flags, trigger script pointers, signpost arguments, or other non-editable bytes. This is a validation layer for the **preview queue only**: it does not grant write authority, validate CUBE-specific layouts or guarantee script/runtime safety. The mobile and offline review display original and proposed field values before any future authenticated edit workflow.
+
+## Per-item queue management
+
+After checking queued proposals, each record has a **Remove this proposal from queue** control. Removing one proposal clears both the byte review and shared-impact results, so they must be rerun against the remaining records. Removing the last proposal resets the review queue. This changes only in-memory preview state and never changes or exports ROM bytes.
