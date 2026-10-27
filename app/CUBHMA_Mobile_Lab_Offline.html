@@ -194,6 +194,20 @@
       <button type="button" id="map-summary-scan" class="subtle-button" disabled>Scan 4096 raw cells</button>
       <button type="button" id="map-summary-next" class="secondary-button" disabled>Next cells</button>
     </div>
+    <div class="toolbar-card" aria-label="Read-only proposed vanilla cell change">
+      <h3>Preview a metatile change (no writes)</h3>
+      <p class="palette-note">Use an independently verified vanilla header. Tap a rendered cell to fill these fields, or enter its coordinates. The six high bits are raw metadata, not verified walkability.</p>
+      <div class="input-row">
+        <div class="input-wrap"><label for="map-preview-x">Cell X</label><input id="map-preview-x" type="number" min="0" max="1023" step="1" value="0"></div>
+        <div class="input-wrap"><label for="map-preview-y">Cell Y</label><input id="map-preview-y" type="number" min="0" max="1023" step="1" value="0"></div>
+      </div>
+      <div class="input-row">
+        <div class="input-wrap"><label for="map-preview-tile">Proposed tile ID (0–1023)</label><input id="map-preview-tile" type="number" min="0" max="1023" step="1" placeholder="Keep existing"></div>
+        <div class="input-wrap"><label for="map-preview-collision">Proposed raw high bits (0–63)</label><input id="map-preview-collision" type="number" min="0" max="63" step="1" placeholder="Keep existing"></div>
+      </div>
+      <button type="button" id="map-preview-cell" class="subtle-button" disabled>Preview original and proposed bytes</button>
+      <output id="map-preview-status" class="palette-note" aria-live="polite">Select an explicit vanilla header and coordinates to preview bytes. No writes.</output>
+    </div>
     <output id="map-summary-status" class="palette-note" aria-live="polite">No raw blockmap statistics scanned. Requires matching selected vanilla header.</output>
     <div id="map-summary-list" class="anchor-list" aria-label="Raw six-bit collision/elevation distribution"></div>
   </div>
@@ -3402,6 +3416,66 @@ function renderVanillaMapViewport(source,{address,family,x=0,y=0,viewportWidth=1
   layoutAuthenticated:false,walkabilityVerified:false});
 }
 
+/**
+ * Read-only, byte-exact proposed vanilla blockmap cell change.
+ *
+ * Pinned upstream kcradi/CUBHMA MapModel.cs: BlockCells stores
+ * (collision << 10) | tile as a little-endian u16. This module deliberately
+ * NEVER writes a ROM or authorizes an edit. CUBE layouts are unauthenticated.
+ */
+function bounded(value,max,label) {
+ if(!Number.isSafeInteger(value)||value<0||value>max)
+  throw new RangeError(label+' must be an integer from 0 to '+max);
+}
+function snapshotAtlas(atlas,header,layout) {
+ if(atlas===undefined)return Object.freeze({known:false,total:0,maps:Object.freeze([])});
+ if(!atlas||atlas.readOnly!==true||atlas.layoutAuthenticated!==false||
+    !Array.isArray(atlas.maps)||atlas.maps.length<1||atlas.maps.length>4096||
+    atlas.family!==header.family)
+  throw new TypeError('Expected a declared read-only vanilla atlas for the same family');
+ const own=atlas.maps.filter(m=>m.mapHeaderOffset===header.address);
+ if(!own.length||own.some(m=>m.layoutOffset!==header.layoutOffset||
+    m.blockmapOffset!==layout.blockmapOffset||m.width!==layout.width||
+    m.height!==layout.height))
+  throw new RangeError('Selected header is absent or stale in the declared atlas');
+ const owners=atlas.maps.filter(m=>m.blockmapOffset===layout.blockmapOffset);
+ return Object.freeze({known:true,total:owners.length,maps:Object.freeze(
+  owners.slice(0,16).map(m=>Object.freeze({bankIndex:m.bankIndex,mapIndex:m.mapIndex,
+   mapHeaderOffset:m.mapHeaderOffset})) )});
+}
+function previewVanillaBlockmapCellChange(source,{
+ address,family,x,y,tileId,collision,expectedRaw,atlas
+}={}) {
+ const header=inspectVanillaMapHeader(source,{address,family}),layout=header.layout;
+ bounded(x,layout.width-1,'X');bounded(y,layout.height-1,'Y');
+ if(tileId===undefined&&collision===undefined)
+  throw new RangeError('Specify a proposed tile ID or raw six-bit collision value');
+ if(tileId!==undefined)bounded(tileId,1023,'Tile ID');
+ if(collision!==undefined)bounded(collision,63,'Raw collision');
+ if(expectedRaw!==undefined)bounded(expectedRaw,65535,'Expected original cell word');
+ const view=inspectBlockMap(source,{address:layout.blockmapOffset,
+  width:layout.width,height:layout.height,x,y,viewportWidth:1,viewportHeight:1});
+ const current=view.cells[0][0];
+ if(expectedRaw!==undefined&&expectedRaw!==current.raw)
+  throw new RangeError('Original cell changed since selection; preview again');
+ const nextTile=tileId===undefined?current.tileId:tileId;
+ const nextCollision=collision===undefined?current.collision:collision;
+ const nextRaw=(nextCollision<<10)|nextTile;
+ const aliases=snapshotAtlas(atlas,header,layout);
+ return Object.freeze({
+  headerOffset:header.address,layoutOffset:header.layoutOffset,
+  blockmapOffset:layout.blockmapOffset,width:layout.width,height:layout.height,
+  x,y,byteOffset:current.byteOffset,
+  before:Object.freeze({raw:current.raw,tileId:current.tileId,
+   collision:current.collision,bytes:Object.freeze([current.raw&255,current.raw>>>8])}),
+  after:Object.freeze({raw:nextRaw,tileId:nextTile,
+   collision:nextCollision,bytes:Object.freeze([nextRaw&255,nextRaw>>>8])}),
+  changed:nextRaw!==current.raw,aliases,readOnly:true,
+  previewOnly:true,writeAuthorized:false,layoutAuthenticated:false,
+  walkabilityVerified:false
+ });
+}
+
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let pcsReference=null,pcsReferenceName='';
@@ -3413,7 +3487,7 @@ let model=null, currentTab='home', page=0, selected=null, patchFile=null, palett
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
 ctx.imageSmoothingEnabled=false;
-const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-summary-scan','map-layout-inspect','map-bank-inspect','map-atlas-inspect','map-atlas-probe','map-warp-inspect','map-connection-inspect','map-event-inspect','map-script-pointer-inspect','map-blockset-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','discard-button','edit-unlock'];
+const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-summary-scan','map-preview-cell','map-layout-inspect','map-bank-inspect','map-atlas-inspect','map-atlas-probe','map-warp-inspect','map-connection-inspect','map-event-inspect','map-script-pointer-inspect','map-blockset-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','discard-button','edit-unlock'];
 const tabs={home:['YOUR WORKSPACE','ROM Workbench'],hex:['BINARY INSPECTOR','Hex editor'],anchors:['ROM SEMANTICS','Named data'],maps:['RAW MAP CELLS','Blockmap inspector'],graphics:['GBA GRAPHICS','Graphics explorer'],patches:['PATCH WORKFLOW','Patch tools'],changes:['REVIEW & EXPORT','Changes']};
 function toast(message,bad=false){const t=$('toast');t.textContent=message;t.classList.toggle('error',bad);t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),4300);}
 function safeRun(fn){try{const result=fn();if(result?.catch) result.catch(err=>toast(err.message||String(err),true));}catch(err){toast(err.message||String(err),true);}}
@@ -4109,6 +4183,7 @@ function clearRenderedMap(message='Rendered preview invalidated; inspect again.'
  clearRawBlockmapSummary();
  activeRenderedMap=null;selectedRenderedHit=null;
  $('map-render-selection').textContent='Tap a rendered metatile to inspect its raw source offsets.';
+ $('map-preview-status').textContent='Select an explicit vanilla header and coordinates to preview bytes. No writes.';
  $('map-render-jump').disabled=true;
  $('map-render-canvas').hidden=true;
  $('map-render-status').textContent=message;
@@ -4909,6 +4984,11 @@ $('map-render-canvas').addEventListener('click',event=>safeRun(()=>{
   (events.length?', raw event(s) '+events.join(', '):'')+
   '. Coordinates and walkability are NOT authenticated.';
  $('map-render-jump').disabled=false;
+ $('map-preview-x').value=String(hit.cell.x);
+ $('map-preview-y').value=String(hit.cell.y);
+ $('map-preview-tile').value=String(hit.cell.tileId);
+ $('map-preview-collision').value=String(hit.cell.collision);
+ $('map-preview-status').textContent='Cell selected. Change a proposed tile or raw collision value, then preview exact bytes. No writes.';
 }));
 $('map-render-jump').addEventListener('click',()=>safeRun(()=>{
  if(!selectedRenderedHit||selectedRenderedHit.rom!==model||!activeRenderedMap)
@@ -4935,6 +5015,48 @@ for(const [id,dx,dy] of [
   }));
 }
 
+
+$('map-preview-cell').addEventListener('click',()=>safeRun(()=>{
+ requireVanillaMapFormat();
+ if($('map-layout-source').value!=='header')
+  throw Error('Choose an independently verified vanilla map header first');
+ const address=parseOffset($('map-layout-offset').value);
+ const family=$('map-layout-family').value;
+ const header=inspectVanillaMapHeader(model,{address,family});
+ if(header.layout.blockmapOffset!==parseOffset($('map-offset').value)||
+    header.layout.width!==Number($('map-width').value)||
+    header.layout.height!==Number($('map-height').value))
+  throw Error('Selected map header differs from the displayed blockmap');
+ let atlas;
+ if(inspectedMapAtlas?.rom===model){
+  const candidate=inspectedMapAtlas.atlas;
+  const counts=parseVanillaBankMapCounts($('map-atlas-counts').value);
+  if(parseOffset($('map-bank-offset').value)!==candidate.address||
+     candidate.family!==family||counts.length!==candidate.bankCount||
+     counts.some((n,i)=>n!==candidate.bankMapCounts[i]))
+   throw Error('Declared atlas inputs changed; inspect atlas again');
+  if(candidate.maps.some(m=>m.mapHeaderOffset===address))atlas=candidate;
+ }
+ const proposedTile=$('map-preview-tile').value.trim();
+ const proposedCollision=$('map-preview-collision').value.trim();
+ const x=Number($('map-preview-x').value),y=Number($('map-preview-y').value);
+ const selected=selectedRenderedHit?.rom===model?selectedRenderedHit.hit.cell:null;
+ const expectedRaw=selected&&selected.x===x&&selected.y===y?selected.raw:undefined;
+ const result=previewVanillaBlockmapCellChange(model,{
+  address,family,x,y,
+  ...(proposedTile===''?{}:{tileId:Number(proposedTile)}),
+  ...(proposedCollision===''?{}:{collision:Number(proposedCollision)}),
+  ...(expectedRaw===undefined?{}:{expectedRaw}),...(atlas?{atlas}:{})
+ });
+ const old=result.before.bytes.map(n=>hex(n,2)).join(' ');
+ const next=result.after.bytes.map(n=>hex(n,2)).join(' ');
+ $('map-preview-status').textContent='ROM 0x'+hex(result.byteOffset)+
+  ' · original '+old+' (tile '+result.before.tileId+', raw bits '+result.before.collision+
+  ') → proposed '+next+' (tile '+result.after.tileId+', raw bits '+result.after.collision+
+  '). '+(result.changed?'Two-byte change preview only.':'No byte difference.')+
+  ' Shared blockmap owners: '+(result.aliases.known?result.aliases.total:'unknown (no matching atlas)')+
+  '. NOT applied. CUBE layout, collision semantics and write safety unverified.';
+}));
 
 $('map-summary-scan').addEventListener('click',()=>safeRun(()=>{
  requireVanillaMapFormat();

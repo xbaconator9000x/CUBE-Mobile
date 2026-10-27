@@ -16,6 +16,7 @@ import {inspectVanillaMapEvents,inspectVanillaEventScriptPointers,previewVanilla
 import {inspectVanillaMapBlocksets} from './map-blocksets.js';
 import {panMapViewport,indexMapWarpMarkers,indexMapEventMarkers,inspectRenderedMapPixel,projectRenderedMapMarkers} from './map-viewport.js';
 import {renderVanillaMapViewport} from './map-render.js';
+import {previewVanillaBlockmapCellChange} from './map-edit-preview.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
@@ -28,7 +29,7 @@ let model=null, currentTab='home', page=0, selected=null, patchFile=null, palett
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
 ctx.imageSmoothingEnabled=false;
-const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-summary-scan','map-layout-inspect','map-bank-inspect','map-atlas-inspect','map-atlas-probe','map-warp-inspect','map-connection-inspect','map-event-inspect','map-script-pointer-inspect','map-blockset-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','discard-button','edit-unlock'];
+const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-summary-scan','map-preview-cell','map-layout-inspect','map-bank-inspect','map-atlas-inspect','map-atlas-probe','map-warp-inspect','map-connection-inspect','map-event-inspect','map-script-pointer-inspect','map-blockset-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','discard-button','edit-unlock'];
 const tabs={home:['YOUR WORKSPACE','ROM Workbench'],hex:['BINARY INSPECTOR','Hex editor'],anchors:['ROM SEMANTICS','Named data'],maps:['RAW MAP CELLS','Blockmap inspector'],graphics:['GBA GRAPHICS','Graphics explorer'],patches:['PATCH WORKFLOW','Patch tools'],changes:['REVIEW & EXPORT','Changes']};
 function toast(message,bad=false){const t=$('toast');t.textContent=message;t.classList.toggle('error',bad);t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),4300);}
 function safeRun(fn){try{const result=fn();if(result?.catch) result.catch(err=>toast(err.message||String(err),true));}catch(err){toast(err.message||String(err),true);}}
@@ -724,6 +725,7 @@ function clearRenderedMap(message='Rendered preview invalidated; inspect again.'
  clearRawBlockmapSummary();
  activeRenderedMap=null;selectedRenderedHit=null;
  $('map-render-selection').textContent='Tap a rendered metatile to inspect its raw source offsets.';
+ $('map-preview-status').textContent='Select an explicit vanilla header and coordinates to preview bytes. No writes.';
  $('map-render-jump').disabled=true;
  $('map-render-canvas').hidden=true;
  $('map-render-status').textContent=message;
@@ -1524,6 +1526,11 @@ $('map-render-canvas').addEventListener('click',event=>safeRun(()=>{
   (events.length?', raw event(s) '+events.join(', '):'')+
   '. Coordinates and walkability are NOT authenticated.';
  $('map-render-jump').disabled=false;
+ $('map-preview-x').value=String(hit.cell.x);
+ $('map-preview-y').value=String(hit.cell.y);
+ $('map-preview-tile').value=String(hit.cell.tileId);
+ $('map-preview-collision').value=String(hit.cell.collision);
+ $('map-preview-status').textContent='Cell selected. Change a proposed tile or raw collision value, then preview exact bytes. No writes.';
 }));
 $('map-render-jump').addEventListener('click',()=>safeRun(()=>{
  if(!selectedRenderedHit||selectedRenderedHit.rom!==model||!activeRenderedMap)
@@ -1550,6 +1557,48 @@ for(const [id,dx,dy] of [
   }));
 }
 
+
+$('map-preview-cell').addEventListener('click',()=>safeRun(()=>{
+ requireVanillaMapFormat();
+ if($('map-layout-source').value!=='header')
+  throw Error('Choose an independently verified vanilla map header first');
+ const address=parseOffset($('map-layout-offset').value);
+ const family=$('map-layout-family').value;
+ const header=inspectVanillaMapHeader(model,{address,family});
+ if(header.layout.blockmapOffset!==parseOffset($('map-offset').value)||
+    header.layout.width!==Number($('map-width').value)||
+    header.layout.height!==Number($('map-height').value))
+  throw Error('Selected map header differs from the displayed blockmap');
+ let atlas;
+ if(inspectedMapAtlas?.rom===model){
+  const candidate=inspectedMapAtlas.atlas;
+  const counts=parseVanillaBankMapCounts($('map-atlas-counts').value);
+  if(parseOffset($('map-bank-offset').value)!==candidate.address||
+     candidate.family!==family||counts.length!==candidate.bankCount||
+     counts.some((n,i)=>n!==candidate.bankMapCounts[i]))
+   throw Error('Declared atlas inputs changed; inspect atlas again');
+  if(candidate.maps.some(m=>m.mapHeaderOffset===address))atlas=candidate;
+ }
+ const proposedTile=$('map-preview-tile').value.trim();
+ const proposedCollision=$('map-preview-collision').value.trim();
+ const x=Number($('map-preview-x').value),y=Number($('map-preview-y').value);
+ const selected=selectedRenderedHit?.rom===model?selectedRenderedHit.hit.cell:null;
+ const expectedRaw=selected&&selected.x===x&&selected.y===y?selected.raw:undefined;
+ const result=previewVanillaBlockmapCellChange(model,{
+  address,family,x,y,
+  ...(proposedTile===''?{}:{tileId:Number(proposedTile)}),
+  ...(proposedCollision===''?{}:{collision:Number(proposedCollision)}),
+  ...(expectedRaw===undefined?{}:{expectedRaw}),...(atlas?{atlas}:{})
+ });
+ const old=result.before.bytes.map(n=>hex(n,2)).join(' ');
+ const next=result.after.bytes.map(n=>hex(n,2)).join(' ');
+ $('map-preview-status').textContent='ROM 0x'+hex(result.byteOffset)+
+  ' · original '+old+' (tile '+result.before.tileId+', raw bits '+result.before.collision+
+  ') → proposed '+next+' (tile '+result.after.tileId+', raw bits '+result.after.collision+
+  '). '+(result.changed?'Two-byte change preview only.':'No byte difference.')+
+  ' Shared blockmap owners: '+(result.aliases.known?result.aliases.total:'unknown (no matching atlas)')+
+  '. NOT applied. CUBE layout, collision semantics and write safety unverified.';
+}));
 
 $('map-summary-scan').addEventListener('click',()=>safeRun(()=>{
  requireVanillaMapFormat();

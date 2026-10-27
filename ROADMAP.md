@@ -1,5 +1,10 @@
 # Roadmap
 
+## Checkpoint — touch-friendly exact-byte blockmap change preview (27 October 2026)
+- [x] Preview proposed tile ID and raw six-bit collision changes from explicit vanilla header/coordinates without modifying ROM bytes; tap rendered cells to prefill fields.
+- [x] Show exact original/proposed bytes, source offset and declared-atlas shared-blockmap owner count; stale selection rejects changed cell words.
+- [ ] This is **not** semantic editing or authenticated CUBE parity. No writes, relocation, emulator or Android acceptance; retain strict 0/30 score.
+
 ## Checkpoint — bounded raw object/trigger script byte preview (27 October 2026)
 - [x] Inspect at most 64 exact bytes from an in-ROM object/trigger script pointer, with staged ROM reads, source offsets, truncation and fail-closed invalid pointer checks.
 - [x] Add mobile/offline touch preview of 32 raw bytes and stale map-selection checks; no script decoding, command boundary inference or execution.
