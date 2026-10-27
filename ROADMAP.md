@@ -1,3 +1,9 @@
+## Checkpoint — atlas-wide shared vanilla script targets (28 October 2026)
+- [x] Audit all explicitly declared vanilla maps in a single capped, fail-closed pass, including aliases separated by arbitrary 64-map scan windows.
+- [x] Preserve exact event pointer-field provenance, count all references while capping displayed groups, and reject stale map pointers/layouts and oversized audits.
+- [x] Add synthetic regression coverage; no ROM writes, CUBE ownership authentication or strict parity credit. See [atlas-wide script aliases](docs/VANILLA_SCRIPT_ALIAS_ATLAS.md).
+- [ ] Add touch-friendly navigation and independently verify genuine CUBE ROM, emulator and Android acceptance.
+
 # Roadmap
 
 ## Checkpoint — mobile vanilla map script summary (28 October 2026)
