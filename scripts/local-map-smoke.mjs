@@ -65,6 +65,8 @@ function main(){
    scriptPointersInspected:scriptAudit.inspectedRecords,
    scriptPointersTruncated:scriptAudit.truncated,
    scriptPointerStatuses:scriptAudit.counts,
+   scriptOperandPointerStatuses:scriptAudit.operandPointerStatuses,
+   scriptOperandPointerRoles:scriptAudit.operandPointerRoles,
    bankIndex:map.bankIndex,mapIndex:map.mapIndex,
    objects:events.counts.objects,warps:events.counts.warps,
    scripts:events.counts.scripts,signposts:events.counts.signposts
