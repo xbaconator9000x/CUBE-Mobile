@@ -34,12 +34,13 @@ test('warp commands stop a sequential prefix rather than parsing following bytes
  }
 });
 
-test('variable-length trainerbattle and family-specific 2c remain untrusted',()=>{
- for(const opcode of [0x2c,0x5c]){
-  const r=read([opcode,0,0,0,0,0,0,0,0]);
-  assert.equal(r.commands.length,0);
-  assert.equal(r.stopReason,'unknown-opcode');
- }
+test('family-specific 2c and unsupported trainerbattle subtypes fail closed',()=>{
+ const familySpecific=read([0x2c,0,0,0,0,0,0,0,0]);
+ assert.equal(familySpecific.commands.length,0);
+ assert.equal(familySpecific.stopReason,'unknown-opcode');
+ const extended=read([0x5c,0x09,0,0,0,0,0,0,0]);
+ assert.equal(extended.commands.length,0);
+ assert.equal(extended.stopReason,'unsupported-trainerbattle');
 });
 
 test('truncated movement and warp operands never produce partial commands',()=>{
