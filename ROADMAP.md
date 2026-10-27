@@ -1,3 +1,8 @@
+## Checkpoint — canonical full-atlas script provenance (28 October 2026)
+- [x] Re-derive every declared map pointer source from the ROM bank table and explicit bank/map counts, rather than accepting a matching pointer value at an arbitrary supplied offset.
+- [x] Reject forged map indexes, shuffled atlas order, missing bank-count provenance and stale map headers before emitting whole-atlas script aliases; add synthetic forgery regressions.
+- [ ] This remains a read-only vanilla structural check, not CUBE layout authentication or pointer ownership. Authentic ROM/emulator/Android acceptance and strict parity remain outstanding.
+
 ## Checkpoint — opt-in local full-atlas script alias smoke (28 October 2026)
 - [x] Add SHA-256-matched, opt-in aggregate alias counts for every explicitly declared vanilla map, with no pointer addresses or ROM bytes in the report.
 - [x] Reject malformed flags and oversized scans; add synthetic multi-map and no-export regressions.

@@ -61,3 +61,21 @@ test('reports truncated reference display without truncating counts',()=>{
  assert.equal(result.groups[0].references.length,1);
  assert.equal(result.groups[0].referencesTruncated,true);
 });
+
+test('rejects forged source offsets, reordered map identities and missing bank declarations',()=>{
+ const {rom,atlas}=fixture(3);
+ // Make two map entries legitimately alias the same header. A forged source
+ // offset can then carry a correct pointer value while lying about ownership.
+ d(rom,0x404,ptr(0x1000));
+ const valid=inspectVanillaMapAtlas(rom,{
+  address:0x100,bankMapCounts:[3],family:'RSE'
+ });
+ const fakeSource={...valid,maps:valid.maps.map((m,i)=>i===0?
+  {...m,mapPointerSource:valid.maps[1].mapPointerSource}:m)};
+ assert.throws(()=>audit(rom,fakeSource),/source forged/);
+ const fakeIndex={...valid,maps:valid.maps.map((m,i)=>i===0?
+  {...m,mapIndex:1}:m)};
+ assert.throws(()=>audit(rom,fakeIndex),/map order/);
+ assert.throws(()=>audit(rom,{...valid,bankMapCounts:[2]}),/bank-table provenance/);
+ assert.throws(()=>audit(rom,{...valid,address:0x104}),RangeError);
+});
