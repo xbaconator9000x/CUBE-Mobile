@@ -23,3 +23,11 @@ test('standalone bundle includes viewport helpers and touch handlers',()=>{
  assert.match(html,/\['map-pan-left',-12,0\]/);
  assert.doesNotMatch(html,/^import \{.*?\} from '\.\//m);
 });
+test('map cells and overlays are invalidated on metadata or ROM edits',()=>{
+ const app=read('src/app.js');
+ assert.match(app,/function clearMapGrid/);
+ assert.match(app,/metadataCommit\(sources\)[\s\S]*?clearMapGrid\('Metadata changed/);
+ assert.match(app,/function metadataReset\(\)\{clearWarpInspection/);
+ assert.match(app,/clearMapGrid\('ROM bytes changed/);
+ assert.match(app,/clearMapGrid\('Edits discarded/);
+});
