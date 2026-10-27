@@ -42,3 +42,16 @@ test('coordinate review is available in modular and offline mobile UI',()=>{
  assert.match(offline,/walkabilityVerified:false/);
  assert.doesNotMatch(offline,/^import \{.*?\} from '\.\//m);
 });
+
+test('atlas-wide coordinate review is present in modular and offline UI',()=>{
+ const app=read('src/app.js');
+ for(const path of ['index.html','app/CUBHMA_Mobile_Lab_Offline.html']){
+  const html=read(path);
+  for(const id of ['map-coordinate-batch-audit','map-coordinate-batch-status','map-coordinate-batch-list'])
+   assert.match(html,new RegExp('id="'+id+'"'));
+ }
+ assert.match(app,/auditVanillaAtlasEventCoordinateBatch\(model,atlas/);
+ assert.match(app,/atlasCoordinateBatchStart=result.nextStart/);
+ assert.match(read('app/CUBHMA_Mobile_Lab_Offline.html'),
+  /function auditVanillaAtlasEventCoordinateBatch\(/);
+});
