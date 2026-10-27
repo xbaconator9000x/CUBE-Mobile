@@ -161,6 +161,9 @@
     <button type="button" id="map-atlas-incoming" class="subtle-button" disabled>Find incoming links to selected map (next 16 declared maps, read only)</button>
     <output id="map-atlas-incoming-status" class="palette-note" aria-live="polite">No incoming link page inspected.</output>
     <div id="map-atlas-incoming-list" class="anchor-list" aria-label="Raw incoming vanilla warp and connection references"></div>
+    <button type="button" id="map-warp-return-audit" class="subtle-button" disabled>Review selected map warp return paths (read only)</button>
+    <output id="map-warp-return-status" class="palette-note" aria-live="polite">No raw warp return-path review run.</output>
+    <div id="map-warp-return-list" class="anchor-list" aria-label="Raw warp return-path review"></div>
     <button type="button" id="map-event-coordinate-audit" class="subtle-button" disabled>Review selected map event coordinates and shared cells (read only)</button>
     <output id="map-event-coordinate-status" class="palette-note" aria-live="polite">No event coordinate audit run.</output>
     <div id="map-event-coordinate-list" class="anchor-list" aria-label="Raw event coordinate findings"></div>
@@ -3795,6 +3798,91 @@ function traceVanillaWarpArrival(source,atlas,{bankIndex,mapIndex,warpIndex}={})
    width:targetHeader.layout.width,height:targetHeader.layout.height})});
 }
 
+
+/**
+ * Inspect whether the raw arrival warp record points back to its source.
+ * A non-reciprocal warp is a REVIEW HINT, not an error: one-way and scripted
+ * travel are valid. No runtime teleport semantics are inferred.
+ * Rechecks pointer sources and layouts against current staged ROM bytes.
+ */
+function auditVanillaWarpReturns(source,atlas,{
+ bankIndex,mapIndex,maxResults=128
+}={}){
+ if(!atlas||atlas.readOnly!==true||atlas.layoutAuthenticated!==false||
+    !['RSE','FRLG'].includes(atlas.family)||!Array.isArray(atlas.maps)||
+    atlas.maps.length<1||atlas.maps.length>4096)
+  throw new TypeError('Expected a declared read-only vanilla atlas');
+ if(!Number.isSafeInteger(maxResults)||maxResults<1||maxResults>256)
+  throw new RangeError('Return audit cap must be 1–256');
+ const selected=lookupVanillaMapAtlasTarget(atlas,bankIndex,mapIndex);
+ if(!selected)throw new RangeError('Source map outside declared atlas');
+ const rom=source instanceof Uint8Array?{length:source.length,read:i=>source[i]}:source;
+ if(!rom||!Number.isSafeInteger(rom.length)||typeof rom.read!=='function')
+  throw new TypeError('Expected ROM bytes or staged reader');
+ const read=i=>{
+  if(!Number.isSafeInteger(i)||i<0||i>=rom.length)throw new RangeError('Pointer outside ROM');
+  const b=rom.read(i);
+  if(!Number.isInteger(b)||b<0||b>255)throw new RangeError('Invalid ROM byte');
+  return b;
+ };
+ const pointer=i=>(read(i)|(read(i+1)<<8)|(read(i+2)<<16)|(read(i+3)<<24))>>>0;
+ const checked=new Set();
+ function verify(entry){
+  if(!Number.isSafeInteger(entry.mapPointerSource)||entry.mapPointerSource<0||
+     !Number.isSafeInteger(entry.mapHeaderOffset)||entry.mapHeaderOffset<0||
+     pointer(entry.mapPointerSource)!==(0x08000000+entry.mapHeaderOffset))
+   throw new RangeError('Atlas pointer changed; reinspect');
+  if(checked.has(entry.mapHeaderOffset))return;
+  const h=inspectVanillaMapHeader(rom,{address:entry.mapHeaderOffset,family:atlas.family});
+  if(h.layoutOffset!==entry.layoutOffset||h.layout.blockmapOffset!==entry.blockmapOffset||
+     h.layout.width!==entry.width||h.layout.height!==entry.height)
+   throw new RangeError('Atlas layout changed; reinspect');
+  checked.add(entry.mapHeaderOffset);
+ }
+ verify(selected);
+ const events=inspectVanillaMapEvents(rom,{address:selected.mapHeaderOffset,family:atlas.family});
+ const counts={reciprocal:0,differentWarp:0,differentMap:0,specialReturn:0,unresolved:0};
+ const records=[];
+ for(const warp of events.arrays.warps){
+  const trace=traceVanillaWarpArrival(rom,atlas,{
+   bankIndex,mapIndex,warpIndex:warp.index
+  });
+  let status,arrival=null,returnTarget=null;
+  if(trace.status!=='raw-arrival'){
+   status='unresolved';
+  }else{
+   const destination=trace.destination;
+   const entry=lookupVanillaMapAtlasTarget(atlas,destination.bankIndex,destination.mapIndex);
+   verify(entry);
+   const targetEvents=inspectVanillaMapEvents(rom,{
+    address:entry.mapHeaderOffset,family:atlas.family
+   });
+   const back=targetEvents.arrays.warps[destination.warpIndex];
+   returnTarget=Object.freeze({bankIndex:back.targetBank,mapIndex:back.targetMap,
+    warpIndex:back.warpId,recordOffset:back.offset});
+   arrival=Object.freeze({bankIndex:destination.bankIndex,mapIndex:destination.mapIndex,
+    warpIndex:destination.warpIndex,x:destination.x,y:destination.y});
+   if(back.targetBank===255||back.targetMap===255||back.warpId===255)
+    status='specialReturn';
+   else if(back.targetBank!==bankIndex||back.targetMap!==mapIndex)
+    status='differentMap';
+   else if(back.warpId!==warp.index)status='differentWarp';
+   else status='reciprocal';
+  }
+  counts[status]++;
+  if(records.length<maxResults)records.push(Object.freeze({
+   sourceWarpIndex:warp.index,sourceRecordOffset:warp.offset,
+   targetBank:warp.targetBank,targetMap:warp.targetMap,targetWarpId:warp.warpId,
+   traceStatus:trace.status,status,arrival,returnTarget
+  }));
+ }
+ return Object.freeze({bankIndex,mapIndex,headerOffset:selected.mapHeaderOffset,
+  totalWarps:events.arrays.warps.length,counts:Object.freeze(counts),
+  truncated:events.arrays.warps.length>records.length,records:Object.freeze(records),
+  readOnly:true,layoutAuthenticated:false,runtimeBehaviorVerified:false,
+  reciprocalRequired:false});
+}
+
 /**
  * Immutable, byte-exact preview of a vanilla eight-byte warp record.
  * Pinned CUBHMA MapModel.cs WarpsFormat: x:y:elevation:warpID:map:bank.
@@ -5087,6 +5175,9 @@ function clearMapAtlas(message='Declared atlas invalidated; inspect again.') {
  $('map-atlas-open').disabled=true;
  $('map-atlas-audit').disabled=true;
  $('map-atlas-incoming').disabled=true;
+ $('map-warp-return-audit').disabled=true;
+ $('map-warp-return-list').replaceChildren();
+ $('map-warp-return-status').textContent='No raw warp return-path review run.';
  $('map-atlas-incoming-list').replaceChildren();
  $('map-atlas-incoming-status').textContent='No incoming link page inspected.';
  $('map-event-coordinate-audit').disabled=true;
@@ -5175,6 +5266,7 @@ $('map-atlas-inspect').addEventListener('click',()=>safeRun(()=>{
  $('map-atlas-open').disabled=false;
  $('map-atlas-audit').disabled=false;
  $('map-atlas-incoming').disabled=false;
+ $('map-warp-return-audit').disabled=false;
  $('map-event-coordinate-audit').disabled=false;
  $('map-atlas-batch-audit').disabled=false;
  $('map-atlas-alias-audit').disabled=false;
@@ -5186,6 +5278,9 @@ $('map-atlas-inspect').addEventListener('click',()=>safeRun(()=>{
 $('map-atlas-select').addEventListener('change',()=>{
  atlasIncomingStart=0;atlasIncomingTarget=null;
  $('map-atlas-incoming').disabled=!inspectedMapAtlas;
+ $('map-warp-return-audit').disabled=!inspectedMapAtlas;
+ $('map-warp-return-list').replaceChildren();
+ $('map-warp-return-status').textContent='Selection changed; review return paths for the selected map.';
  $('map-atlas-incoming-list').replaceChildren();
  $('map-atlas-incoming-status').textContent='Selection changed; scan from the first declared map.';
 });
@@ -5307,6 +5402,65 @@ $('map-atlas-incoming').addEventListener('click',()=>safeRun(()=>{
  }
  atlasIncomingStart=result.nextStart??0;
  $('map-atlas-incoming').disabled=result.nextStart===null;
+}));
+
+$('map-warp-return-audit').addEventListener('click',()=>safeRun(()=>{
+ requireVanillaMapFormat();
+ if(!inspectedMapAtlas||inspectedMapAtlas.rom!==model)
+  throw Error('Reinspect the declared atlas before reviewing return paths');
+ const atlas=inspectedMapAtlas.atlas;
+ const counts=parseVanillaBankMapCounts($('map-atlas-counts').value);
+ if(parseOffset($('map-bank-offset').value)!==atlas.address||
+    $('map-layout-family').value!==atlas.family||
+    counts.length!==atlas.bankCount||
+    counts.some((n,i)=>n!==atlas.bankMapCounts[i]))
+  throw Error('Atlas inputs changed; reinspect before return-path review');
+ const i=Number($('map-atlas-select').value);
+ if(!Number.isSafeInteger(i)||i<0||i>=atlas.maps.length)
+  throw Error('Select a declared map first');
+ const entry=atlas.maps[i];
+ const result=auditVanillaWarpReturns(model,atlas,{
+  bankIndex:entry.bankIndex,mapIndex:entry.mapIndex,maxResults:128
+ });
+ const root=$('map-warp-return-list');root.replaceChildren();
+ $('map-warp-return-status').textContent='Map '+entry.bankIndex+'/'+entry.mapIndex+
+  ': '+result.totalWarps+' raw source warps, '+result.counts.reciprocal+
+  ' reciprocal records, '+result.counts.differentWarp+' different return indexes, '+
+  result.counts.differentMap+' different return maps, '+result.counts.specialReturn+
+  ' special returns, '+result.counts.unresolved+' unresolved arrivals'+
+  (result.truncated?' (first 128 shown)':'')+
+  '. Non-reciprocal links may be intentional. Runtime behavior and CUBE layout unverified.';
+ for(const record of result.records){
+  const button=document.createElement('button');button.type='button';
+  button.className='secondary-button';button.style.display='block';
+  button.style.margin='8px 0';button.style.textAlign='left';
+  button.textContent='Warp '+record.sourceWarpIndex+' → '+
+   record.targetBank+'/'+record.targetMap+' warp '+record.targetWarpId+
+   ' · '+record.status+' ('+record.traceStatus+')'+
+   ' · ROM 0x'+hex(record.sourceRecordOffset);
+  button.addEventListener('click',()=>safeRun(()=>{
+   if(inspectedMapAtlas?.rom!==model||inspectedMapAtlas.atlas!==atlas)
+    throw Error('Atlas expired; reinspect');
+   setPageForOffset(record.sourceRecordOffset);gotoTab('hex');
+  }));
+  root.append(button);
+  if(record.returnTarget){
+   const back=document.createElement('button');back.type='button';
+   back.className='secondary-button';back.style.margin='0 0 8px 8px';
+   back.textContent='Inspect arrival warp at 0x'+hex(record.returnTarget.recordOffset);
+   back.addEventListener('click',()=>safeRun(()=>{
+    if(inspectedMapAtlas?.rom!==model||inspectedMapAtlas.atlas!==atlas)
+     throw Error('Atlas expired; reinspect');
+    setPageForOffset(record.returnTarget.recordOffset);gotoTab('hex');
+   }));
+   root.append(back);
+  }
+ }
+ if(!result.records.length){
+  const empty=document.createElement('div');empty.className='empty-state';
+  empty.textContent='No raw warp records in this declared map.';
+  root.append(empty);
+ }
 }));
 
 $('map-event-coordinate-audit').addEventListener('click',()=>safeRun(()=>{
