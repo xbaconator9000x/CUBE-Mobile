@@ -27,3 +27,18 @@ test('batch atlas audit controls and offline bundle stay synchronized',()=>{
  assert.match(app,/atlasBatchStart=result.nextStart/);
  assert.match(read('app/CUBHMA_Mobile_Lab_Offline.html'),/function auditVanillaAtlasLinkBatch/);
 });
+
+test('coordinate review is available in modular and offline mobile UI',()=>{
+ for(const path of ['index.html','app/CUBHMA_Mobile_Lab_Offline.html']){
+  const html=read(path);
+  for(const id of ['map-event-coordinate-audit','map-event-coordinate-status','map-event-coordinate-list'])
+   assert.match(html,new RegExp('id="'+id+'"'));
+ }
+ const app=read('src/app.js'),offline=read('app/CUBHMA_Mobile_Lab_Offline.html');
+ assert.match(app,/auditVanillaMapEventCoordinates\(model,atlas/);
+ assert.match(app,/map-event-coordinate-audit'\)\.disabled=false/);
+ assert.match(app,/map-event-coordinate-audit'\)\.disabled=true/);
+ assert.match(offline,/function auditVanillaMapEventCoordinates\(/);
+ assert.match(offline,/walkabilityVerified:false/);
+ assert.doesNotMatch(offline,/^import \{.*?\} from '\.\//m);
+});
