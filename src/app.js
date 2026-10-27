@@ -328,7 +328,7 @@ $('project-picker').addEventListener('change',async e=>{
     ensureModel();if(file.size>16*1024*1024)throw Error('Project JSON is too large');
     const project=JSON.parse(await file.text());
     if(model.dirty&&!(await confirmAction('Replace staged edits?','Restoring a project will discard the current staged edits. Continue?')))return;
-    const restored=model.loadProject(project);invalidateDecodedGraphic();drawHex();drawGraphics();drawChanges();updateIndicators();toast(`Restored ${restored} bytes of checked edits.`);
+    const restored=model.loadProject(project);invalidateDecodedGraphic();clearWarpInspection('Project restored; inspect warps again.');clearConnectionInspection('Project restored; inspect connections again.');clearMapGrid('Project restored; inspect map cells again.');drawHex();drawGraphics();drawChanges();updateIndicators();toast(`Restored ${restored} bytes of checked edits.`);
   }catch(err){toast(err.message||String(err),true);}
 });
 $('patch-picker').addEventListener('change',e=>{patchFile=e.target.files?.[0]||null;$('patch-filename').textContent=patchFile?`${patchFile.name} · ${formatSize(patchFile.size)}`:'No patch selected';updateIndicators();});
@@ -1021,6 +1021,10 @@ $('map-inspect').addEventListener('click',()=>safeRun(()=>{
 }));
 
 $('map-render-enabled').addEventListener('change',()=>{clearRenderedMap();if(model)$('map-inspect').click();});
+
+for(const id of ['map-layout-offset','map-layout-family','map-layout-source','map-offset','map-width','map-height','map-x','map-y']){
+ $(id).addEventListener('change',()=>clearRenderedMap('Map selection changed; inspect again.'));
+}
 
 for(const [id,dx,dy] of [
   ['map-pan-up',0,-10],['map-pan-down',0,10],
