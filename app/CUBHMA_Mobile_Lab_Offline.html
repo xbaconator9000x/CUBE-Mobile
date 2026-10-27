@@ -133,6 +133,13 @@
       <div class="input-wrap"><label for="map-x">Start X</label><input id="map-x" type="number" min="0" value="0"></div>
       <div class="input-wrap"><label for="map-y">Start Y</label><input id="map-y" type="number" min="0" value="0"></div>
     </div>
+    <div class="input-wrap"><label for="map-layout-offset">Optional known VANILLA map header/layout ROM offset (hex)</label><input id="map-layout-offset" inputmode="text" spellcheck="false" placeholder="e.g. 1A2B3C"></div>
+    <div class="input-row">
+      <div class="input-wrap"><label for="map-layout-source">Source structure</label><select id="map-layout-source"><option value="header">Vanilla map header</option><option value="layout">Vanilla map layout</option></select></div>
+      <div class="input-wrap"><label for="map-layout-family">Vanilla format</label><select id="map-layout-family"><option value="RSE">Ruby / Sapphire / Emerald</option><option value="FRLG">FireRed / LeafGreen</option></select></div>
+    </div>
+    <button type="button" id="map-layout-inspect" class="subtle-button" disabled>Read vanilla structure (no writes)</button>
+    <output id="map-layout-status" class="palette-note" aria-live="polite">This optional decoder is ONLY for independently verified vanilla-format structures, not CUBE expansion layouts. ROM header identity does not verify a structure.</output>
     <button type="button" id="map-inspect" class="subtle-button" disabled>Inspect 12 × 10 cells</button>
     <p class="palette-note">You must independently verify the map's blockmap offset and dimensions. Header identity alone cannot verify CUBE layouts. No bytes are changed. Collision values are raw metadata, not passability colours.</p>
     <output id="map-status" class="palette-note" aria-live="polite">Open a ROM and enter a known blockmap offset.</output>
@@ -2103,6 +2110,109 @@ function inspectBlockMap(bytes, {
   });
 }
 
+/**
+ * Read-only, explicitly selected VANILLA RSE/FRLG map structures.
+ *
+ * Source: kcradi/CUBHMA src/HexManiac.Core/Models/Map/MapModel.cs
+ * Format.LayoutFormat and Format.MapFormat (2026-10-27 inspection).
+ * CUBHMA replaces these formats from metadata for expansion ROMs.
+ * These functions NEVER infer a ROM's layout from its game code.
+ */
+function romReader(rom) {
+  if (rom instanceof Uint8Array) return {length:rom.length,read:i=>rom[i]};
+  if (rom && Number.isSafeInteger(rom.length) && rom.length>=0 && typeof rom.read==='function')
+    return rom;
+  throw new TypeError('Expected a ROM byte array or read-only accessor');
+}
+function requireSpan(rom,address,size,label) {
+  if (!Number.isSafeInteger(address)||address<0||address%4!==0)
+    throw new RangeError(label+' offset must be a four-byte-aligned ROM offset');
+  if (address>rom.length-size) throw new RangeError(label+' extends beyond ROM bounds');
+}
+function u8(rom,i) {
+  const n=rom.read(i);
+  if (!Number.isInteger(n)||n<0||n>255) throw new RangeError('ROM accessor returned an invalid byte');
+  return n;
+}
+function u32(rom,i) {
+  return (u8(rom,i)|(u8(rom,i+1)<<8)|(u8(rom,i+2)<<16)|(u8(rom,i+3)<<24))>>>0;
+}
+function pointer(rom,raw,label,{nullable=false,alignment=4}={}) {
+  if (nullable && (raw===0||raw===0xFFFFFFFF)) return null;
+  // Only the conventional 32 MiB GBA ROM pointer window is understood.
+  // Expanded CUBE layouts may use other conventions: never guess.
+  if (raw<0x08000000||raw>=0x0A000000)
+    throw new RangeError(label+' is not a conventional GBA ROM pointer');
+  const offset=raw-0x08000000;
+  if (offset%alignment!==0||offset>=rom.length)
+    throw new RangeError(label+' points outside/alignment of ROM');
+  return offset;
+}
+function familyCheck(family) {
+  if (family!=='RSE'&&family!=='FRLG')
+    throw new RangeError('Explicit vanilla family RSE or FRLG required');
+}
+/**
+ * The vanilla RSE layout is 24 bytes: width:: height:: borderblock<>
+ * blockmap<> blockdata1<> blockdata2<>.
+ * FRLG appends borderwidth. borderheight. unused: (4 bytes).
+ */
+function inspectVanillaMapLayout(source,{address,family}={}) {
+  familyCheck(family);
+  const rom=romReader(source),size=family==='FRLG'?28:24;
+  requireSpan(rom,address,size,'Map layout');
+  const width=u32(rom,address),height=u32(rom,address+4);
+  if (!width||width>1024||!height||height>1024)
+    throw new RangeError('Vanilla map dimensions are invalid or unsupported');
+  const borderPointer=u32(rom,address+8),blockmapPointer=u32(rom,address+12);
+  const primaryPointer=u32(rom,address+16),secondaryPointer=u32(rom,address+20);
+  const borderOffset=pointer(rom,borderPointer,'Border block');
+  const blockmapOffset=pointer(rom,blockmapPointer,'Blockmap',{alignment:2});
+  const primaryOffset=pointer(rom,primaryPointer,'Primary blockset');
+  const secondaryOffset=pointer(rom,secondaryPointer,'Secondary blockset');
+  const byteLength=width*height*2;
+  if (byteLength>rom.length-blockmapOffset)
+    throw new RangeError('Complete vanilla blockmap extends beyond ROM');
+  if (blockmapOffset<address+size && blockmapOffset+byteLength>address)
+    throw new RangeError('Blockmap overlaps its layout header');
+  const extra=family==='FRLG'?Object.freeze({
+    borderWidth:u8(rom,address+24),borderHeight:u8(rom,address+25),
+    unused:u8(rom,address+26)|(u8(rom,address+27)<<8)
+  }):null;
+  return Object.freeze({
+    address,family,width,height,byteLength,blockmapOffset,blockmapPointer,
+    borderOffset,borderPointer,primaryOffset,primaryPointer,
+    secondaryOffset,secondaryPointer,extra,
+    readOnly:true,layoutAuthenticated:false,walkabilityVerified:false
+  });
+}
+/**
+ * Vanilla map header begins with four pointers: layout, events, map scripts,
+ * connections. This is not a map-bank scan and is NOT valid for unknown CUBE
+ * expansion headers unless independently confirmed to use this exact format.
+ */
+function inspectVanillaMapHeader(source,{address,family}={}) {
+  familyCheck(family);
+  const rom=romReader(source);
+  requireSpan(rom,address,28,'Map header');
+  const layoutPointer=u32(rom,address);
+  const layoutOffset=pointer(rom,layoutPointer,'Layout');
+  const eventsPointer=u32(rom,address+4),scriptsPointer=u32(rom,address+8),
+    connectionsPointer=u32(rom,address+12);
+  const eventsOffset=pointer(rom,eventsPointer,'Events',{nullable:true});
+  const scriptsOffset=pointer(rom,scriptsPointer,'Map scripts',{nullable:true});
+  const connectionsOffset=pointer(rom,connectionsPointer,'Connections',{nullable:true});
+  if (layoutOffset<address+28 && layoutOffset+24>address)
+    throw new RangeError('Layout overlaps map header');
+  const layout=inspectVanillaMapLayout(rom,{address:layoutOffset,family});
+  return Object.freeze({
+    address,family,layoutPointer,layoutOffset,layout,
+    eventsPointer,eventsOffset,scriptsPointer,scriptsOffset,
+    connectionsPointer,connectionsOffset,
+    readOnly:true,layoutAuthenticated:false
+  });
+}
+
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let pcsReference=null,pcsReferenceName='';
@@ -2112,7 +2222,7 @@ let model=null, currentTab='home', page=0, selected=null, patchFile=null, palett
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
 ctx.imageSmoothingEnabled=false;
-const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','save-rom','save-project','export-ips','discard-button','edit-unlock'];
+const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-layout-inspect','save-rom','save-project','export-ips','discard-button','edit-unlock'];
 const tabs={home:['YOUR WORKSPACE','ROM Workbench'],hex:['BINARY INSPECTOR','Hex editor'],anchors:['ROM SEMANTICS','Named data'],maps:['RAW MAP CELLS','Blockmap inspector'],graphics:['GBA GRAPHICS','Graphics explorer'],patches:['PATCH WORKFLOW','Patch tools'],changes:['REVIEW & EXPORT','Changes']};
 function toast(message,bad=false){const t=$('toast');t.textContent=message;t.classList.toggle('error',bad);t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),4300);}
 function safeRun(fn){try{const result=fn();if(result?.catch) result.catch(err=>toast(err.message||String(err),true));}catch(err){toast(err.message||String(err),true);}}
@@ -2192,7 +2302,7 @@ function updateIndicators(){
   if(active)showRomInfo();
   drawMetadataFingerprintStatus();
 }
-function installModel(name,bytes){metadataImportSerial++;metadataFingerprints=[];$('map-grid').innerHTML='<div class="empty-state">No blockmap inspected.</div>';$('map-status').textContent='ROM replaced. Enter a verified offset and inspect again.';pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
+function installModel(name,bytes){metadataImportSerial++;metadataFingerprints=[];$('map-grid').innerHTML='<div class="empty-state">No blockmap inspected.</div>';$('map-layout-status').textContent='ROM replaced. No vanilla-format layout inspected.';$('map-status').textContent='ROM replaced. Enter a verified offset and inspect again.';pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
 $('rom-picker').addEventListener('change',async e=>{
   const file=e.target.files?.[0];e.target.value='';if(!file)return;
   if(file.size<0xC0 || file.size>MAX_BYTES)return toast('ROM must be 192 bytes to 128 MiB',true);
@@ -2795,6 +2905,29 @@ $('metadata-stock').addEventListener('click',async()=>{
   }catch(err){toast('Stock metadata: '+err.message,true);}finally{$('metadata-stock').disabled=false;}
 });
 
+
+// This is an explicit, unverified vanilla-format interpretation only.
+$('map-layout-inspect').addEventListener('click',()=>safeRun(()=>{
+  ensureModel();
+  if(metadataLayoutKind==='expansion'||metadataLayoutKind==='custom')
+    throw Error('Imported metadata declares a non-vanilla layout; vanilla structure interpretation refused.');
+  const address=parseOffset($('map-layout-offset').value);
+  const family=$('map-layout-family').value,kind=$('map-layout-source').value;
+  const parsed=kind==='header'?
+    inspectVanillaMapHeader(model,{address,family}):
+    inspectVanillaMapLayout(model,{address,family});
+  const layout=kind==='header'?parsed.layout:parsed;
+  $('map-offset').value=hex(layout.blockmapOffset);
+  $('map-width').value=String(layout.width);$('map-height').value=String(layout.height);
+  $('map-x').value='0';$('map-y').value='0';
+  $('map-grid').replaceChildren();
+  $('map-layout-status').textContent=
+    'Unverified '+family+' vanilla-format '+kind+' at 0x'+hex(address)+
+    ' → layout 0x'+hex(layout.address)+', blockmap 0x'+hex(layout.blockmapOffset)+
+    ', '+layout.width+' × '+layout.height+
+    '. Pointers and dimensions are syntactically bounded only. NOT CUBE-authenticated; no edits enabled.';
+  $('map-inspect').click();
+}));
 
 // A manually supplied blockmap address is NOT a verified map layout. This
 // view deliberately never interprets the high six bits as walkability.

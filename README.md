@@ -13,6 +13,10 @@ Local and pinned-upstream TOML imports now hash **raw bytes before UTF-8 decodin
 
 `src/map-blocks.js` now implements a source-grounded, **read-only** GBA map blockmap cell decoder, matching upstream CUBHMA's 10-bit tile ID and 6-bit collision/elevation field. It inspects bounded map viewports with strict ROM bounds and preserves exact byte offsets. The **Blockmaps** screen now exposes this codec as a touch-friendly 12 × 10 read-only viewport with manual hex offset and decimal dimensions, including staged edits and tap-to-hex navigation. This is **not a map editor**: it does not discover map pointers, infer walkability, render graphics, edit maps, or validate CUBE-specific layout ownership. See `tests/map-blocks.test.mjs`.
 
+## Development checkpoint — read-only vanilla map header/layout resolution
+
+The Blockmaps screen can now resolve a **manually supplied, independently verified vanilla RSE/FRLG map header or layout offset** into bounded blockmap dimensions and a ROM offset, then inspect the existing raw tile/collision cells. The decoder follows the upstream CUBHMA vanilla map formats and preserves source pointer provenance. It refuses declared custom/expansion metadata and never infers layout authenticity from a ROM header. This is **not** CUBE map-bank discovery, rendering, editing or warp/event interpretation. See [vanilla map layout checkpoint](docs/VANILLA_MAP_LAYOUT_CHECKPOINT.md).
+
 ## Current working code
 
 - **Exact ROM comparison (unreleased):** after computing the local staged-ROM SHA-256, optionally paste a published expected SHA-256 to compare exact bytes. A matching user-provided digest does **not** authenticate its provenance, CUBE layout or TOML. The bundled curated-profile registry is intentionally **empty** until independently verified CUBE ROM and matching metadata digests exist; no semantic writes are unlocked. See [ROM fingerprint registry requirements](docs/ROM_FINGERPRINT_REGISTRY.md).
