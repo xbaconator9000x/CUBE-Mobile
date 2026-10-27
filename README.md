@@ -12,6 +12,10 @@ The opt-in vanilla map canvas now displays read-only raw warp/event coordinate b
 
 The Blockmaps screen can now inspect a bounded catalog of vanilla map headers using a known bank-table offset and **explicit per-bank map counts**. A selector opens declared maps; warp and connection records can navigate to declared targets. Counts and layouts are not automatically discovered or CUBE-authenticated, and the workflow remains read-only. See [atlas checkpoint](docs/VANILLA_MAP_ATLAS_CHECKPOINT.md).
 
+## Development checkpoint — declared vanilla map-link audit
+
+The manually declared vanilla map atlas can now cross-reference raw warp and connection destinations against supplied bank/map counts, inspect destination warp-record indexes and navigate to declared targets or source bytes. Special 0xFF fields remain unresolved and missing declarations are not treated as proof of invalidity. No CUBE authenticity or semantic writes are implied. See [map-link audit checkpoint](docs/VANILLA_MAP_LINK_AUDIT.md).
+
 ## Development checkpoint — rendered vanilla map canvas
 
 An opt-in read-only canvas now composes 16×16 RSE/FRLG metatiles with palette banks, flips and layers from explicitly selected vanilla headers. Each rendered cell also displays its raw metatile behavior and layer bytes, without claiming walkability. The raw collision/elevation grid remains separate. This is not CUBE-authenticated map editing. See [rendering checkpoint](docs/VANILLA_METATILE_RENDER_CHECKPOINT.md).
