@@ -28,7 +28,7 @@ const VANILLA_COMMANDS=Object.freeze({
   0x2b:['checkflag',['word']],0x30:['waitsound',[]],
   0x31:['fanfare',['word']],0x32:['waitfanfare',[]]
 });
-const VANILLA_TERMINALS=new Set([0x02,0x03,0x05,0x08,0x23,0x24,0x27]);
+const VANILLA_TERMINALS=new Set([0x02,0x03,0x05,0x08,0x24,0x27]);
 const ARG_WIDTH=Object.freeze({byte:1,word:2,pointer:4});
 function scriptReader(source){
  if(source instanceof Uint8Array)return {length:source.length,read:i=>source[i]};
@@ -100,7 +100,7 @@ export function inspectVanillaScriptCommandPrefix(source,{
   stopReason=cursor>=rom.length?'rom-end':'byte-budget';
  else if(commands.length>=maxCommands&&stopReason==='byte-budget')
   stopReason='command-budget';
- return Object.freeze({address,family,requestedBytes:maxBytes,
+ stopOffset=cursor;\n return Object.freeze({address,family,requestedBytes:maxBytes,
   inspectedBytes:cursor-address,stopOffset,stopReason,
   commands:Object.freeze(commands),readOnly:true,
   layoutAuthenticated:false,grammarAuthenticated:false,
