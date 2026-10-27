@@ -3476,6 +3476,59 @@ function previewVanillaBlockmapCellChange(source,{
  });
 }
 
+/**
+ * Read-only vanilla warp destination trace for explicitly declared map banks.
+ * Source: pinned CUBHMA MapModel.cs vanilla EventsFormat/WarpsFormat.
+ * A raw destination is NOT an authenticated runtime teleport or CUBE layout.
+ */
+function headerFor(source,atlas,entry) {
+ const header=inspectVanillaMapHeader(source,{address:entry.mapHeaderOffset,family:atlas.family});
+ const layout=header.layout;
+ if(layout.width!==entry.width||layout.height!==entry.height||
+    layout.blockmapOffset!==entry.blockmapOffset||header.layoutOffset!==entry.layoutOffset)
+  throw new RangeError('Declared atlas map layout changed; reinspect atlas');
+ return header;
+}
+function traceVanillaWarpArrival(source,atlas,{bankIndex,mapIndex,warpIndex}={}) {
+ if(!atlas||atlas.readOnly!==true||atlas.layoutAuthenticated!==false||
+    !['RSE','FRLG'].includes(atlas.family)||!Array.isArray(atlas.maps)||
+    atlas.maps.length<1||atlas.maps.length>4096)
+  throw new TypeError('Expected a read-only explicitly declared vanilla atlas');
+ const entry=lookupVanillaMapAtlasTarget(atlas,bankIndex,mapIndex);
+ if(!entry)throw new RangeError('Source map is outside declared atlas');
+ const header=headerFor(source,atlas,entry);
+ const events=inspectVanillaMapEvents(source,{address:entry.mapHeaderOffset,family:atlas.family});
+ if(!Number.isSafeInteger(warpIndex)||warpIndex<0||warpIndex>=events.arrays.warps.length)
+  throw new RangeError('Warp index is outside selected source map');
+ const warp=events.arrays.warps[warpIndex];
+ const base={source:Object.freeze({bankIndex,mapIndex,warpIndex,
+  recordOffset:warp.offset,headerOffset:entry.mapHeaderOffset}),
+  targetBank:warp.targetBank,targetMap:warp.targetMap,targetWarpId:warp.warpId,
+  readOnly:true,layoutAuthenticated:false,runtimeBehaviorVerified:false};
+ if(warp.targetBank===255||warp.targetMap===255||warp.warpId===255)
+  return Object.freeze({...base,status:'special',destination:null});
+ const target=lookupVanillaMapAtlasTarget(atlas,warp.targetBank,warp.targetMap);
+ if(!target)return Object.freeze({...base,status:'undeclared',destination:null});
+ const targetHeader=headerFor(source,atlas,target);
+ const targetEvents=inspectVanillaMapEvents(source,{address:target.mapHeaderOffset,family:atlas.family});
+ if(warp.warpId>=targetEvents.arrays.warps.length)
+  return Object.freeze({...base,status:'invalid-index',destination:null,
+   targetHeaderOffset:target.mapHeaderOffset,targetWarpCount:targetEvents.arrays.warps.length});
+ const arrival=targetEvents.arrays.warps[warp.warpId];
+ if(arrival.x>=targetHeader.layout.width||arrival.y>=targetHeader.layout.height)
+  return Object.freeze({...base,status:'out-of-bounds',destination:null,
+   targetHeaderOffset:target.mapHeaderOffset,targetWarpOffset:arrival.offset});
+ const cell=inspectBlockMap(source,{address:targetHeader.layout.blockmapOffset,
+  width:targetHeader.layout.width,height:targetHeader.layout.height,
+  x:arrival.x,y:arrival.y,viewportWidth:1,viewportHeight:1}).cells[0][0];
+ return Object.freeze({...base,status:'raw-arrival',
+  destination:Object.freeze({bankIndex:warp.targetBank,mapIndex:warp.targetMap,
+   warpIndex:warp.warpId,headerOffset:target.mapHeaderOffset,
+   warpRecordOffset:arrival.offset,x:arrival.x,y:arrival.y,elevation:arrival.elevation,
+   blockmapByteOffset:cell.byteOffset,tileId:cell.tileId,rawCollision:cell.collision,
+   width:targetHeader.layout.width,height:targetHeader.layout.height})});
+}
+
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let pcsReference=null,pcsReferenceName='';
@@ -4646,6 +4699,45 @@ $('map-warp-inspect').addEventListener('click',()=>safeRun(()=>{
       open.textContent='Open declared warp destination '+target.bankIndex+'/'+target.mapIndex;
       open.addEventListener('click',()=>safeRun(()=>openDeclaredAtlasMap(target)));
       root.append(open);
+    }
+    if(atlas&&atlas.family===family){
+      const traceButton=document.createElement('button');traceButton.type='button';
+      traceButton.className='secondary-button';traceButton.style.margin='0 0 8px 8px';
+      traceButton.textContent='Trace recorded arrival for warp '+warp.index;
+      traceButton.addEventListener('click',()=>safeRun(()=>{
+        requireVanillaMapFormat();
+        if(inspectedMapAtlas?.rom!==model||inspectedMapAtlas.atlas!==atlas)
+          throw Error('Declared atlas expired; inspect again');
+        const sources=atlas.maps.filter(m=>m.mapHeaderOffset===address);
+        if(sources.length!==1)
+          throw Error('Source map header is absent or aliased; choose an unambiguous atlas entry');
+        const source=sources[0];
+        const result=traceVanillaWarpArrival(model,atlas,{
+          bankIndex:source.bankIndex,mapIndex:source.mapIndex,warpIndex:warp.index
+        });
+        if(result.status!=='raw-arrival'){
+          $('map-warp-status').textContent='Raw warp '+warp.index+': '+result.status+
+            '. Cannot navigate to a recorded arrival cell. CUBE behavior unverified.';
+          return;
+        }
+        const destination=result.destination;
+        const entry=lookupVanillaMapAtlasTarget(atlas,destination.bankIndex,destination.mapIndex);
+        if(!entry||entry.mapHeaderOffset!==destination.headerOffset)
+          throw Error('Destination changed; inspect atlas again');
+        openDeclaredAtlasMap(entry);
+        const next=panMapViewport({width:destination.width,height:destination.height,
+          x:0,y:0,dx:destination.x-6,dy:destination.y-5});
+        $('map-x').value=String(next.x);$('map-y').value=String(next.y);
+        $('map-inspect').click();
+        $('map-warp-status').textContent='Raw arrival '+destination.bankIndex+'/'+
+          destination.mapIndex+' warp '+destination.warpIndex+' at ('+
+          destination.x+', '+destination.y+'), warp record ROM 0x'+
+          hex(destination.warpRecordOffset)+', blockmap ROM 0x'+
+          hex(destination.blockmapByteOffset)+', tile '+destination.tileId+
+          ', raw high bits '+destination.rawCollision+
+          '. This is a recorded coordinate, NOT verified runtime teleport behavior.';
+      }));
+      root.append(traceButton);
     }
   }
   // Only annotate the blockmap when its exact selected offset/dimensions
