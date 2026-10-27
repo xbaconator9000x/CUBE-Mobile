@@ -1,5 +1,11 @@
 # Roadmap
 
+## Checkpoint — conservative vanilla event-script prefix (28 October 2026)
+- [x] Decode a bounded subset of fixed-width vanilla RSE/FRLG event commands using pinned upstream CUBHMA signatures, with raw offsets, arguments and pointer statuses.
+- [x] Stop on unknown opcodes, incomplete commands and terminal instructions without following control flow; test malformed inputs and accessor safety.
+- [ ] Integrate a touch-friendly command list and offline HTML, then authenticate CUBE-specific grammar, genuine script ownership and ROM/emulator/Android acceptance. No semantic writes or strict parity change. See [script prefix](docs/VANILLA_SCRIPT_PREFIX.md).
+
+
 ## Checkpoint — queued map visual previews (27 October 2026)
 - [x] Validate up to 64 proposed vanilla blockmap cells together; recheck original ROM bytes, reject overlap and forged map provenance, and render a bounded before/after viewport without writes.
 - [x] Add a stale-checked read-only staged ROM accessor for reviewed blockmap, warp and event changes.
