@@ -237,6 +237,17 @@
     <button type="button" id="map-event-inspect" class="subtle-button" disabled>Inspect vanilla objects, scripts and signposts</button>
     <output id="map-event-status" class="palette-note" aria-live="polite">Select a known vanilla map header to inspect raw object, script trigger and signpost records. Read only.</output>
     <div id="map-event-list" class="anchor-list" aria-label="Read-only object, script and signpost records"><div class="empty-state">No additional event records inspected.</div></div>
+    <div class="toolbar-card" aria-label="Read-only proposed event coordinate change">
+      <h3>Preview object / trigger / signpost coordinates (no writes)</h3>
+      <p class="palette-note">Choose “Plan coordinate changes” beside an inspected event. Script pointers, flags and all other bytes are preserved. Shared arrays and CUBE layouts are not authenticated.</p>
+      <div class="input-row">
+        <div class="input-wrap"><label for="map-event-preview-x">Proposed X</label><input id="map-event-preview-x" type="number" min="0" max="65535" step="1"></div>
+        <div class="input-wrap"><label for="map-event-preview-y">Proposed Y</label><input id="map-event-preview-y" type="number" min="0" max="65535" step="1"></div>
+        <div class="input-wrap"><label for="map-event-preview-elevation">Proposed elevation</label><input id="map-event-preview-elevation" type="number" min="0" max="65535" step="1"></div>
+      </div>
+      <button type="button" id="map-event-preview" class="subtle-button" disabled>Preview exact event record bytes</button>
+      <output id="map-event-preview-status" class="palette-note" aria-live="polite">Select a raw event record to preview proposed bytes. No writes.</output>
+    </div>
     <button type="button" id="map-script-pointer-inspect" class="subtle-button" disabled>Inspect raw object/trigger script pointer fields (read only)</button>
     <output id="map-script-pointer-status" class="palette-note" aria-live="polite">No raw script pointer fields inspected.</output>
     <div id="map-script-pointer-list" class="anchor-list" aria-label="Unverified raw script pointer fields"></div>
@@ -3729,12 +3740,84 @@ function previewVanillaWarpRecordChange(source,{
  });
 }
 
+/**
+ * Byte-exact, immutable proposed coordinate/elevation changes for vanilla
+ * object, script-trigger and signpost records.
+ * Pinned kcradi/CUBHMA MapModel.cs: ObjectsFormat, ScriptsFormat,
+ * SignpostsFormat. Never edits ROM bytes or authenticates CUBE layouts.
+ */
+const eventCoordinateDefinitions=Object.freeze({
+ objects:Object.freeze({size:24,pointerField:4,fields:Object.freeze({
+  x:[4,2,65535],y:[6,2,65535],elevation:[8,1,255]})}),
+ scripts:Object.freeze({size:16,pointerField:12,fields:Object.freeze({
+  x:[0,2,65535],y:[2,2,65535],elevation:[4,2,65535]})}),
+ signposts:Object.freeze({size:12,pointerField:16,fields:Object.freeze({
+  x:[0,2,65535],y:[2,2,65535],elevation:[4,1,255]})})
+});
+function eventPreviewByte(source,i){
+ const n=source instanceof Uint8Array?source[i]:source.read(i);
+ if(!Number.isInteger(n)||n<0||n>255)
+  throw new RangeError('Invalid staged ROM byte');
+ return n;
+}
+function previewVanillaEventCoordinateChange(source,{
+ address,family,kind,index,changes,expectedBytes
+}={}){
+ const def=eventCoordinateDefinitions[kind];
+ if(!def)throw new RangeError('Select objects, scripts or signposts');
+ const header=inspectVanillaMapHeader(source,{address,family});
+ const events=inspectVanillaMapEvents(source,{address,family});
+ const records=events.arrays[kind];
+ if(!Number.isSafeInteger(index)||index<0||index>=records.length)
+  throw new RangeError('Event index outside inspected vanilla map');
+ if(!changes||typeof changes!=='object'||Array.isArray(changes)||
+    Object.keys(changes).length===0)
+  throw new TypeError('Specify at least one coordinate or elevation field');
+ for(const name of Object.keys(changes)){
+  if(!Object.hasOwn(def.fields,name))
+   throw new RangeError('Unsupported event field: '+name);
+  const max=def.fields[name][2],n=changes[name];
+  if(!Number.isSafeInteger(n)||n<0||n>max)
+   throw new RangeError(name+' must be an integer from 0 to '+max);
+ }
+ if(changes.x!==undefined&&changes.x>=header.layout.width||
+    changes.y!==undefined&&changes.y>=header.layout.height)
+  throw new RangeError('Proposed event coordinates outside selected map');
+ const record=records[index],offset=record.offset;
+ const before=Object.freeze(Array.from({length:def.size},(_,i)=>eventPreviewByte(source,offset+i)));
+ if(expectedBytes!==undefined){
+  if(!Array.isArray(expectedBytes)||expectedBytes.length!==def.size||
+     expectedBytes.some(n=>!Number.isInteger(n)||n<0||n>255))
+   throw new TypeError('Expected original bytes must match complete record length');
+  if(expectedBytes.some((n,i)=>n!==before[i]))
+   throw new RangeError('Event bytes changed since selection; preview again');
+ }
+ const after=[...before];
+ for(const name of Object.keys(changes)){
+  const [start,size]=def.fields[name],n=changes[name];
+  for(let i=0;i<size;i++)after[start+i]=(n>>>(8*i))&255;
+ }
+ const x=changes.x??record.x,y=changes.y??record.y;
+ return Object.freeze({
+  headerOffset:address,eventsOffset:events.eventsOffset,
+  arrayOffset:events.offsets[kind],arrayPointerSource:events.eventsOffset+def.pointerField,
+  kind,index,recordOffset:offset,recordLength:def.size,
+  before,after:Object.freeze(after),changed:after.some((n,i)=>n!==before[i]),
+  original:Object.freeze({x:record.x,y:record.y,elevation:record.elevation}),
+  proposed:Object.freeze({x,y,elevation:changes.elevation??record.elevation}),
+  originalCoordinatesInMap:record.x<header.layout.width&&record.y<header.layout.height,
+  proposedCoordinatesInMap:x<header.layout.width&&y<header.layout.height,
+  readOnly:true,previewOnly:true,writeAuthorized:false,
+  layoutAuthenticated:false,ownershipVerified:false
+ });
+}
+
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let pcsReference=null,pcsReferenceName='';
 let fingerprintResult=null,fingerprintAbort=null;
 let metadataFingerprints=[],metadataImportSerial=0;
-let inspectedWarpMap=null,selectedWarpPreview=null,inspectedEventMap=null,inspectedMapAtlas=null,atlasBatchStart=0,atlasCoordinateBatchStart=0;
+let inspectedWarpMap=null,selectedWarpPreview=null,selectedEventPreview=null,inspectedEventMap=null,inspectedMapAtlas=null,atlasBatchStart=0,atlasCoordinateBatchStart=0;
 let activeRenderedMap=null,selectedRenderedHit=null;
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
 const PER_PAGE=128;
@@ -4461,7 +4544,9 @@ function clearWarpInspection(message='Select a vanilla map header to inspect war
   $('map-warp-status').textContent=message;
 }
 function clearEventInspection(message='Select a vanilla map header to inspect object, script and signpost records.'){
-  inspectedEventMap=null;
+  inspectedEventMap=null;selectedEventPreview=null;
+  $('map-event-preview').disabled=true;
+  $('map-event-preview-status').textContent='Select a raw event record to preview proposed bytes. No writes.';
   $('map-event-list').replaceChildren();
   $('map-event-status').textContent=message;
   $('map-script-pointer-list').replaceChildren();
@@ -5138,6 +5223,28 @@ $('map-event-inspect').addEventListener('click',()=>safeRun(()=>{
     button.setAttribute('aria-label',button.textContent+'; inspect raw hex');
     button.addEventListener('click',()=>safeRun(()=>{setPageForOffset(event.offset);gotoTab('hex');}));
     root.append(button);
+    const plan=document.createElement('button');plan.type='button';
+    plan.className='secondary-button';plan.style.margin='0 0 8px 8px';
+    plan.textContent='Plan coordinate changes for '+label+' '+event.index;
+    plan.addEventListener('click',()=>safeRun(()=>{
+     requireVanillaMapFormat();
+     if($('map-layout-source').value!=='header'||
+        parseOffset($('map-layout-offset').value)!==address||
+        $('map-layout-family').value!==family)
+      throw Error('Map selection changed; inspect event records again');
+     const lengths={objects:24,scripts:16,signposts:12};
+     const bytes=Array.from({length:lengths[key]},(_,i)=>model.read(event.offset+i));
+     selectedEventPreview={rom:model,address,family,kind:key,index:event.index,
+      expectedBytes:bytes};
+     $('map-event-preview-x').value=String(event.x);
+     $('map-event-preview-y').value=String(event.y);
+     $('map-event-preview-elevation').value=String(event.elevation);
+     $('map-event-preview').disabled=false;
+     $('map-event-preview-status').textContent=label+' '+event.index+
+      ' selected at ROM 0x'+hex(event.offset)+
+      '. Preview only; no bytes will be changed.';
+    }));
+    root.append(plan);
   }
   if(!total){
     const empty=document.createElement('div');empty.className='empty-state';
@@ -5149,6 +5256,32 @@ $('map-event-inspect').addEventListener('click',()=>safeRun(()=>{
     $('map-inspect').click();
 }));
 
+
+$('map-event-preview').addEventListener('click',()=>safeRun(()=>{
+ requireVanillaMapFormat();
+ const selection=selectedEventPreview;
+ if(!selection||selection.rom!==model||
+    $('map-layout-source').value!=='header'||
+    parseOffset($('map-layout-offset').value)!==selection.address||
+    $('map-layout-family').value!==selection.family)
+  throw Error('Event selection expired; inspect and select an event again');
+ const field=id=>{
+  const value=$('map-event-preview-'+id).value.trim();
+  if(!value)throw Error('Fill every proposed event field');
+  return Number(value);
+ };
+ const result=previewVanillaEventCoordinateChange(model,{
+  address:selection.address,family:selection.family,kind:selection.kind,
+  index:selection.index,expectedBytes:selection.expectedBytes,
+  changes:{x:field('x'),y:field('y'),elevation:field('elevation')}
+ });
+ const format=bytes=>bytes.map(n=>hex(n,2)).join(' ');
+ $('map-event-preview-status').textContent=result.kind+' '+result.index+
+  ' · ROM 0x'+hex(result.recordOffset)+' ('+result.recordLength+' bytes): '+
+  format(result.before)+' → '+format(result.after)+
+  (result.changed?' (proposed change).':' (no difference).')+
+  ' NOT applied. Script/flag bytes preserved; CUBE layout and array ownership unverified.';
+}));
 
 $('map-script-pointer-inspect').addEventListener('click',()=>safeRun(()=>{
  requireVanillaMapFormat();

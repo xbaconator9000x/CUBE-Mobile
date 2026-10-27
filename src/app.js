@@ -20,13 +20,14 @@ import {renderVanillaMapViewport} from './map-render.js';
 import {previewVanillaBlockmapCellChange} from './map-edit-preview.js';
 import {traceVanillaWarpArrival} from './map-warp-trace.js';
 import {previewVanillaWarpRecordChange} from './map-warp-edit-preview.js';
+import {previewVanillaEventCoordinateChange} from './map-event-edit-preview.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let pcsReference=null,pcsReferenceName='';
 let fingerprintResult=null,fingerprintAbort=null;
 let metadataFingerprints=[],metadataImportSerial=0;
-let inspectedWarpMap=null,selectedWarpPreview=null,inspectedEventMap=null,inspectedMapAtlas=null,atlasBatchStart=0,atlasCoordinateBatchStart=0;
+let inspectedWarpMap=null,selectedWarpPreview=null,selectedEventPreview=null,inspectedEventMap=null,inspectedMapAtlas=null,atlasBatchStart=0,atlasCoordinateBatchStart=0;
 let activeRenderedMap=null,selectedRenderedHit=null;
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
 const PER_PAGE=128;
@@ -753,7 +754,9 @@ function clearWarpInspection(message='Select a vanilla map header to inspect war
   $('map-warp-status').textContent=message;
 }
 function clearEventInspection(message='Select a vanilla map header to inspect object, script and signpost records.'){
-  inspectedEventMap=null;
+  inspectedEventMap=null;selectedEventPreview=null;
+  $('map-event-preview').disabled=true;
+  $('map-event-preview-status').textContent='Select a raw event record to preview proposed bytes. No writes.';
   $('map-event-list').replaceChildren();
   $('map-event-status').textContent=message;
   $('map-script-pointer-list').replaceChildren();
@@ -1430,6 +1433,28 @@ $('map-event-inspect').addEventListener('click',()=>safeRun(()=>{
     button.setAttribute('aria-label',button.textContent+'; inspect raw hex');
     button.addEventListener('click',()=>safeRun(()=>{setPageForOffset(event.offset);gotoTab('hex');}));
     root.append(button);
+    const plan=document.createElement('button');plan.type='button';
+    plan.className='secondary-button';plan.style.margin='0 0 8px 8px';
+    plan.textContent='Plan coordinate changes for '+label+' '+event.index;
+    plan.addEventListener('click',()=>safeRun(()=>{
+     requireVanillaMapFormat();
+     if($('map-layout-source').value!=='header'||
+        parseOffset($('map-layout-offset').value)!==address||
+        $('map-layout-family').value!==family)
+      throw Error('Map selection changed; inspect event records again');
+     const lengths={objects:24,scripts:16,signposts:12};
+     const bytes=Array.from({length:lengths[key]},(_,i)=>model.read(event.offset+i));
+     selectedEventPreview={rom:model,address,family,kind:key,index:event.index,
+      expectedBytes:bytes};
+     $('map-event-preview-x').value=String(event.x);
+     $('map-event-preview-y').value=String(event.y);
+     $('map-event-preview-elevation').value=String(event.elevation);
+     $('map-event-preview').disabled=false;
+     $('map-event-preview-status').textContent=label+' '+event.index+
+      ' selected at ROM 0x'+hex(event.offset)+
+      '. Preview only; no bytes will be changed.';
+    }));
+    root.append(plan);
   }
   if(!total){
     const empty=document.createElement('div');empty.className='empty-state';
@@ -1441,6 +1466,32 @@ $('map-event-inspect').addEventListener('click',()=>safeRun(()=>{
     $('map-inspect').click();
 }));
 
+
+$('map-event-preview').addEventListener('click',()=>safeRun(()=>{
+ requireVanillaMapFormat();
+ const selection=selectedEventPreview;
+ if(!selection||selection.rom!==model||
+    $('map-layout-source').value!=='header'||
+    parseOffset($('map-layout-offset').value)!==selection.address||
+    $('map-layout-family').value!==selection.family)
+  throw Error('Event selection expired; inspect and select an event again');
+ const field=id=>{
+  const value=$('map-event-preview-'+id).value.trim();
+  if(!value)throw Error('Fill every proposed event field');
+  return Number(value);
+ };
+ const result=previewVanillaEventCoordinateChange(model,{
+  address:selection.address,family:selection.family,kind:selection.kind,
+  index:selection.index,expectedBytes:selection.expectedBytes,
+  changes:{x:field('x'),y:field('y'),elevation:field('elevation')}
+ });
+ const format=bytes=>bytes.map(n=>hex(n,2)).join(' ');
+ $('map-event-preview-status').textContent=result.kind+' '+result.index+
+  ' · ROM 0x'+hex(result.recordOffset)+' ('+result.recordLength+' bytes): '+
+  format(result.before)+' → '+format(result.after)+
+  (result.changed?' (proposed change).':' (no difference).')+
+  ' NOT applied. Script/flag bytes preserved; CUBE layout and array ownership unverified.';
+}));
 
 $('map-script-pointer-inspect').addEventListener('click',()=>safeRun(()=>{
  requireVanillaMapFormat();

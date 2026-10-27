@@ -6,7 +6,7 @@
  */
 import {inspectVanillaMapEvents} from './map-events.js';
 import {inspectVanillaMapHeader} from './map-layouts.js';
-const definitions=Object.freeze({
+const eventCoordinateDefinitions=Object.freeze({
  objects:Object.freeze({size:24,pointerField:4,fields:Object.freeze({
   x:[4,2,65535],y:[6,2,65535],elevation:[8,1,255]})}),
  scripts:Object.freeze({size:16,pointerField:12,fields:Object.freeze({
@@ -14,7 +14,7 @@ const definitions=Object.freeze({
  signposts:Object.freeze({size:12,pointerField:16,fields:Object.freeze({
   x:[0,2,65535],y:[2,2,65535],elevation:[4,1,255]})})
 });
-function byte(source,i){
+function eventPreviewByte(source,i){
  const n=source instanceof Uint8Array?source[i]:source.read(i);
  if(!Number.isInteger(n)||n<0||n>255)
   throw new RangeError('Invalid staged ROM byte');
@@ -23,7 +23,7 @@ function byte(source,i){
 export function previewVanillaEventCoordinateChange(source,{
  address,family,kind,index,changes,expectedBytes
 }={}){
- const def=definitions[kind];
+ const def=eventCoordinateDefinitions[kind];
  if(!def)throw new RangeError('Select objects, scripts or signposts');
  const header=inspectVanillaMapHeader(source,{address,family});
  const events=inspectVanillaMapEvents(source,{address,family});
@@ -44,7 +44,7 @@ export function previewVanillaEventCoordinateChange(source,{
     changes.y!==undefined&&changes.y>=header.layout.height)
   throw new RangeError('Proposed event coordinates outside selected map');
  const record=records[index],offset=record.offset;
- const before=Object.freeze(Array.from({length:def.size},(_,i)=>byte(source,offset+i)));
+ const before=Object.freeze(Array.from({length:def.size},(_,i)=>eventPreviewByte(source,offset+i)));
  if(expectedBytes!==undefined){
   if(!Array.isArray(expectedBytes)||expectedBytes.length!==def.size||
      expectedBytes.some(n=>!Number.isInteger(n)||n<0||n>255))
