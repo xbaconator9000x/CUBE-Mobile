@@ -9,7 +9,7 @@ test('mobile review JSON export is guarded by live queue and stale original vali
  assert.match(app,/exportVanillaChangeReviewJson\(model,mapReviewQueue\)/);
  assert.match(app,/mapReviewRom!==model/);
  assert.match(app,/map-review-export'\)\.disabled=false/);
- assert.match(app,/map-review-impact','map-review-roundtrip','map-review-export'\]\)\$\(id\)\.disabled=true/);
+ assert.match(app,/map-review-impact','map-review-roundtrip','map-review-route-delta','map-review-export'\]\)\$\(id\)\.disabled=true/);
  assert.match(app,/downloadFile\(safeName\(model\.name\)\+'_map-review\.json',json,'application\/json'\)/);
  assert.match(app,/No raw ROM byte arrays, executable patch/);
 });
