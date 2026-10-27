@@ -143,6 +143,7 @@
         <div class="input-wrap"><label for="map-preview-collision">Proposed raw high bits (0–63)</label><input id="map-preview-collision" type="number" min="0" max="63" step="1" placeholder="Keep existing"></div>
       </div>
       <button type="button" id="map-preview-cell" class="subtle-button" disabled>Preview original and proposed bytes</button>
+      <button type="button" id="map-review-cell-add" class="secondary-button" disabled>Add last cell preview to change review</button>
       <output id="map-preview-status" class="palette-note" aria-live="polite">Select an explicit vanilla header and coordinates to preview bytes. No writes.</output>
     </div>
     <output id="map-summary-status" class="palette-note" aria-live="polite">No raw blockmap statistics scanned. Requires matching selected vanilla header.</output>
@@ -166,6 +167,7 @@
         <div class="input-wrap"><label for="map-warp-preview-target-bank">Target bank</label><input id="map-warp-preview-target-bank" type="number" min="0" max="255" step="1"></div>
       </div>
       <button type="button" id="map-warp-preview" class="subtle-button" disabled>Preview exact eight-byte record</button>
+      <button type="button" id="map-review-warp-add" class="secondary-button" disabled>Add last warp preview to change review</button>
       <output id="map-warp-preview-status" class="palette-note" aria-live="polite">Select a raw warp record to preview proposed bytes. No writes.</output>
     </div>
     <button type="button" id="map-event-inspect" class="subtle-button" disabled>Inspect vanilla objects, scripts and signposts</button>
@@ -180,7 +182,18 @@
         <div class="input-wrap"><label for="map-event-preview-elevation">Proposed elevation</label><input id="map-event-preview-elevation" type="number" min="0" max="65535" step="1"></div>
       </div>
       <button type="button" id="map-event-preview" class="subtle-button" disabled>Preview exact event record bytes</button>
+      <button type="button" id="map-review-event-add" class="secondary-button" disabled>Add last event preview to change review</button>
       <output id="map-event-preview-status" class="palette-note" aria-live="polite">Select a raw event record to preview proposed bytes. No writes.</output>
+    </div>
+    <div class="toolbar-card" aria-label="Immutable multi-change map review">
+      <h3>Review proposed map changes together (no writes)</h3>
+      <p class="palette-note">Queue up to 64 previews from any selected vanilla maps. Check stale original bytes, overlapping ranges and proposed changes before any future authenticated editing. This cannot apply or export ROM changes.</p>
+      <div class="input-row">
+        <button type="button" id="map-review-run" class="subtle-button" disabled>Check queued changes</button>
+        <button type="button" id="map-review-clear" class="secondary-button" disabled>Clear review queue</button>
+      </div>
+      <output id="map-review-status" class="palette-note" aria-live="polite">No proposed changes queued.</output>
+      <div id="map-review-list" class="anchor-list" aria-label="Immutable proposed byte change review"></div>
     </div>
     <button type="button" id="map-script-pointer-inspect" class="subtle-button" disabled>Inspect raw object/trigger script pointer fields (read only)</button>
     <output id="map-script-pointer-status" class="palette-note" aria-live="polite">No raw script pointer fields inspected.</output>
