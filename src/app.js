@@ -186,10 +186,10 @@ $('edit-unlock').addEventListener('change',()=>{if(!$('edit-unlock').checked)toa
 $('write-byte').addEventListener('click',()=>safeRun(()=>{
   ensureModel();if(!$('edit-unlock').checked)throw Error('Unlock raw editing first');if(selected===null)throw Error('Tap a byte first');
   const val=$('selected-value').value.trim();if(!/^[0-9a-f]{1,2}$/i.test(val))throw Error('Enter a 1–2 digit hexadecimal byte');
-  if(model.write(selected,parseInt(val,16))){invalidateDecodedGraphic();clearWarpInspection('ROM bytes changed; inspect warps again.');clearConnectionInspection('ROM bytes changed; inspect connections again.');clearConnectionInspection('ROM bytes changed; inspect connections again.');toast(`Staged edit at 0x${hex(selected)}`);}drawHex();updateIndicators();
+  if(model.write(selected,parseInt(val,16))){invalidateDecodedGraphic();clearWarpInspection('ROM bytes changed; inspect warps again.');clearConnectionInspection('ROM bytes changed; inspect connections again.');clearMapGrid('ROM bytes changed; inspect map cells again.');clearConnectionInspection('ROM bytes changed; inspect connections again.');clearMapGrid('ROM bytes changed; inspect map cells again.');toast(`Staged edit at 0x${hex(selected)}`);}drawHex();updateIndicators();
 }));
-$('undo-button').addEventListener('click',()=>safeRun(()=>{if(model.undo()){invalidateDecodedGraphic();clearWarpInspection('ROM bytes changed; inspect warps again.');clearConnectionInspection('ROM bytes changed; inspect connections again.');drawHex();drawGraphics();updateIndicators();}}));
-$('redo-button').addEventListener('click',()=>safeRun(()=>{if(model.redo()){invalidateDecodedGraphic();clearWarpInspection('ROM bytes changed; inspect warps again.');clearConnectionInspection('ROM bytes changed; inspect connections again.');drawHex();drawGraphics();updateIndicators();}}));
+$('undo-button').addEventListener('click',()=>safeRun(()=>{if(model.undo()){invalidateDecodedGraphic();clearWarpInspection('ROM bytes changed; inspect warps again.');clearConnectionInspection('ROM bytes changed; inspect connections again.');clearMapGrid('ROM bytes changed; inspect map cells again.');drawHex();drawGraphics();updateIndicators();}}));
+$('redo-button').addEventListener('click',()=>safeRun(()=>{if(model.redo()){invalidateDecodedGraphic();clearWarpInspection('ROM bytes changed; inspect warps again.');clearConnectionInspection('ROM bytes changed; inspect connections again.');clearMapGrid('ROM bytes changed; inspect map cells again.');drawHex();drawGraphics();updateIndicators();}}));
 $('selected-value').addEventListener('keydown',e=>{if(e.key==='Enter')$('write-byte').click();});
 // The graphic source and the colour palette are deliberately independent:
 // a generic ROM offset has no known sprite layout or matching palette.
@@ -361,7 +361,7 @@ $('fix-checksum').addEventListener('click',()=>safeRun(()=>{ensureModel();const 
 $('discard-button').addEventListener('click',async()=>{
   if(!model||!model.dirty)return toast('Nothing to discard');
   const yes=await confirmAction('Discard all changes?','This resets your in-memory workspace to the original ROM. Any applied patch and all staged raw edits will be lost.');
-  if(yes){model.reset();page=0;selected=null;resetGraphicState();$('edit-unlock').checked=false;drawHex();drawGraphics();drawChanges();updateIndicators();toast('Reset to original ROM.');}
+  if(yes){model.reset();clearWarpInspection('Edits discarded; inspect warps again.');clearConnectionInspection('Edits discarded; inspect connections again.');clearMapGrid('Edits discarded; inspect map cells again.');page=0;selected=null;resetGraphicState();$('edit-unlock').checked=false;drawHex();drawGraphics();drawChanges();updateIndicators();toast('Reset to original ROM.');}
 });
 window.addEventListener('beforeunload',e=>{if(model?.dirty){e.preventDefault();e.returnValue='';}});
 if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')) navigator.serviceWorker.register('./sw.js').catch(()=>{});
@@ -372,7 +372,7 @@ if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostn
 // engine, game fingerprints and pointer allocator have been ported and tested.
 let displayedAnchors=[], selectedInspection=null;
 const encodeHex=bytes=>Array.from(bytes).map((b,i)=>hex(b,2)+(i%16===15?'\n':' ')).join('').trim();
-function metadataReset(){metadataImportSerial++;metadataFingerprints=[];metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
+function metadataReset(){clearWarpInspection('Metadata reset; inspect warps again.');clearConnectionInspection('Metadata reset; inspect connections again.');clearMapGrid('Metadata reset; inspect map again.');metadataImportSerial++;metadataFingerprints=[];metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
 function snapshotMatchedWords(words=metadataMatchedWords){
   if(!model)return [];
   return words.map(word=>{
@@ -431,6 +431,9 @@ function metadataCommit(sources){
   metadata=nextMetadata;metadataResolution=nextResolution;
   metadataSources=sources.map(({name})=>name);metadataLayoutKind=metadataCheck.layout.kind;
   metadataFingerprints=nextFingerprints;
+  clearWarpInspection('Metadata changed; re-inspect vanilla warps.');
+  clearConnectionInspection('Metadata changed; re-inspect vanilla connections.');
+  clearMapGrid('Metadata changed; recheck vanilla map structure compatibility.');
   selectedAnchor=null;selectedInspection=null;
   drawAnchors();
   toast(`Loaded ${metadata.length} anchor declarations; ${merged.conflictedNames.size} conflicting names; ${metadataResolution.anchoredCount} anchor-length, ${metadataResolution.listCount} list-length and ${metadataResolution.matchedCount} matched-word-length tables · ${metadataLayoutKind} TOML layout · ROM unverified`);
@@ -706,6 +709,14 @@ $('metadata-stock').addEventListener('click',async()=>{
 });
 
 
+function clearMapGrid(message='Map structure changed; inspect again.'){
+  const root=$('map-grid');root.replaceChildren();
+  const empty=document.createElement('div');empty.className='empty-state';
+  empty.textContent=message;root.append(empty);
+  $('map-status').textContent=message;
+  $('map-layout-status').textContent=message+' Vanilla layouts remain unverified.';
+  $('map-bank-status').textContent=message+' Recheck bank pointer provenance.';
+}
 function clearWarpInspection(message='Select a vanilla map header to inspect warp events.'){
   inspectedWarpMap=null;
   $('map-warp-list').replaceChildren();
