@@ -1,5 +1,11 @@
 # Roadmap
 
+## Checkpoint — read-only vanilla script branch review (28 October 2026)
+- [x] Classify decoded vanilla call/goto/conditional script pointer operands as known command starts, mid-command hints, unresolved outside-prefix, null, non-ROM or out-of-ROM, with exact source offsets and bounded output.
+- [x] Preserve no-follow/no-write behavior and synthetic regression coverage; [branch audit details](docs/VANILLA_SCRIPT_BRANCH_AUDIT.md).
+- [ ] Add touch-friendly branch findings, then authenticate CUBE script grammar and real-ROM/emulator/Android behavior before any semantic edits or parity credit.
+
+
 ## Checkpoint — conservative vanilla event-script prefix (28 October 2026)
 - [x] Decode a bounded subset of fixed-width vanilla RSE/FRLG event commands using pinned upstream CUBHMA signatures, with raw offsets, arguments and pointer statuses.
 - [x] Stop on unknown opcodes, incomplete commands and terminal instructions without following control flow; test malformed inputs and accessor safety.
