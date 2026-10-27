@@ -4728,8 +4728,8 @@ const VANILLA_COMMANDS=Object.freeze({
   0x2e:['gettime',[]],0x2f:['sound',['word']],0x30:['waitsound',[]],
   0x31:['fanfare',['word']],0x32:['waitfanfare',[]],
   // Fixed-width vanilla commands cross-checked against the pinned
-  // CUBHMA scriptReference.txt. Variable-length trainerbattle (0x5c),
-  // family-specific 0x2c and all unknown signatures remain unsupported.
+  // CUBHMA scriptReference.txt. Family-specific 0x2c and unknown
+  // signatures remain unsupported; 0x5c is handled by subtype below.
   0x33:['playsong',['word','byte']],0x34:['savesong',['word']],
   0x35:['fadedefault',[]],0x36:['fadesong',['word']],
   0x37:['fadeout',['byte']],0x38:['fadein',['byte']],
