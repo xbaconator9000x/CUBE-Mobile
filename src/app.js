@@ -1937,6 +1937,27 @@ $('map-script-pointer-inspect').addEventListener('click',()=>safeRun(()=>{
         setPageForOffset(command.offset);gotoTab('hex');
       }));
       list.append(item);
+      // Pointer operands are raw destinations, not authenticated scripts,
+      // text or movement data. Recheck the source command before navigation.
+      for(const arg of command.args){
+        if(arg.type!=='pointer'||arg.target?.status!=='in-rom')continue;
+        const targetButton=document.createElement('button');
+        targetButton.type='button';targetButton.className='secondary-button';
+        targetButton.style.margin='0 8px 8px 0';
+        targetButton.textContent='Inspect raw '+command.name+
+         ' target ROM 0x'+hex(arg.target.offset);
+        targetButton.addEventListener('click',()=>safeRun(()=>{
+          if(model!==original)throw Error('ROM replaced; reinspect script');
+          const current=inspectVanillaScriptCommandPrefix(model,{
+            address:command.offset,family,maxBytes:command.length,maxCommands:1
+          }).commands[0];
+          if(!current||current.bytes.length!==command.bytes.length||
+             current.bytes.some((value,index)=>value!==command.bytes[index]))
+            throw Error('Script command bytes changed; reinspect');
+          setPageForOffset(arg.target.offset);gotoTab('hex');
+        }));
+        list.append(targetButton);
+      }
     }
     $('map-script-preview-status').textContent=
       'Vanilla fixed-width subset · '+decoded.commands.length+

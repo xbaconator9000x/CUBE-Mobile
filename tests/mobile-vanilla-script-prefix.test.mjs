@@ -29,3 +29,15 @@ test('offline bundler explicitly strips and includes the decoder module',()=>{
  assert.match(build,/stripVanillaScriptPrefix/);
  assert.match(build,/map-raw-overlay\|vanilla-script-prefix/);
 });
+
+test('mobile and offline script pointer target navigation revalidates source bytes',()=>{
+ for(const path of ['src/app.js','app/CUBHMA_Mobile_Lab_Offline.html']){
+  const source=read(path);
+  assert.match(source,/Inspect raw '\+command\.name/);
+  assert.match(source,/arg\.target\?\.status!=='in-rom'/);
+  assert.match(source,/address:command\.offset,family,maxBytes:command\.length,maxCommands:1/);
+  assert.match(source,/current\.bytes\.some\(\(value,index\)=>value!==command\.bytes\[index\]\)/);
+  assert.match(source,/Script command bytes changed; reinspect/);
+  assert.match(source,/setPageForOffset\(arg\.target\.offset\)/);
+ }
+});
