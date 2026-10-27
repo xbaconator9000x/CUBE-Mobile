@@ -151,6 +151,12 @@
       <button type="button" id="map-preview-cell" class="subtle-button" disabled>Preview original and proposed bytes</button>
       <button type="button" id="map-review-cell-add" class="secondary-button" disabled>Add last cell preview to change review</button>
       <output id="map-preview-status" class="palette-note" aria-live="polite">Select an explicit vanilla header and coordinates to preview bytes. No writes.</output>
+      <button type="button" id="map-visual-compare" class="secondary-button" disabled>Compare proposed map appearance</button>
+      <output id="map-compare-status" class="palette-note" aria-live="polite">No proposed visual comparison. Preview a cell first.</output>
+      <div class="map-compare-grid" aria-label="Read-only metatile appearance comparison">
+        <div><strong>Original</strong><canvas id="map-compare-before" hidden aria-label="Original vanilla map appearance"></canvas></div>
+        <div><strong>Proposed</strong><canvas id="map-compare-after" hidden aria-label="Proposed vanilla map appearance; no ROM write"></canvas></div>
+      </div>
     </div>
     <output id="map-summary-status" class="palette-note" aria-live="polite">No raw blockmap statistics scanned. Requires matching selected vanilla header.</output>
     <div id="map-summary-list" class="anchor-list" aria-label="Raw six-bit collision/elevation distribution"></div>
