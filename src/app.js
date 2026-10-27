@@ -780,6 +780,19 @@ function clearMapChangeReview(){
  $('map-review-impact-status').textContent='No structural impact audit run.';
  $('map-review-status').textContent='No proposed changes queued. No ROM writes.';
 }
+function removeQueuedMapPreview(index){
+ if(mapReviewRom!==model||!Number.isSafeInteger(index)||
+    index<0||index>=mapReviewQueue.length)
+  throw Error('Queue changed; review proposals again');
+ mapReviewQueue=mapReviewQueue.filter((_,i)=>i!==index);
+ if(!mapReviewQueue.length){clearMapChangeReview();return;}
+ $('map-review-list').replaceChildren();
+ $('map-review-impact-list').replaceChildren();
+ $('map-review-impact-status').textContent='Queue changed; rerun impact audit.';
+ $('map-review-status').textContent=mapReviewQueue.length+
+  ' proposed record(s) remain. Rerun review before relying on these previews; no writes.';
+ $('map-review-impact').disabled=!inspectedMapAtlas||inspectedMapAtlas.rom!==model;
+}
 function queueMapChangePreview(kind){
  ensureModel();
  const preview=lastMapPreviews[kind];
@@ -827,6 +840,13 @@ $('map-review-run').addEventListener('click',()=>safeRun(()=>{
    setPageForOffset(entry.offset);gotoTab('hex');
   }));
   root.append(button);
+  const remove=document.createElement('button');remove.type='button';
+  remove.className='subtle-button';remove.style.display='block';
+  remove.style.margin='0 0 12px';
+  remove.textContent='Remove this proposal from queue';
+  remove.addEventListener('click',()=>safeRun(()=>
+   removeQueuedMapPreview(entry.sourceIndex)));
+  root.append(remove);
  }
 }));
 $('map-review-impact').addEventListener('click',()=>safeRun(()=>{
