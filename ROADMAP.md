@@ -1,7 +1,13 @@
+## Checkpoint — mobile/offline raw-cell census (28 October 2026)
+- [x] Add bounded touch-first inspection of raw six-bit vanilla blockmap values across a declared atlas, with shared-blockmap deduplication and physical-versus-logical cell totals.
+- [x] Revalidate canonical ROM provenance and all declarations before hex navigation; regenerate offline HTML and add UI regression coverage.
+- [x] Add opt-in, independently SHA-256-checked local-ROM aggregate counts without exporting ROM bytes, pointer offsets or file paths.
+- [ ] Authenticate CUBE-specific layouts and collision semantics, establish real save/reopen transactions, emulator acceptance and Android hardware tests. Strict parity remains unchanged. See [mobile census](docs/MOBILE_RAW_CELL_CENSUS.md).
+
 ## Checkpoint — opt-in local-ROM raw blockmap census (28 October 2026)
 - [x] Added a bounded source-validated vanilla map-cell high-bit census with exact shared blockmap deduplication and fail-closed overlap/budget checks.
 - [x] Added opt-in SHA-256-matched local-ROM aggregate reporting, with no ROM bytes or pointer addresses exported.
-- [ ] Mobile atlas census UI, authentic CUBE layouts, ROM save/reopen, emulator and Android acceptance remain outstanding. No strict parity credit. See [raw cell census](docs/VANILLA_ATLAS_RAW_CELL_CENSUS.md).
+- [x] Mobile atlas census UI completed separately; authentic CUBE layouts, ROM save/reopen, emulator and Android acceptance remain outstanding. No strict parity credit. See [raw cell census](docs/VANILLA_ATLAS_RAW_CELL_CENSUS.md).
 
 ## Checkpoint — mixed-role script operand alias review (28 October 2026)
 - [x] Identify shared raw script operand targets referenced under different decoded command roles, without treating mixed roles as corruption or proven allocation conflict.
