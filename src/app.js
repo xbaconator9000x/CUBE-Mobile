@@ -814,6 +814,8 @@ $('map-review-run').addEventListener('click',()=>safeRun(()=>{
   button.style.margin='8px 0';button.style.textAlign='left';
   button.textContent=entry.kind+' ROM 0x'+hex(entry.offset)+
    ' · '+entry.length+' bytes · '+(entry.changed?'change':'unchanged')+
+   (entry.fieldChanges.length?' · '+entry.fieldChanges.map(f=>
+    f.field+': '+f.before+' → '+f.after).join('; '):'')+
    ' · inspect original hex';
   button.addEventListener('click',()=>safeRun(()=>{
    if(mapReviewRom!==model)throw Error('Review belongs to another ROM');
