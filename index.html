@@ -70,6 +70,15 @@
       <div class="input-wrap"><label for="map-x">Start X</label><input id="map-x" type="number" min="0" value="0"></div>
       <div class="input-wrap"><label for="map-y">Start Y</label><input id="map-y" type="number" min="0" value="0"></div>
     </div>
+    <div class="input-wrap"><label for="map-bank-offset">Optional known VANILLA bank pointer-table offset (hex)</label><input id="map-bank-offset" inputmode="text" placeholder="Verified data.maps.banks address" spellcheck="false"></div>
+    <div class="input-row">
+      <div class="input-wrap"><label for="map-bank-count">Bank count (declared)</label><input id="map-bank-count" type="number" min="1" max="256" value="1"></div>
+      <div class="input-wrap"><label for="map-bank-index">Bank index (0-based)</label><input id="map-bank-index" type="number" min="0" value="0"></div>
+      <div class="input-wrap"><label for="map-bank-map-count">Maps in bank (declared)</label><input id="map-bank-map-count" type="number" min="1" max="1024" value="1"></div>
+      <div class="input-wrap"><label for="map-bank-map-index">Map index (0-based)</label><input id="map-bank-map-index" type="number" min="0" value="0"></div>
+    </div>
+    <button type="button" id="map-bank-inspect" class="subtle-button" disabled>Follow vanilla bank → map (read only)</button>
+    <output id="map-bank-status" class="palette-note" aria-live="polite">Requires independently verified vanilla bank table and explicit counts; no automatic CUBE map-bank discovery.</output>
     <div class="input-wrap"><label for="map-layout-offset">Optional known VANILLA map header/layout ROM offset (hex)</label><input id="map-layout-offset" inputmode="text" spellcheck="false" placeholder="e.g. 1A2B3C"></div>
     <div class="input-row">
       <div class="input-wrap"><label for="map-layout-source">Source structure</label><select id="map-layout-source"><option value="header">Vanilla map header</option><option value="layout">Vanilla map layout</option></select></div>
@@ -80,6 +89,11 @@
     <button type="button" id="map-inspect" class="subtle-button" disabled>Inspect 12 × 10 cells</button>
     <p class="palette-note">You must independently verify the map's blockmap offset and dimensions. Header identity alone cannot verify CUBE layouts. No bytes are changed. Collision values are raw metadata, not passability colours.</p>
     <output id="map-status" class="palette-note" aria-live="polite">Open a ROM and enter a known blockmap offset.</output>
+  </div>
+  <div class="toolbar-card">
+    <button type="button" id="map-warp-inspect" class="subtle-button" disabled>Inspect vanilla warps for selected header</button>
+    <output id="map-warp-status" class="palette-note" aria-live="polite">Select a known vanilla map header to inspect event counts and warp destinations. Read only.</output>
+    <div id="map-warp-list" class="anchor-list" aria-label="Read-only warp events"><div class="empty-state">No warp events inspected.</div></div>
   </div>
   <div class="editor-card"><div id="map-grid" class="blockmap-scroller" aria-label="Read-only map block cells"><div class="empty-state">No blockmap inspected.</div></div></div>
 </section>
