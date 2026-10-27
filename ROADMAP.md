@@ -1,3 +1,9 @@
+## Checkpoint — pinned upstream CUBE metadata and nested pointer depth (28 October 2026)
+- [x] Add a small MIT-licensed, metadata-only map-bank declaration excerpt from pinned upstream CUBE Emerald TOML; no ROM or graphics assets.
+- [x] Correct the ambiguity audit to distinguish legitimate nested same-name pointer fields from conflicting same-depth duplicates.
+- [x] Test real upstream CUBE metadata hierarchy and explicit no-authentication/no-write guarantees.
+- [ ] Independently match exact CUBE ROM and metadata fingerprints, decode actual custom layouts, then verify save/reopen, emulator and Android acceptance before strict parity credit.
+
 ## Checkpoint — conservative HMA map format ambiguity gate (28 October 2026)
 - [x] Detect repeated same-name map/layout/events/warp/script/blockset pointer declarations in extracted nested TOML formats, without silently trusting the first field.
 - [x] Fail closed on ambiguous formats and test duplicate names, similarly named fields, malformed text and bounds.
