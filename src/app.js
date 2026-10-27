@@ -35,6 +35,7 @@ import {auditVanillaQueuedChangeRoundtrip} from './map-change-roundtrip.js';
 import {compareVanillaBlockmapVisualChange,compareVanillaBlockmapVisualChangeSet} from './map-visual-diff.js';
 import {buildVanillaRawMapOverlay,buildRawBlockmapGridOverlay} from './map-raw-overlay.js';
 import {auditVanillaAtlasRawCells} from './map-cell-census.js';
+import {auditVanillaAtlasWarpGraph} from './map-warp-graph.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
@@ -1000,6 +1001,9 @@ function clearMapAtlas(message='Declared atlas invalidated; inspect again.') {
  $('map-atlas-batch-audit').disabled=true;
  $('map-atlas-alias-audit').disabled=true;
  $('map-atlas-raw-census').disabled=true;
+ $('map-atlas-graph').disabled=true;
+ $('map-atlas-graph-list').replaceChildren();
+ $('map-atlas-graph-status').textContent='No declared raw map network reviewed.';
  $('map-atlas-raw-census-list').replaceChildren();
  $('map-atlas-raw-census-status').textContent='No raw-cell census run.';
  $('map-event-ownership-audit').disabled=true;
@@ -1129,6 +1133,7 @@ $('map-atlas-inspect').addEventListener('click',()=>safeRun(()=>{
  $('map-atlas-batch-audit').disabled=false;
  $('map-atlas-alias-audit').disabled=false;
  $('map-atlas-raw-census').disabled=false;
+ $('map-atlas-graph').disabled=false;
  $('map-event-ownership-audit').disabled=false;
  $('map-script-alias-audit').disabled=false;
  atlasScriptAliasStart=0;
@@ -1463,6 +1468,84 @@ $('map-coordinate-batch-audit').addEventListener('click',()=>safeRun(()=>{
 }));
 
 
+
+$('map-atlas-graph').addEventListener('click',()=>safeRun(()=>{
+ requireVanillaMapFormat();
+ if(!inspectedMapAtlas||inspectedMapAtlas.rom!==model)
+  throw Error('Inspect a declared vanilla atlas before network review');
+ const atlas=inspectedMapAtlas.atlas;
+ function inputsUnchanged(){
+  const counts=parseVanillaBankMapCounts($('map-atlas-counts').value);
+  return inspectedMapAtlas?.rom===model&&
+   parseOffset($('map-bank-offset').value)===atlas.address&&
+   $('map-layout-family').value===atlas.family&&
+   counts.length===atlas.bankCount&&
+   counts.every((n,i)=>n===atlas.bankMapCounts[i]);
+ }
+ if(!inputsUnchanged())throw Error('Atlas inputs changed; reinspect before network review');
+ const selected=Number($('map-atlas-select').value);
+ if(!Number.isSafeInteger(selected)||selected<0||selected>=atlas.maps.length)
+  throw Error('Select a declared origin map first');
+ const origin=atlas.maps[selected];
+ const opts={originBank:origin.bankIndex,originMap:origin.mapIndex,
+  maxMaps:128,maxLinks:8192,maxRows:32,maxFindings:48};
+ const result=auditVanillaAtlasWarpGraph(model,atlas,opts);
+ const root=$('map-atlas-graph-list');root.replaceChildren();
+ $('map-atlas-graph-status').textContent=
+  'From bank '+origin.bankIndex+' / map '+origin.mapIndex+': '+
+  result.reachableByRawLinks+'/'+result.mapsInspected+
+  ' declared maps reached by raw directed links; '+
+  result.counts.resolved+' resolved references, '+
+  result.counts.invalidWarp+' invalid raw warp indexes, '+
+  result.counts.undeclared+' undeclared targets, '+
+  result.counts.special+' special references and '+
+  result.counts.oneWayPairs+' pairs without a direct reverse reference. '+
+  (result.rowsTruncated?'First 32 map summaries shown. ':'')+
+  (result.findingsTruncated?'First 48 findings shown. ':'')+
+  'Raw graph only: NOT verified gameplay travel, walkability or CUBE compatibility.';
+ for(const row of result.rows){
+  const button=document.createElement('button');button.type='button';
+  button.className='secondary-button';button.style.display='block';
+  button.style.margin='8px 0';button.style.textAlign='left';
+  button.textContent='Bank '+row.bankIndex+' / map '+row.mapIndex+
+   ' · '+row.incoming+' inbound / '+row.outgoing+' outbound'+
+   ' · '+(row.reachableByRawLinks?'raw-link reached':'not reached by raw links')+
+   ' · open declared map';
+  button.addEventListener('click',()=>safeRun(()=>{
+   requireVanillaMapFormat();
+   if(!inputsUnchanged())throw Error('Atlas inputs changed; reinspect');
+   const fresh=auditVanillaAtlasWarpGraph(model,atlas,opts);
+   const match=fresh.rows.find(x=>x.bankIndex===row.bankIndex&&
+    x.mapIndex===row.mapIndex&&x.headerOffset===row.headerOffset&&
+    x.incoming===row.incoming&&x.outgoing===row.outgoing&&
+    x.reachableByRawLinks===row.reachableByRawLinks);
+   if(!match)throw Error('Raw map network changed; rescan first');
+   openDeclaredAtlasMap(atlas.maps.find(m=>m.bankIndex===match.bankIndex&&m.mapIndex===match.mapIndex));
+  }));
+  root.append(button);
+ }
+ for(const finding of result.findings){
+  const line=document.createElement('button');line.type='button';
+  line.className='secondary-button';line.style.display='block';
+  line.style.margin='8px 0';line.style.textAlign='left';
+  line.textContent='Raw reference '+finding.source+' → '+
+   (finding.targetId??finding.target)+': '+finding.status+
+   (Number.isSafeInteger(finding.offset)?' · inspect ROM bytes':' · structural hint');
+  if(!Number.isSafeInteger(finding.offset))line.disabled=true;
+  else line.addEventListener('click',()=>safeRun(()=>{
+   requireVanillaMapFormat();
+   if(!inputsUnchanged())throw Error('Atlas inputs changed; rescan first');
+   const fresh=auditVanillaAtlasWarpGraph(model,atlas,opts);
+   const match=fresh.findings.find(x=>x.source===finding.source&&
+    x.kind===finding.kind&&x.index===finding.index&&
+    x.offset===finding.offset&&x.status===finding.status&&
+    x.targetId===finding.targetId);
+   if(!match)throw Error('Raw link changed; rescan first');
+   setPageForOffset(match.offset);gotoTab('hex');
+  }));
+  root.append(line);
+ }
+}));
 
 $('map-atlas-raw-census').addEventListener('click',()=>safeRun(()=>{
  requireVanillaMapFormat();

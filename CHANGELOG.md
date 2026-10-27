@@ -1,3 +1,7 @@
+## Unreleased — mobile/offline directed warp graph explorer (28 October 2026)
+- Add touch-first inspection of raw directed map links, bounded map summaries, unresolved warp findings and stale-checked navigation to maps and hex bytes.
+- Bundle the graph inspector into the standalone offline application with UI wiring regressions. Raw reachability is not verified gameplay travel.
+
 ## Unreleased — bounded vanilla warp/connection graph (28 October 2026)
 - Add canonical source-revalidated, read-only directed raw link graph with declared destination/warp index checks and bounded whole-atlas coverage.
 - Report raw reachability, inbound/outbound references and absent direct reverse links as structural hints, not verified gameplay traversal.
