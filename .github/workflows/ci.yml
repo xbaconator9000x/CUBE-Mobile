@@ -17,6 +17,8 @@ jobs:
           node-version: '22'
       - name: Unit tests
         run: npm test
+      - name: Validate conservative feature parity baseline
+        run: npm run parity:check
       - name: Generate standalone offline HTML
         run: npm run build:standalone
       - name: Ensure checked-in offline checkpoint matches source
