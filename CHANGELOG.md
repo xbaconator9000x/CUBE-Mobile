@@ -1,3 +1,8 @@
+## Unreleased — bounded vanilla warp/connection graph (28 October 2026)
+- Add canonical source-revalidated, read-only directed raw link graph with declared destination/warp index checks and bounded whole-atlas coverage.
+- Report raw reachability, inbound/outbound references and absent direct reverse links as structural hints, not verified gameplay traversal.
+- Add synthetic safety/provenance tests and scope documentation. No CUBE authentication or semantic writes.
+
 ## Unreleased — declared vanilla atlas raw-cell census (28 October 2026)
 - Count raw six-bit blockmap high-bit values across bounded, canonical source-validated map banks, deduplicating exact shared blockmaps.
 - Expose a touch-friendly, read-only atlas summary and stale-checked tap-to-hex inspection in both web and standalone offline builds.
