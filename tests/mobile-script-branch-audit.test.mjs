@@ -27,5 +27,5 @@ test('offline generator includes dependency in correct order',()=>{
  const build=read('build-standalone.mjs');
  assert.match(build,/vanillaScriptBranches=read\('src\/vanilla-script-branches\.js'\)/);
  assert.match(build,/stripVanillaScriptPrefix\+"\\n"\+stripVanillaScriptBranches/);
- assert.match(build,/map-raw-overlay\|map-cell-census\|map-warp-graph\|vanilla-script-prefix\|vanilla-script-branches/);
+ assert.match(build,/map-raw-overlay\|map-cell-census\|map-warp-graph\|map-route-explorer\|vanilla-script-prefix\|vanilla-script-branches/);
 });
