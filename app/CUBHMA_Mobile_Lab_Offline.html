@@ -182,7 +182,7 @@
     <output id="map-connection-status" class="palette-note" aria-live="polite">Select a known vanilla map header to inspect connection records. Read only.</output>
     <div id="map-connection-list" class="anchor-list" aria-label="Read-only map connections"><div class="empty-state">No connections inspected.</div></div>
   </div>
-  <div class="editor-card"><output id="map-render-status" class="palette-note" aria-live="polite">Rendered preview disabled; vanilla layout is unverified.</output><div class="blockmap-scroller"><canvas id="map-render-canvas" hidden aria-label="Composed vanilla map viewport"></canvas></div></div>
+  <div class="editor-card"><output id="map-render-status" class="palette-note" aria-live="polite">Rendered preview disabled; vanilla layout is unverified.</output><div class="blockmap-scroller"><canvas id="map-render-canvas" hidden aria-label="Composed vanilla map viewport; tap a metatile for raw inspection"></canvas></div><output id="map-render-selection" class="palette-note" aria-live="polite">Tap a rendered metatile to inspect its raw source offsets.</output><button type="button" id="map-render-jump" class="subtle-button" disabled>Inspect selected metatile bytes in hex</button></div>
   <div class="editor-card"><div id="map-grid" class="blockmap-scroller" aria-label="Read-only map block cells"><div class="empty-state">No blockmap inspected.</div></div></div>
 </section>
 <section class="view" id="view-graphics">
@@ -2771,6 +2771,46 @@ function indexMapEventMarkers(arrays,{width,height}={}){
 }
 
 /**
+ * Hit-test a composed 16px metatile viewport in native canvas coordinates.
+ * The caller must transform CSS/client coordinates to canvas pixels first.
+ * Returns source byte offsets from the existing read-only decoded cells.
+ */
+function inspectRenderedMapPixel(rendered,pixelX,pixelY) {
+ if(!rendered||!Array.isArray(rendered.cells)||!Array.isArray(rendered.attributes)||
+    !Number.isSafeInteger(rendered.columns)||!Number.isSafeInteger(rendered.rows))
+  throw new TypeError('Expected rendered map viewport');
+ if(!Number.isFinite(pixelX)||!Number.isFinite(pixelY)||pixelX<0||pixelY<0||
+    pixelX>=rendered.columns*16||pixelY>=rendered.rows*16)return null;
+ const column=Math.floor(pixelX/16),row=Math.floor(pixelY/16);
+ const cell=rendered.cells[row]?.[column],attribute=rendered.attributes[row]?.[column];
+ if(!cell||!attribute||!Number.isSafeInteger(cell.byteOffset))
+  throw new RangeError('Rendered map cell has no source provenance');
+ return Object.freeze({column,row,cell,attribute});
+}
+
+/** Spatial markers are unverified coordinates, not sprite/warp semantics. */
+function projectRenderedMapMarkers(rendered,warpIndex=null,eventIndex=null) {
+ if(!rendered||!Array.isArray(rendered.cells)||!Number.isSafeInteger(rendered.columns)||
+    !Number.isSafeInteger(rendered.rows))
+  throw new TypeError('Expected rendered map viewport');
+ const markers=[];
+ for(let row=0;row<rendered.rows;row++)for(let column=0;column<rendered.columns;column++){
+  const cell=rendered.cells[row]?.[column];
+  if(!cell||!Number.isSafeInteger(cell.x)||!Number.isSafeInteger(cell.y))
+   throw new RangeError('Rendered map coordinate missing');
+  const key=cell.x+','+cell.y;
+  const warps=warpIndex?.[key]||[],events=eventIndex?.[key]||[];
+  if(!Array.isArray(warps)||!Array.isArray(events))
+   throw new TypeError('Invalid marker index');
+  if(warps.length||events.length)markers.push(Object.freeze({
+   column,row,x:cell.x,y:cell.y,warps:Object.freeze([...warps]),
+   events:Object.freeze([...events])
+  }));
+ }
+ return Object.freeze(markers);
+}
+
+/**
  * Read-only vanilla RSE/FRLG 16x16 metatile compositor.
  * Based on upstream BlockmapRun.RenderBlock and LzTilemapRun.ReadTileData.
  * Does not authenticate CUBE layouts, walkability or pointer ownership.
@@ -2895,6 +2935,7 @@ let pcsReference=null,pcsReferenceName='';
 let fingerprintResult=null,fingerprintAbort=null;
 let metadataFingerprints=[],metadataImportSerial=0;
 let inspectedWarpMap=null,inspectedEventMap=null,inspectedMapAtlas=null;
+let activeRenderedMap=null,selectedRenderedHit=null;
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
@@ -3587,6 +3628,9 @@ $('metadata-stock').addEventListener('click',async()=>{
 
 
 function clearRenderedMap(message='Rendered preview invalidated; inspect again.'){
+ activeRenderedMap=null;selectedRenderedHit=null;
+ $('map-render-selection').textContent='Tap a rendered metatile to inspect its raw source offsets.';
+ $('map-render-jump').disabled=true;
  $('map-render-canvas').hidden=true;
  $('map-render-status').textContent=message;
 }
@@ -3960,6 +4004,19 @@ $('map-inspect').addEventListener('click',()=>safeRun(()=>{
       canvas.width=rendered.width;canvas.height=rendered.height;
       const image=context.createImageData(rendered.width,rendered.height);
       image.data.set(rendered.pixels);context.putImageData(image,0,0);
+      const projected=projectRenderedMapMarkers(rendered,markerIndex,eventMarkerIndex);
+      context.font='bold 7px sans-serif';
+      for(const marker of projected){
+        const left=marker.column*16,top=marker.row*16;
+        const label=marker.warps.length?
+          'W'+(marker.events.length||marker.warps.length>1?'+':String(marker.warps[0])):
+          'E'+(marker.events.length>1?'+':'');
+        context.fillStyle='rgba(10,15,28,0.86)';
+        context.fillRect(left,top,16,8);
+        context.fillStyle='#ffffff';
+        context.fillText(label,left+1,top+6,14);
+      }
+      activeRenderedMap={rom:model,rendered,warpIndex:markerIndex,eventIndex:eventMarkerIndex};
       canvas.style.width=(rendered.width*2)+'px';
       canvas.style.height=(rendered.height*2)+'px';
       canvas.hidden=false;
@@ -3982,6 +4039,34 @@ $('map-inspect').addEventListener('click',()=>safeRun(()=>{
 }));
 
 $('map-render-enabled').addEventListener('change',()=>{clearRenderedMap();if(model)$('map-inspect').click();});
+$('map-render-canvas').addEventListener('click',event=>safeRun(()=>{
+ if(!activeRenderedMap||activeRenderedMap.rom!==model)
+  throw Error('Rendered map changed; inspect again');
+ const canvas=$('map-render-canvas'),rect=canvas.getBoundingClientRect();
+ if(!rect.width||!rect.height)throw Error('Rendered canvas has no visible dimensions');
+ const pixelX=(event.clientX-rect.left)*canvas.width/rect.width;
+ const pixelY=(event.clientY-rect.top)*canvas.height/rect.height;
+ const hit=inspectRenderedMapPixel(activeRenderedMap.rendered,pixelX,pixelY);
+ if(!hit)return;
+ selectedRenderedHit={rom:model,hit};
+ const key=hit.cell.x+','+hit.cell.y;
+ const warps=activeRenderedMap.warpIndex?.[key]||[];
+ const events=activeRenderedMap.eventIndex?.[key]||[];
+ $('map-render-selection').textContent='Cell ('+hit.cell.x+', '+hit.cell.y+
+  '): metatile '+hit.cell.tileId+', raw collision/elevation '+hit.cell.collision+
+  ', behavior 0x'+hex(hit.attribute.behavior,2)+', layer '+hit.attribute.layer+
+  ', blockmap ROM 0x'+hex(hit.cell.byteOffset)+
+  ', attributes ROM 0x'+hex(hit.attribute.attributeOffset)+
+  (warps.length?', raw warp(s) '+warps.join(', '):'')+
+  (events.length?', raw event(s) '+events.join(', '):'')+
+  '. Coordinates and walkability are NOT authenticated.';
+ $('map-render-jump').disabled=false;
+}));
+$('map-render-jump').addEventListener('click',()=>safeRun(()=>{
+ if(!selectedRenderedHit||selectedRenderedHit.rom!==model||!activeRenderedMap)
+  throw Error('Rendered selection expired; inspect again');
+ setPageForOffset(selectedRenderedHit.hit.cell.byteOffset);gotoTab('hex');
+}));
 
 for(const id of ['map-layout-offset','map-layout-family','map-layout-source','map-offset','map-width','map-height','map-x','map-y']){
  $(id).addEventListener('change',()=>clearRenderedMap('Map selection changed; inspect again.'));
