@@ -128,6 +128,20 @@
       <button type="button" id="map-summary-scan" class="subtle-button" disabled>Scan 4096 raw cells</button>
       <button type="button" id="map-summary-next" class="secondary-button" disabled>Next cells</button>
     </div>
+    <div class="toolbar-card" aria-label="Read-only proposed vanilla cell change">
+      <h3>Preview a metatile change (no writes)</h3>
+      <p class="palette-note">Use an independently verified vanilla header. Tap a rendered cell to fill these fields, or enter its coordinates. The six high bits are raw metadata, not verified walkability.</p>
+      <div class="input-row">
+        <div class="input-wrap"><label for="map-preview-x">Cell X</label><input id="map-preview-x" type="number" min="0" max="1023" step="1" value="0"></div>
+        <div class="input-wrap"><label for="map-preview-y">Cell Y</label><input id="map-preview-y" type="number" min="0" max="1023" step="1" value="0"></div>
+      </div>
+      <div class="input-row">
+        <div class="input-wrap"><label for="map-preview-tile">Proposed tile ID (0–1023)</label><input id="map-preview-tile" type="number" min="0" max="1023" step="1" placeholder="Keep existing"></div>
+        <div class="input-wrap"><label for="map-preview-collision">Proposed raw high bits (0–63)</label><input id="map-preview-collision" type="number" min="0" max="63" step="1" placeholder="Keep existing"></div>
+      </div>
+      <button type="button" id="map-preview-cell" class="subtle-button" disabled>Preview original and proposed bytes</button>
+      <output id="map-preview-status" class="palette-note" aria-live="polite">Select an explicit vanilla header and coordinates to preview bytes. No writes.</output>
+    </div>
     <output id="map-summary-status" class="palette-note" aria-live="polite">No raw blockmap statistics scanned. Requires matching selected vanilla header.</output>
     <div id="map-summary-list" class="anchor-list" aria-label="Raw six-bit collision/elevation distribution"></div>
   </div>
