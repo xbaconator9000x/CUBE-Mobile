@@ -14,12 +14,12 @@ function occurrences(text,name){
  let depth=0,quoted=false,firstDepth=null,count=0;
  for(let i=0;i<text.length;i++){
   const ch=text[i];
-  if(ch==='\`'){quoted=!quoted;continue;}
+  if(ch==='`'){quoted=!quoted;continue;}
   if(quoted)continue;
   if(ch==='['){depth++;continue;}
   if(ch===']'){depth--;continue;}
   if(text.startsWith(name+'<',i)&&
-     (i===0||' [<\\n\\t'.includes(text[i-1]))){
+     (i===0||' [<\n\t'.includes(text[i-1]))){
     if(firstDepth===null)firstDepth=depth;
     if(depth===firstDepth)count++;
   }
