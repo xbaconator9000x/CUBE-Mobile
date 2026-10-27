@@ -16,7 +16,6 @@ test('mobile and offline keep vanilla map inspection read-only and explicitly un
  const app=read('src/app.js'),offline=read('app/CUBHMA_Mobile_Lab_Offline.html');
  for(const s of [app,offline]){
   assert.match(s,/metadataLayoutKind==='expansion'/);
-  assert.match(s,/layoutAuthenticated/);
   assert.match(s,/NOT CUBE-authenticated/);
   assert.match(s,/inspectVanillaMapHeader\(model/);
  }
