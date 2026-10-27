@@ -21,6 +21,7 @@ import {previewVanillaBlockmapCellChange} from './map-edit-preview.js';
 import {traceVanillaWarpArrival} from './map-warp-trace.js';
 import {previewVanillaWarpRecordChange} from './map-warp-edit-preview.js';
 import {previewVanillaEventCoordinateChange} from './map-event-edit-preview.js';
+import {reviewVanillaChangeSet} from './map-change-review.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
@@ -29,6 +30,7 @@ let fingerprintResult=null,fingerprintAbort=null;
 let metadataFingerprints=[],metadataImportSerial=0;
 let inspectedWarpMap=null,selectedWarpPreview=null,selectedEventPreview=null,inspectedEventMap=null,inspectedMapAtlas=null,atlasBatchStart=0,atlasCoordinateBatchStart=0;
 let activeRenderedMap=null,selectedRenderedHit=null;
+let mapReviewQueue=[],mapReviewRom=null,lastMapPreviews={cell:null,warp:null,event:null};
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
@@ -113,7 +115,7 @@ function updateIndicators(){
   if(active)showRomInfo();
   drawMetadataFingerprintStatus();
 }
-function installModel(name,bytes){clearMapAtlas('ROM replaced; declared atlas invalidated.');metadataImportSerial++;metadataFingerprints=[];clearRenderedMap('ROM replaced. Select vanilla header again.');$('map-grid').innerHTML='<div class="empty-state">No blockmap inspected.</div>';$('map-bank-status').textContent='ROM replaced. Re-enter independently verified vanilla bank location and counts.';clearWarpInspection('ROM replaced. Select a vanilla map header again.');clearConnectionInspection('ROM replaced. Select a vanilla map header again.');$('map-layout-status').textContent='ROM replaced. No vanilla-format layout inspected.';$('map-status').textContent='ROM replaced. Enter a verified offset and inspect again.';pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
+function installModel(name,bytes){clearMapChangeReview();clearMapAtlas('ROM replaced; declared atlas invalidated.');metadataImportSerial++;metadataFingerprints=[];clearRenderedMap('ROM replaced. Select vanilla header again.');$('map-grid').innerHTML='<div class="empty-state">No blockmap inspected.</div>';$('map-bank-status').textContent='ROM replaced. Re-enter independently verified vanilla bank location and counts.';clearWarpInspection('ROM replaced. Select a vanilla map header again.');clearConnectionInspection('ROM replaced. Select a vanilla map header again.');$('map-layout-status').textContent='ROM replaced. No vanilla-format layout inspected.';$('map-status').textContent='ROM replaced. Enter a verified offset and inspect again.';pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
 $('rom-picker').addEventListener('change',async e=>{
   const file=e.target.files?.[0];e.target.value='';if(!file)return;
   if(file.size<0xC0 || file.size>MAX_BYTES)return toast('ROM must be 192 bytes to 128 MiB',true);
@@ -383,7 +385,7 @@ if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostn
 // engine, game fingerprints and pointer allocator have been ported and tested.
 let displayedAnchors=[], selectedInspection=null;
 const encodeHex=bytes=>Array.from(bytes).map((b,i)=>hex(b,2)+(i%16===15?'\n':' ')).join('').trim();
-function metadataReset(){metadataImportSerial++;metadataFingerprints=[];clearWarpInspection('Metadata reset; inspect warps again.');clearConnectionInspection('Metadata reset; inspect connections again.');clearMapGrid('Metadata reset; inspect map again.');metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
+function metadataReset(){clearMapChangeReview();metadataImportSerial++;metadataFingerprints=[];clearWarpInspection('Metadata reset; inspect warps again.');clearConnectionInspection('Metadata reset; inspect connections again.');clearMapGrid('Metadata reset; inspect map again.');metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
 function snapshotMatchedWords(words=metadataMatchedWords){
   if(!model)return [];
   return words.map(word=>{
@@ -735,6 +737,7 @@ function clearRenderedMap(message='Rendered preview invalidated; inspect again.'
  $('map-render-status').textContent=message;
 }
 function clearMapGrid(message='Map structure changed; inspect again.'){
+  lastMapPreviews.cell=null;$('map-review-cell-add').disabled=true;
   clearMapAtlas(message+' Reinspect declared bank counts.');
   clearRenderedMap();
   const root=$('map-grid');root.replaceChildren();
@@ -747,14 +750,16 @@ function clearMapGrid(message='Map structure changed; inspect again.'){
 function clearWarpInspection(message='Select a vanilla map header to inspect warp events.'){
   clearEventInspection('Map or ROM changed; inspect vanilla event records again.');
   clearBlocksetInspection('Map or ROM changed; inspect blockset headers again.');
-  inspectedWarpMap=null;selectedWarpPreview=null;
+  inspectedWarpMap=null;selectedWarpPreview=null;lastMapPreviews.warp=null;
+  $('map-review-warp-add').disabled=true;
   $('map-warp-preview').disabled=true;
   $('map-warp-preview-status').textContent='Select a raw warp record to preview proposed bytes. No writes.';
   $('map-warp-list').replaceChildren();
   $('map-warp-status').textContent=message;
 }
 function clearEventInspection(message='Select a vanilla map header to inspect object, script and signpost records.'){
-  inspectedEventMap=null;selectedEventPreview=null;
+  inspectedEventMap=null;selectedEventPreview=null;lastMapPreviews.event=null;
+  $('map-review-event-add').disabled=true;
   $('map-event-preview').disabled=true;
   $('map-event-preview-status').textContent='Select a raw event record to preview proposed bytes. No writes.';
   $('map-event-list').replaceChildren();
@@ -764,6 +769,60 @@ function clearEventInspection(message='Select a vanilla map header to inspect ob
   $('map-script-preview-list').replaceChildren();
   $('map-script-preview-status').textContent='No raw script byte prefix inspected.';
 }
+function clearMapChangeReview(){
+ mapReviewQueue=[];mapReviewRom=null;
+ lastMapPreviews={cell:null,warp:null,event:null};
+ for(const id of ['map-review-cell-add','map-review-warp-add','map-review-event-add',
+  'map-review-run','map-review-clear'])$(id).disabled=true;
+ $('map-review-list').replaceChildren();
+ $('map-review-status').textContent='No proposed changes queued. No ROM writes.';
+}
+function queueMapChangePreview(kind){
+ ensureModel();
+ const preview=lastMapPreviews[kind];
+ if(!preview)throw Error('Preview the selected '+kind+' record before queueing');
+ if(mapReviewRom&&mapReviewRom!==model)
+  throw Error('ROM changed; clear the review queue');
+ const next=[...mapReviewQueue,preview];
+ reviewVanillaChangeSet(model,next,{maxChanges:64,maxBytes:2048});
+ mapReviewQueue=next;mapReviewRom=model;
+ $('map-review-run').disabled=false;$('map-review-clear').disabled=false;
+ $('map-review-list').replaceChildren();
+ $('map-review-status').textContent=next.length+
+  ' proposed record(s) queued. Recheck originals and overlaps before relying on review; no writes.';
+}
+for(const kind of ['cell','warp','event'])
+ $('map-review-'+kind+'-add').addEventListener('click',()=>safeRun(()=>queueMapChangePreview(kind)));
+$('map-review-run').addEventListener('click',()=>safeRun(()=>{
+ if(!mapReviewQueue.length||mapReviewRom!==model)
+  throw Error('Review queue is empty or belongs to a different ROM');
+ const result=reviewVanillaChangeSet(model,mapReviewQueue,{
+  maxChanges:64,maxBytes:2048});
+ const root=$('map-review-list');root.replaceChildren();
+ $('map-review-status').textContent=result.count+' non-overlapping record(s), '+
+  result.totalBytes+' original bytes checked, '+result.changedBytes+
+  ' proposed byte differences. Preview only; NOT applied, exported or authenticated.';
+ for(const entry of result.entries){
+  const button=document.createElement('button');button.type='button';
+  button.className='secondary-button';button.style.display='block';
+  button.style.margin='8px 0';button.style.textAlign='left';
+  button.textContent=entry.kind+' ROM 0x'+hex(entry.offset)+
+   ' · '+entry.length+' bytes · '+(entry.changed?'change':'unchanged')+
+   ' · inspect original hex';
+  button.addEventListener('click',()=>safeRun(()=>{
+   if(mapReviewRom!==model)throw Error('Review belongs to another ROM');
+   const fresh=reviewVanillaChangeSet(model,mapReviewQueue,{
+    maxChanges:64,maxBytes:2048});
+   if(!fresh.entries.some(e=>e.sourceIndex===entry.sourceIndex&&
+      e.offset===entry.offset&&e.length===entry.length))
+    throw Error('Review changed; run again');
+   setPageForOffset(entry.offset);gotoTab('hex');
+  }));
+  root.append(button);
+ }
+}));
+$('map-review-clear').addEventListener('click',()=>clearMapChangeReview());
+
 function clearBlocksetInspection(message='Select a vanilla map header to inspect tileset pointers.'){
   $('map-blockset-list').replaceChildren();
   $('map-blockset-status').textContent=message;
@@ -1347,6 +1406,7 @@ $('map-warp-preview').addEventListener('click',()=>safeRun(()=>{
    warpId:readField('warp-id'),targetMap:readField('target-map'),
    targetBank:readField('target-bank')}
  });
+ lastMapPreviews.warp=result;$('map-review-warp-add').disabled=false;
  const format=bytes=>bytes.map(n=>hex(n,2)).join(' ');
  $('map-warp-preview-status').textContent='Warp '+result.warpIndex+' ROM 0x'+
   hex(result.recordOffset)+': '+format(result.before)+' → '+format(result.after)+
@@ -1485,6 +1545,7 @@ $('map-event-preview').addEventListener('click',()=>safeRun(()=>{
   index:selection.index,expectedBytes:selection.expectedBytes,
   changes:{x:field('x'),y:field('y'),elevation:field('elevation')}
  });
+ lastMapPreviews.event=result;$('map-review-event-add').disabled=false;
  const format=bytes=>bytes.map(n=>hex(n,2)).join(' ');
  $('map-event-preview-status').textContent=result.kind+' '+result.index+
   ' · ROM 0x'+hex(result.recordOffset)+' ('+result.recordLength+' bytes): '+
@@ -1794,6 +1855,7 @@ $('map-preview-cell').addEventListener('click',()=>safeRun(()=>{
   ...(proposedCollision===''?{}:{collision:Number(proposedCollision)}),
   ...(expectedRaw===undefined?{}:{expectedRaw}),...(atlas?{atlas}:{})
  });
+ lastMapPreviews.cell=result;$('map-review-cell-add').disabled=false;
  const old=result.before.bytes.map(n=>hex(n,2)).join(' ');
  const next=result.after.bytes.map(n=>hex(n,2)).join(' ');
  $('map-preview-status').textContent='ROM 0x'+hex(result.byteOffset)+
