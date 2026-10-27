@@ -5,7 +5,7 @@ const decode=(bytes,options={})=>inspect(Uint8Array.from(bytes),{
  address:0,family:'RSE',...options});
 test('decodes upstream fixed-width commands with byte-exact offsets',()=>{
  const result=decode([0x16,0x00,0x40,0x03,0x00,0x06,0x01,
-  0x10,0x00,0x08,0x02,0x00,0x00,0x00,0xff]);
+  0x10,0x00,0x08,0x02,0x02,0x00,0x00,0xff]);
  assert.deepEqual(result.commands.map(c=>[c.name,c.offset,c.length]),
   [['setvar',0,5],['if1',5,6],['end',11,1]]);
  assert.equal(result.commands[0].args[0].value,0x4000);
