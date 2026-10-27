@@ -1,3 +1,8 @@
+## Checkpoint — reviewed warp queue raw-route preflight (28 October 2026)
+- [x] Compare before/after shortest raw map-link paths through a typed, multi-owner-checked, immutable reviewed warp overlay.
+- [x] Reject stale originals, non-warp proposals and bounded-budget violations; synthetic tests cover changed/no-op routes and ROM immutability.
+- [ ] Wire queue comparison into mobile/offline UI, authenticate CUBE structures and genuine ROM/emulator/Android acceptance. Strict parity unchanged. See [route preflight](docs/VANILLA_ROUTE_CHANGE_PREVIEW.md).
+
 ## Checkpoint — mobile/offline shortest raw map-link route (28 October 2026)
 - [x] Add origin/destination selection and touch-first shortest raw route inspection with per-hop ROM byte and declared destination navigation.
 - [x] Revalidate atlas inputs and recompute the route before navigation; regenerate offline HTML and add modular/offline UI regression tests.
