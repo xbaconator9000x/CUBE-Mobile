@@ -62,3 +62,43 @@ export function indexMapEventMarkers(arrays,{width,height}={}){
   for(const key of Object.keys(markers))Object.freeze(markers[key]);
   return Object.freeze(markers);
 }
+
+/**
+ * Hit-test a composed 16px metatile viewport in native canvas coordinates.
+ * The caller must transform CSS/client coordinates to canvas pixels first.
+ * Returns source byte offsets from the existing read-only decoded cells.
+ */
+export function inspectRenderedMapPixel(rendered,pixelX,pixelY) {
+ if(!rendered||!Array.isArray(rendered.cells)||!Array.isArray(rendered.attributes)||
+    !Number.isSafeInteger(rendered.columns)||!Number.isSafeInteger(rendered.rows))
+  throw new TypeError('Expected rendered map viewport');
+ if(!Number.isFinite(pixelX)||!Number.isFinite(pixelY)||pixelX<0||pixelY<0||
+    pixelX>=rendered.columns*16||pixelY>=rendered.rows*16)return null;
+ const column=Math.floor(pixelX/16),row=Math.floor(pixelY/16);
+ const cell=rendered.cells[row]?.[column],attribute=rendered.attributes[row]?.[column];
+ if(!cell||!attribute||!Number.isSafeInteger(cell.byteOffset))
+  throw new RangeError('Rendered map cell has no source provenance');
+ return Object.freeze({column,row,cell,attribute});
+}
+
+/** Spatial markers are unverified coordinates, not sprite/warp semantics. */
+export function projectRenderedMapMarkers(rendered,warpIndex=null,eventIndex=null) {
+ if(!rendered||!Array.isArray(rendered.cells)||!Number.isSafeInteger(rendered.columns)||
+    !Number.isSafeInteger(rendered.rows))
+  throw new TypeError('Expected rendered map viewport');
+ const markers=[];
+ for(let row=0;row<rendered.rows;row++)for(let column=0;column<rendered.columns;column++){
+  const cell=rendered.cells[row]?.[column];
+  if(!cell||!Number.isSafeInteger(cell.x)||!Number.isSafeInteger(cell.y))
+   throw new RangeError('Rendered map coordinate missing');
+  const key=cell.x+','+cell.y;
+  const warps=warpIndex?.[key]||[],events=eventIndex?.[key]||[];
+  if(!Array.isArray(warps)||!Array.isArray(events))
+   throw new TypeError('Invalid marker index');
+  if(warps.length||events.length)markers.push(Object.freeze({
+   column,row,x:cell.x,y:cell.y,warps:Object.freeze([...warps]),
+   events:Object.freeze([...events])
+  }));
+ }
+ return Object.freeze(markers);
+}

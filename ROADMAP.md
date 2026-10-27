@@ -1,5 +1,18 @@
 # Roadmap
 
+## Checkpoint — declared vanilla map-link audit (27 October 2026)
+- [x] Read-only structural cross-reference for warp and connection targets within explicitly declared map-bank counts.
+- [x] Preserve raw source offsets, distinguish missing declarations and special 0xFF fields, and flag out-of-range destination warp indexes without assuming runtime behavior.
+- [x] Touch-friendly audit and target navigation, synthetic ROM regressions and offline build inclusion.
+- [ ] Authenticate CUBE map banks, prove runtime link semantics, test on Android hardware and implement safe semantic map writes.
+
+
+## Checkpoint — touch rendered map and raw event markers (27 October 2026)
+- [x] Hit-test touch coordinates against native 16px rendered metatiles and preserve blockmap/attribute source provenance.
+- [x] Project inspected raw warp and event coordinate badges onto the composed map canvas, with invalidation and no inferred passability.
+- [ ] Add verified CUBE sprite/event semantics, mobile hardware acceptance, and safe map/warp editing after ownership gates.
+
+
 ## Checkpoint — explicit vanilla map atlas (27 October 2026)
 - [x] Traverse explicitly counted vanilla bank/map pointer arrays and validate map header, layout and blockmap bounds, with a 4096-map cap.
 - [x] Add touch-friendly map catalog selection and conditional warp/connection target navigation; invalidate on ROM/metadata changes.
