@@ -1,0 +1,230 @@
+{
+  "upstreamRepo": "kcradi/CUBHMA",
+  "upstreamCommit": "3044393183e01af2ae1e907fb37e4a75eda6a8dc",
+  "auditDate": "2026-10-27",
+  "scoring": "One complete feature requires source parity, mobile UI, synthetic and authentic roundtrip, emulator, Android and CUBE compatibility evidence. Partial features score zero.",
+  "features": [
+    {
+      "id": "rom-open",
+      "label": "ROM open, headers and save-as",
+      "upstreamPath": "src/HexManiac.Core/Models/PokemonModel.cs",
+      "status": "partial",
+      "localEvidence": [
+        "tests/core.test.mjs"
+      ]
+    },
+    {
+      "id": "hex-edit",
+      "label": "Hex view, guarded edits and undo",
+      "upstreamPath": "src/HexManiac.Core/ViewModels/EditorViewModel.cs",
+      "status": "partial",
+      "localEvidence": [
+        "tests/core-regression.test.mjs"
+      ]
+    },
+    {
+      "id": "patching",
+      "label": "IPS/BPS patch import/export",
+      "upstreamPath": "src/HexManiac.Core/Models/Code/BpsPatch.cs",
+      "status": "partial",
+      "localEvidence": [
+        "tests/core-regression.test.mjs"
+      ]
+    },
+    {
+      "id": "pointers",
+      "label": "Pointer references and ownership",
+      "upstreamPath": "src/HexManiac.Core/Models/Runs/PointerRun.cs",
+      "status": "partial",
+      "localEvidence": [
+        "tests/pointer-references.test.mjs"
+      ]
+    },
+    {
+      "id": "metadata",
+      "label": "Stored metadata and overlay semantics",
+      "upstreamPath": "src/HexManiac.Core/Models/StoredMetadata.cs",
+      "status": "partial",
+      "localEvidence": [
+        "tests/metadata-layout.test.mjs"
+      ]
+    },
+    {
+      "id": "tables",
+      "label": "Typed table decoding and editing",
+      "upstreamPath": "src/HexManiac.Core/Models/Runs/ArrayRun.cs",
+      "status": "partial",
+      "localEvidence": [
+        "tests/semantic.test.mjs"
+      ]
+    },
+    {
+      "id": "text",
+      "label": "PCS text decoding and editing",
+      "upstreamPath": "src/HexManiac.Core/Models/Runs/PCSRun.cs",
+      "status": "partial",
+      "localEvidence": [
+        "tests/pcs-reference.test.mjs"
+      ]
+    },
+    {
+      "id": "scripts",
+      "label": "Event script parsing and editing",
+      "upstreamPath": "src/HexManiac.Core/Models/Code/ScriptParser.cs",
+      "status": "absent"
+    },
+    {
+      "id": "thumb",
+      "label": "THUMB assembly editing",
+      "upstreamPath": "src/HexManiac.Core/Models/Code/ThumbParser.cs",
+      "status": "absent"
+    },
+    {
+      "id": "relocation",
+      "label": "Free space allocation and repointing",
+      "upstreamPath": "src/HexManiac.Core/ViewModels/Map/MapRepointer.cs",
+      "status": "absent"
+    },
+    {
+      "id": "map-catalog",
+      "label": "Map bank/catalog discovery",
+      "upstreamPath": "src/HexManiac.Core/Models/Map/MapModel.cs",
+      "status": "partial",
+      "localEvidence": [
+        "tests/map-atlas.test.mjs"
+      ]
+    },
+    {
+      "id": "map-render",
+      "label": "Layered map canvas rendering",
+      "upstreamPath": "src/HexManiac.Core/ViewModels/Map/MapEditorViewModel.cs",
+      "status": "partial",
+      "localEvidence": [
+        "tests/map-render.test.mjs"
+      ]
+    },
+    {
+      "id": "map-paint",
+      "label": "Metatile painting and block editor",
+      "upstreamPath": "src/HexManiac.Core/ViewModels/Map/BlockEditor.cs",
+      "status": "partial",
+      "localEvidence": [
+        "tests/map-blocks.test.mjs"
+      ]
+    },
+    {
+      "id": "collision",
+      "label": "Collision, behavior and border editing",
+      "upstreamPath": "src/HexManiac.Core/Models/Map/BlockCollisionDefaults.cs",
+      "status": "partial",
+      "localEvidence": [
+        "tests/map-render.test.mjs"
+      ]
+    },
+    {
+      "id": "map-events",
+      "label": "Object and trigger event editing",
+      "upstreamPath": "src/HexManiac.Core/ViewModels/Map/EventTemplate.cs",
+      "status": "partial",
+      "localEvidence": [
+        "tests/map-events.test.mjs"
+      ]
+    },
+    {
+      "id": "warps",
+      "label": "Warp and connection editing",
+      "upstreamPath": "src/HexManiac.Core/ViewModels/Map/SurfConnectionViewModel.cs",
+      "status": "partial",
+      "localEvidence": [
+        "tests/map-link-audit.test.mjs"
+      ]
+    },
+    {
+      "id": "wild",
+      "label": "Wild encounter editing",
+      "upstreamPath": "src/HexManiac.Core/ViewModels/Map/WildPokemonViewModel.cs",
+      "status": "absent"
+    },
+    {
+      "id": "trainers",
+      "label": "Trainer teams and data editing",
+      "upstreamPath": "src/HexManiac.Core/Models/Runs/TrainerPokemonTeamRun.cs",
+      "status": "absent"
+    },
+    {
+      "id": "species",
+      "label": "Pokémon species and evolution editing",
+      "upstreamPath": "src/HexManiac.Core/Models/PokemonModel.cs",
+      "status": "absent"
+    },
+    {
+      "id": "moves",
+      "label": "Move definitions and expansion",
+      "upstreamPath": "src/HexManiac.Core/ViewModels/QuickEditItems/MakeMovesExpandable.cs",
+      "status": "absent"
+    },
+    {
+      "id": "items",
+      "label": "Item definitions and expansion",
+      "upstreamPath": "src/HexManiac.Core/ViewModels/QuickEditItems/MakeItemsExpandable.cs",
+      "status": "absent"
+    },
+    {
+      "id": "tms",
+      "label": "TM/HM and tutor editing",
+      "upstreamPath": "src/HexManiac.Core/ViewModels/QuickEditItems/MakeTmsExpandable.cs",
+      "status": "absent"
+    },
+    {
+      "id": "sprites",
+      "label": "Image and palette editing",
+      "upstreamPath": "src/HexManiac.Core/ViewModels/ImageEditorViewModel.cs",
+      "status": "partial",
+      "localEvidence": [
+        "tests/lz-accessor.test.mjs"
+      ]
+    },
+    {
+      "id": "animations",
+      "label": "Pokémon and tileset animation editing",
+      "upstreamPath": "src/HexManiac.Core/Models/PokemonAnimations/PokemonAnimationEngine.cs",
+      "status": "absent"
+    },
+    {
+      "id": "sound",
+      "label": "Music, cries and MIDI editing",
+      "upstreamPath": "src/HexManiac.Core/Models/Sound/MidiToAgb.cs",
+      "status": "absent"
+    },
+    {
+      "id": "dex",
+      "label": "Pokédex reordering",
+      "upstreamPath": "src/HexManiac.Core/ViewModels/DexReorderTab.cs",
+      "status": "absent"
+    },
+    {
+      "id": "intro",
+      "label": "Intro sequence editor",
+      "upstreamPath": "src/HexManiac.Core/ViewModels/IntroManagerTab.cs",
+      "status": "absent"
+    },
+    {
+      "id": "character",
+      "label": "Character customization",
+      "upstreamPath": "src/HexManiac.Core/ViewModels/CharacterCustomizationTab.cs",
+      "status": "absent"
+    },
+    {
+      "id": "cube-update",
+      "label": "CUBE upgrades and migration",
+      "upstreamPath": "src/HexManiac.Core/ViewModels/QuickEditItems/UpdateCube.cs",
+      "status": "absent"
+    },
+    {
+      "id": "rom-expand",
+      "label": "ROM expansion tools",
+      "upstreamPath": "src/HexManiac.Core/ViewModels/QuickEditItems/ExpandRom.cs",
+      "status": "absent"
+    }
+  ]
+}
