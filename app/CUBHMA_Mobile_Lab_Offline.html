@@ -239,6 +239,7 @@
       <button type="button" id="map-review-cell-add" class="secondary-button" disabled>Add last cell preview to change review</button>
       <output id="map-preview-status" class="palette-note" aria-live="polite">Select an explicit vanilla header and coordinates to preview bytes. No writes.</output>
       <button type="button" id="map-visual-compare" class="secondary-button" disabled>Compare proposed map appearance</button>
+      <button type="button" id="map-visual-compare-queue" class="secondary-button" disabled>Compare queued map-cell changes</button>
       <output id="map-compare-status" class="palette-note" aria-live="polite">No proposed visual comparison. Preview a cell first.</output>
       <div class="map-compare-grid" aria-label="Read-only metatile appearance comparison">
         <div><strong>Original</strong><canvas id="map-compare-before" hidden aria-label="Original vanilla map appearance"></canvas></div>
@@ -4583,7 +4584,7 @@ let model=null, currentTab='home', page=0, selected=null, patchFile=null, palett
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
 ctx.imageSmoothingEnabled=false;
-const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-summary-scan','map-preview-cell','map-visual-compare','map-layout-inspect','map-bank-inspect','map-atlas-inspect','map-atlas-probe','map-warp-inspect','map-connection-inspect','map-event-inspect','map-script-pointer-inspect','map-blockset-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','discard-button','edit-unlock'];
+const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-summary-scan','map-preview-cell','map-visual-compare','map-visual-compare-queue','map-layout-inspect','map-bank-inspect','map-atlas-inspect','map-atlas-probe','map-warp-inspect','map-connection-inspect','map-event-inspect','map-script-pointer-inspect','map-blockset-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','discard-button','edit-unlock'];
 const tabs={home:['YOUR WORKSPACE','ROM Workbench'],hex:['BINARY INSPECTOR','Hex editor'],anchors:['ROM SEMANTICS','Named data'],maps:['RAW MAP CELLS','Blockmap inspector'],graphics:['GBA GRAPHICS','Graphics explorer'],patches:['PATCH WORKFLOW','Patch tools'],changes:['REVIEW & EXPORT','Changes']};
 function toast(message,bad=false){const t=$('toast');t.textContent=message;t.classList.toggle('error',bad);t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),4300);}
 function safeRun(fn){try{const result=fn();if(result?.catch) result.catch(err=>toast(err.message||String(err),true));}catch(err){toast(err.message||String(err),true);}}
@@ -5285,6 +5286,7 @@ function clearRenderedMap(message='Rendered preview invalidated; inspect again.'
  $('map-overlay-legend').replaceChildren();
  $('map-overlay-status').textContent='No raw attribute overlay. Enable rendered metatiles to inspect.';
  $('map-visual-compare').disabled=true;
+ $('map-visual-compare-queue').disabled=true;
  for(const id of ['map-compare-before','map-compare-after'])$(id).hidden=true;
  $('map-compare-status').textContent='No proposed visual comparison. Preview a cell first.';
  $('map-render-status').textContent=message;
@@ -5328,6 +5330,7 @@ function clearMapChangeReview(){
  mapReviewQueue=[];mapReviewRom=null;
  lastMapPreviews={cell:null,warp:null,event:null};
  $('map-visual-compare').disabled=true;
+ $('map-visual-compare-queue').disabled=true;
  for(const id of ['map-compare-before','map-compare-after'])$(id).hidden=true;
  $('map-compare-status').textContent='Review queue cleared; preview a cell again.';
  for(const id of ['map-review-cell-add','map-review-warp-add','map-review-event-add',
@@ -5342,6 +5345,7 @@ function removeQueuedMapPreview(index){
     index<0||index>=mapReviewQueue.length)
   throw Error('Queue changed; review proposals again');
  mapReviewQueue=mapReviewQueue.filter((_,i)=>i!==index);
+ $('map-visual-compare-queue').disabled=!mapReviewQueue.some(p=>Number.isSafeInteger(p.byteOffset));
  if(!mapReviewQueue.length){clearMapChangeReview();return;}
  $('map-review-list').replaceChildren();
  $('map-review-impact-list').replaceChildren();
@@ -5359,6 +5363,7 @@ function queueMapChangePreview(kind){
  const next=[...mapReviewQueue,preview];
  reviewVanillaChangeSet(model,next,{maxChanges:64,maxBytes:2048});
  mapReviewQueue=next;mapReviewRom=model;
+ $('map-visual-compare-queue').disabled=!next.some(p=>Number.isSafeInteger(p.byteOffset));
  $('map-review-run').disabled=false;$('map-review-clear').disabled=false;
  $('map-review-export').disabled=false;
  $('map-review-impact').disabled=!inspectedMapAtlas||inspectedMapAtlas.rom!==model;
@@ -6710,6 +6715,39 @@ $('map-visual-compare').addEventListener('click',()=>safeRun(()=>{
    result.changedPixelBounds.height+' pixel bounds':'')+
   (result.changedRawCollision?'. Raw high bits changed; this is not a walkability preview.':'')+
   ' Before/after images are local and read-only. No ROM bytes were modified; CUBE layout remains unauthenticated.';
+}));
+
+
+$('map-visual-compare-queue').addEventListener('click',()=>safeRun(()=>{
+ ensureModel();requireVanillaMapFormat();
+ if(mapReviewRom!==model||!mapReviewQueue.length)
+  throw Error('Queue map-cell previews for the current ROM first');
+ reviewVanillaChangeSet(model,mapReviewQueue,{maxChanges:64,maxBytes:2048});
+ if($('map-layout-source').value!=='header')
+  throw Error('Select a declared vanilla map header to compare queued cells');
+ const headerAddress=parseOffset($('map-layout-offset').value);
+ const family=$('map-layout-family').value;
+ const previews=mapReviewQueue.filter(p=>Number.isSafeInteger(p.byteOffset)&&
+  p.headerOffset===headerAddress&&p.family===family);
+ if(!previews.length)throw Error('No queued cell changes belong to the selected map header');
+ const x=Number($('map-x').value),y=Number($('map-y').value);
+ const result=compareVanillaBlockmapVisualChangeSet(model,{
+  previews,x,y,viewportWidth:12,viewportHeight:10
+ });
+ for(const [id,view] of [['map-compare-before',result.before],['map-compare-after',result.after]]){
+  const canvas=$(id),context=canvas.getContext('2d');
+  canvas.width=view.width;canvas.height=view.height;
+  const image=context.createImageData(view.width,view.height);
+  image.data.set(view.pixels);context.putImageData(image,0,0);
+  canvas.hidden=false;
+ }
+ $('map-compare-status').textContent=result.cells.length+
+  ' queued cell proposal(s) for selected vanilla map; '+result.visibleCellCount+
+  ' in viewport; '+result.changedPixelCount+' changed rendered pixel(s). '+
+  result.changedMetatileCount+' tile ID change(s), '+
+  result.changedRawCollisionCount+' raw high-bit change(s). '+
+  (mapReviewQueue.length-previews.length)+' other map/warp/event proposal(s) excluded. '+
+  'No ROM writes; CUBE layout and walkability remain unauthenticated.';
 }));
 
 $('map-summary-scan').addEventListener('click',()=>safeRun(()=>{
