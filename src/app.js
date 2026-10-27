@@ -228,7 +228,7 @@ function drawGraphics(){
   let pageBytes,totalBytes;
   try{
     if(graphicsSource.kind==='lz'){
-      const result=graphicsSource.bytes?{data:graphicsSource.bytes,consumed:graphicsSource.compressedBytes}:decodeLz10(model.snapshot(),graphicsSource.offset);
+      const result=graphicsSource.bytes?{data:graphicsSource.bytes,consumed:graphicsSource.compressedBytes}:decodeLz10(model,graphicsSource.offset);
       graphicsSource.bytes=result.data;graphicsSource.size=result.data.length;
       graphicsSource.compressedBytes=result.consumed;
       totalBytes=result.data.length;
@@ -267,7 +267,7 @@ function drawGraphics(){
 function chooseGraphic(kind,offset){
   ensureModel();if(!Number.isInteger(offset)||offset<0||offset>=model.length)throw Error('Graphics offset is outside ROM');
   if(kind==='raw'&&offset+32>model.length)throw Error('A raw 4bpp tile needs at least 32 bytes');
-  const next=kind==='lz'?decodeLz10(model.snapshot(),offset):null;
+  const next=kind==='lz'?decodeLz10(model,offset):null;
   graphicsSource={kind,offset,size:next?.data.length||model.length-offset,compressedBytes:next?.consumed||0,bytes:next?.data||null};tilePage=0;
   $('graphics-offset').value=hex(offset);drawGraphics();
   toast(kind==='lz'?`Decoded ${next.data.length} bytes of LZ77 data at 0x${hex(offset)}`:'Raw 4bpp view: bytes may not represent graphics');
@@ -293,7 +293,7 @@ $('graphics-scan').addEventListener('click',async()=>{
   const token=++scanToken;scanning=true;graphicCandidates=[];const picker=$('graphics-candidates');
   picker.replaceChildren(new Option('Searching…',''));updateIndicators();
   $('graphics-scan-status').textContent='Scanning for structurally valid LZ77 streams. This can take time on large ROMs.';
-  const data=model.snapshot(),chunkSize=1024*1024,limit=128;
+  const data=model,chunkSize=1024*1024,limit=128;
   try{
     for(let start=0;start<data.length;start+=chunkSize){
       if(token!==scanToken)return;
