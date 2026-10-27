@@ -39,7 +39,9 @@ Repeated events sharing one script are deduplicated. Only aggregate counts
 are exported; the scanner does not follow control flow or verify CUBE
 target formats. See [operand alias audit](VANILLA_SCRIPT_OPERAND_ALIAS_ATLAS.md).
 
-Set `scanRawWarpGraph` to `true` to add a bounded, canonical pointer-revalidated directed raw warp/connection graph from declared bank 0 / map 0. The JSON contains only aggregate link status counts, reached/not-reached totals and isolated-map counts. No warp source offsets, map header pointers, event bytes or full edge list are exported. Raw reachability is not gameplay accessibility; a non-reached map is not proof of a defect. The optional scan fails closed above 4,096 maps or 65,536 raw links.\n\nOn success, the command prints JSON with the matched SHA-256, declared
+Set `scanRawWarpGraph` to `true` to add a bounded, canonical pointer-revalidated directed raw warp/connection graph from declared bank 0 / map 0. The JSON contains only aggregate link status counts, reached/not-reached totals and isolated-map counts. No warp source offsets, map header pointers, event bytes or full edge list are exported. Raw reachability is not gameplay accessibility; a non-reached map is not proof of a defect. The optional scan fails closed above 4,096 maps or 65,536 raw links.
+
+On success, the command prints JSON with the matched SHA-256, declared
 map counts, up to 16 event-map summaries, shared pointer alias counts,
 and explicit **false** values for CUBE authentication, ROM save/reopen,
 emulator acceptance, Android acceptance and independent parity evidence.
