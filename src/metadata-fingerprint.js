@@ -44,10 +44,27 @@ export function fingerprintMetadataFiles(files){
  * registry is empty. Caller-injected profiles and matching hashes NEVER
  * authorize editing, relocation, or claims that the metadata was parsed safely.
  */
-export function compareRomMetadataIdentity(model,romFingerprint,metadataFiles,
+/** Compare previously hashed metadata records without retaining raw TOML bytes. */
+export function compareRomMetadataFingerprintRecords(model,romFingerprint,metadataFingerprints,
   {profiles=CURATED_ROM_PROFILES}={}){
+  if(!Array.isArray(metadataFingerprints)||metadataFingerprints.length>MAX_FILES)
+    throw Error('Invalid metadata fingerprint collection');
+  const names=new Set(),files=[];
+  let total=0;
+  for(const entry of metadataFingerprints){
+    if(!entry||typeof entry!=='object'||Array.isArray(entry)||
+       typeof entry.name!=='string'||!entry.name.trim()||
+       entry.name.length>255||entry.name.includes('\0')||
+       !Number.isSafeInteger(entry.length)||entry.length<1||entry.length>MAX_FILE_BYTES||
+       typeof entry.sha256!=='string'||!/^[a-f0-9]{64}$/i.test(entry.sha256)||
+       names.has(entry.name))
+      throw Error('Invalid exact metadata fingerprint record');
+    names.add(entry.name);
+    total+=entry.length;
+    if(total>MAX_TOTAL_BYTES)throw Error('Metadata fingerprints exceed total size limit');
+    files.push(Object.freeze({name:entry.name,length:entry.length,sha256:entry.sha256.toLowerCase()}));
+  }
   const rom=compareRomIdentity(model,romFingerprint,{profiles});
-  const files=fingerprintMetadataFiles(metadataFiles);
   let metadataExactMatch=null,metadataBindingStatus='rom-unverified';
   if(rom.status==='profile-match'){
     if(!files.length)metadataBindingStatus='metadata-missing';
@@ -57,6 +74,13 @@ export function compareRomMetadataIdentity(model,romFingerprint,metadataFiles,
       metadataBindingStatus=metadataExactMatch?'exact-byte-match':'digest-mismatch';
     }
   }
-  return Object.freeze({...rom,metadataFiles:files,metadataExactMatch,
+  return Object.freeze({...rom,metadataFiles:Object.freeze(files),metadataExactMatch,
     metadataBindingStatus,metadataAuthenticated:false,semanticWritesAllowed:false});
+}
+
+/** Exact raw-byte wrapper for callers that still hold their imported files. */
+export function compareRomMetadataIdentity(model,romFingerprint,metadataFiles,
+  {profiles=CURATED_ROM_PROFILES}={}){
+  return compareRomMetadataFingerprintRecords(model,romFingerprint,
+    fingerprintMetadataFiles(metadataFiles),{profiles});
 }
