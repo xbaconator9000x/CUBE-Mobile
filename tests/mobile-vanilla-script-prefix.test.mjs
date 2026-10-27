@@ -27,7 +27,7 @@ test('offline bundler explicitly strips and includes the decoder module',()=>{
  const build=read('build-standalone.mjs');
  assert.match(build,/vanillaScriptPrefix=read\('src\/vanilla-script-prefix\.js'\)/);
  assert.match(build,/stripVanillaScriptPrefix/);
- assert.match(build,/map-raw-overlay\|map-cell-census\|map-warp-graph\|vanilla-script-prefix/);
+ assert.match(build,/map-raw-overlay\|map-cell-census\|map-warp-graph\|map-route-explorer\|vanilla-script-prefix/);
 });
 
 test('mobile and offline script pointer target navigation revalidates source bytes',()=>{
