@@ -1,5 +1,10 @@
 # Roadmap
 
+## Checkpoint — read-only vanilla event script pointer fields (27 October 2026)
+- [x] Classify object and trigger script pointer fields, preserve exact source offsets and allow touch-to-hex navigation for conventional in-ROM targets.
+- [x] Reject malformed event structures, retain null/non-ROM/out-of-ROM distinctions and test staged ROM immutability.
+- [ ] Script grammar, code ownership, CUBE event formats, relocation, write safety and emulator/Android acceptance are not implemented.
+
 ## Checkpoint — bounded vanilla bank-table candidate probe (27 October 2026)
 - [x] Inspect at most 4096 bytes near a user-supplied approximate offset for vanilla-format pointer-table candidates using explicit counts (max 128 maps).
 - [x] Expose candidate selection in mobile/offline map UI, with synthetic ROM/staged accessor immutability tests.

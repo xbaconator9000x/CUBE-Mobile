@@ -12,7 +12,7 @@ import {inspectVanillaMapBankEntry,inspectVanillaMapWarps} from './map-discovery
 import {parseVanillaBankMapCounts,inspectVanillaMapAtlas,lookupVanillaMapAtlasTarget,probeVanillaMapBankTables} from './map-atlas.js';
 import {auditVanillaMapLinks,auditVanillaAtlasLinkBatch} from './map-link-audit.js';
 import {inspectVanillaMapConnections} from './map-connections.js';
-import {inspectVanillaMapEvents} from './map-events.js';
+import {inspectVanillaMapEvents,inspectVanillaEventScriptPointers} from './map-events.js';
 import {inspectVanillaMapBlocksets} from './map-blocksets.js';
 import {panMapViewport,indexMapWarpMarkers,indexMapEventMarkers,inspectRenderedMapPixel,projectRenderedMapMarkers} from './map-viewport.js';
 import {renderVanillaMapViewport} from './map-render.js';
@@ -28,7 +28,7 @@ let model=null, currentTab='home', page=0, selected=null, patchFile=null, palett
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
 ctx.imageSmoothingEnabled=false;
-const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-layout-inspect','map-bank-inspect','map-atlas-inspect','map-atlas-probe','map-warp-inspect','map-connection-inspect','map-event-inspect','map-blockset-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','discard-button','edit-unlock'];
+const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-layout-inspect','map-bank-inspect','map-atlas-inspect','map-atlas-probe','map-warp-inspect','map-connection-inspect','map-event-inspect','map-script-pointer-inspect','map-blockset-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','discard-button','edit-unlock'];
 const tabs={home:['YOUR WORKSPACE','ROM Workbench'],hex:['BINARY INSPECTOR','Hex editor'],anchors:['ROM SEMANTICS','Named data'],maps:['RAW MAP CELLS','Blockmap inspector'],graphics:['GBA GRAPHICS','Graphics explorer'],patches:['PATCH WORKFLOW','Patch tools'],changes:['REVIEW & EXPORT','Changes']};
 function toast(message,bad=false){const t=$('toast');t.textContent=message;t.classList.toggle('error',bad);t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),4300);}
 function safeRun(fn){try{const result=fn();if(result?.catch) result.catch(err=>toast(err.message||String(err),true));}catch(err){toast(err.message||String(err),true);}}
@@ -743,6 +743,8 @@ function clearEventInspection(message='Select a vanilla map header to inspect ob
   inspectedEventMap=null;
   $('map-event-list').replaceChildren();
   $('map-event-status').textContent=message;
+  $('map-script-pointer-list').replaceChildren();
+  $('map-script-pointer-status').textContent='No raw script pointer fields inspected.';
 }
 function clearBlocksetInspection(message='Select a vanilla map header to inspect tileset pointers.'){
   $('map-blockset-list').replaceChildren();
@@ -1123,6 +1125,48 @@ $('map-event-inspect').addEventListener('click',()=>safeRun(()=>{
      Number($('map-width').value)===layout.width &&
      Number($('map-height').value)===layout.height)
     $('map-inspect').click();
+}));
+
+
+$('map-script-pointer-inspect').addEventListener('click',()=>safeRun(()=>{
+ requireVanillaMapFormat();
+ if($('map-layout-source').value!=='header')
+  throw Error('Select a vanilla map header for raw script pointers');
+ const address=parseOffset($('map-layout-offset').value);
+ const family=$('map-layout-family').value;
+ const result=inspectVanillaEventScriptPointers(model,{address,family});
+ const root=$('map-script-pointer-list');root.replaceChildren();
+ $('map-script-pointer-status').textContent=result.records.length+
+  ' raw object/trigger script fields: '+result.counts.inRom+
+  ' conventional in-ROM, '+result.counts.null+' zero, '+
+  result.counts.outsideRom+' outside ROM, '+result.counts.nonRom+
+  ' non-conventional. No scripts decoded, followed or executed.';
+ for(const record of result.records){
+  const button=document.createElement('button');button.type='button';
+  button.className='secondary-button';button.style.display='block';
+  button.style.margin='8px 0';button.style.textAlign='left';
+  button.textContent=record.kind+' '+record.index+
+   ' · pointer field 0x'+hex(record.sourceOffset)+
+   ' → raw 0x'+hex(record.rawPointer)+' · '+record.status;
+  button.addEventListener('click',()=>safeRun(()=>{
+   setPageForOffset(record.sourceOffset);gotoTab('hex');
+  }));
+  root.append(button);
+  if(record.targetOffset!==null){
+   const target=document.createElement('button');target.type='button';
+   target.className='secondary-button';target.style.margin='0 0 8px 8px';
+   target.textContent='Inspect raw destination 0x'+hex(record.targetOffset);
+   target.addEventListener('click',()=>safeRun(()=>{
+    setPageForOffset(record.targetOffset);gotoTab('hex');
+   }));
+   root.append(target);
+  }
+ }
+ if(!result.records.length){
+  const empty=document.createElement('div');empty.className='empty-state';
+  empty.textContent='No raw object/trigger script pointer fields.';
+  root.append(empty);
+ }
 }));
 
 // Blockset pointers are syntactically bounded, not proof of CUBE layout.

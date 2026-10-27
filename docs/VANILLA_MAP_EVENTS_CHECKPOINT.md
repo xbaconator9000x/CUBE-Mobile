@@ -15,3 +15,7 @@ Upstream source: [kcradi/CUBHMA MapModel.cs](https://github.com/kcradi/CUBHMA/bl
 - No CUBE event-format variants, sprite graphics, rendered tiles, script disassembly, collision/walkability, safe event edits, pointer relocation, map ownership graph or emulator/device acceptance.
 - No feature-parity percentage is inferred from passing synthetic tests. Continue toward authenticated map discovery and actual map rendering.
 
+
+## Raw script pointer fields
+
+The event screen can now separately list raw object/trigger script pointer fields, preserving the exact pointer field offset and original 32-bit value. Conventional in-ROM addresses can be opened in the hex viewer, but **no scripts are parsed, followed, executed or edited**. Zero, non-conventional and outside-ROM values are reported distinctly. Signpost arguments are deliberately excluded because their meaning depends on the signpost type. All results are invalidated on ROM/map changes and remain unverified for CUBE layouts.

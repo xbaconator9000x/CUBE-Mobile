@@ -8,6 +8,10 @@
 
 The opt-in vanilla map canvas now displays read-only raw warp/event coordinate badges and lets you tap a rendered metatile to inspect its blockmap and attribute source offsets, behavior and layer, with an explicit jump to hex. It does not authenticate CUBE layouts or interpret walkability. See [touch checkpoint](docs/MAP_CANVAS_TOUCH_CHECKPOINT.md).
 
+## Development checkpoint — raw event script pointer fields
+
+Inspect vanilla object/trigger script pointer words and their exact ROM source offsets, with optional hex navigation for conventional in-ROM targets. No script parsing, execution or editing. See [event checkpoint](docs/VANILLA_MAP_EVENTS_CHECKPOINT.md).
+
 ## Development checkpoint — bounded vanilla bank-table candidate probe
 
 A manually bounded, read-only probe checks nearby aligned offsets against explicitly declared vanilla map counts. Candidates are structural hints, never proof of stock/CUBE layout or safe editing. See [atlas checkpoint](docs/VANILLA_MAP_ATLAS_CHECKPOINT.md).
