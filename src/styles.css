@@ -70,3 +70,8 @@
 .map-compare-grid>div{min-width:0;overflow:auto}
 .map-compare-grid strong{display:block;margin-bottom:6px}
 .map-compare-grid canvas{image-rendering:pixelated;width:min(100%,384px);height:auto;border:1px solid var(--border,#64748b)}
+
+/* Categorical raw-byte overlays: never indicate passability or walkability. */
+.map-overlay-legend{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.map-overlay-legend-item{display:inline-flex;align-items:center;gap:5px;font-size:.8rem;padding:3px 6px;border:1px solid var(--border,#64748b);border-radius:5px}
+.map-overlay-swatch{display:inline-block;width:14px;height:14px;border:1px solid rgba(0,0,0,.35);border-radius:3px}
