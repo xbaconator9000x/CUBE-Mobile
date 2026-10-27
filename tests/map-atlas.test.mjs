@@ -35,7 +35,7 @@ test('catalog resolves explicitly declared vanilla banks, offsets and targets',(
  assert.deepEqual(rom,original);
 });
 test('staged bytes change atlas readout without modifying source ROM',()=>{
- const r=fixture(),reader={length:r.length,read:i=>i===0x144?0x80:r[i]};
+ const r=fixture(),reader={length:r.length,read:i=>i===0x144?0xff:r[i]};
  assert.throws(()=>inspectVanillaMapAtlas(reader,{address:0x100,bankMapCounts:[2,1],family:'RSE'}));
  assert.equal(r[0x144],0x40);
 });
