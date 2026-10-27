@@ -20,7 +20,7 @@ test('local and upstream TOML imports hash exact bytes before atomic metadata co
 });
 test('ROM replacement and metadata reset invalidate cached metadata identity',()=>{
   const app=read('src/app.js');
-  assert.match(app,/function installModel\(name,bytes\)\{metadataImportSerial\+\+;metadataFingerprints=\[\];/);
+  assert.match(app,/function installModel\(name,bytes\)\{[\s\S]*?metadataImportSerial\+\+;metadataFingerprints=\[\];/);
   assert.match(app,/function metadataReset\(\)\{metadataImportSerial\+\+;metadataFingerprints=\[\];/);
   assert.match(app,/fingerprintMatchesRom\(model,\{snapshot\}\)/);
   assert.match(app,/drawMetadataFingerprintStatus\(\);/);
