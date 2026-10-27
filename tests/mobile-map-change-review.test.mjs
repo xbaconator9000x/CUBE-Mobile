@@ -32,3 +32,12 @@ test('offline review helper parses and never grants semantic write permissions',
  assert.doesNotThrow(()=>new Script("'use strict';\n"+script[1]));
  assert.doesNotMatch(script[1],/^import \{/m);
 });
+
+test('typed field changes are shown in modular and standalone review',()=>{
+ const app=read('src/app.js');
+ const offline=read('app/CUBHMA_Mobile_Lab_Offline.html');
+ assert.match(app,/entry\.fieldChanges\.map\(f=>/);
+ assert.match(offline,/entry\.fieldChanges\.map\(f=>/);
+ assert.match(offline,/function reviewFieldChanges\(/);
+ assert.match(offline,/non-editable pointer, flag or reserved field/);
+});
