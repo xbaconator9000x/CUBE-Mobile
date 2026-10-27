@@ -24,6 +24,7 @@ import {previewVanillaEventCoordinateChange} from './map-event-edit-preview.js';
 import {reviewVanillaChangeSet,exportVanillaChangeReviewJson} from './map-change-review.js';
 import {auditVanillaChangeImpact} from './map-change-impact.js';
 import {compareVanillaBlockmapVisualChange} from './map-visual-diff.js';
+import {buildVanillaRawMapOverlay} from './map-raw-overlay.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
@@ -736,6 +737,8 @@ function clearRenderedMap(message='Rendered preview invalidated; inspect again.'
  $('map-preview-status').textContent='Select an explicit vanilla header and coordinates to preview bytes. No writes.';
  $('map-render-jump').disabled=true;
  $('map-render-canvas').hidden=true;
+ $('map-overlay-legend').replaceChildren();
+ $('map-overlay-status').textContent='No raw attribute overlay. Enable rendered metatiles to inspect.';
  $('map-visual-compare').disabled=true;
  for(const id of ['map-compare-before','map-compare-after'])$(id).hidden=true;
  $('map-compare-status').textContent='No proposed visual comparison. Preview a cell first.';
@@ -1961,6 +1964,26 @@ $('map-inspect').addEventListener('click',()=>safeRun(()=>{
       canvas.width=rendered.width;canvas.height=rendered.height;
       const image=context.createImageData(rendered.width,rendered.height);
       image.data.set(rendered.pixels);context.putImageData(image,0,0);
+      const overlayMode=$('map-raw-overlay-mode').value;
+      if(overlayMode!=='none'){
+        const overlay=buildVanillaRawMapOverlay(rendered,{mode:overlayMode,maxLegend:12});
+        for(const cell of overlay.cells){
+          context.fillStyle='rgba('+cell.rgb.join(',')+',0.46)';
+          context.fillRect(cell.column*16,cell.row*16,16,16);
+        }
+        const legend=$('map-overlay-legend');legend.replaceChildren();
+        for(const entry of overlay.legend){
+          const item=document.createElement('span');item.className='map-overlay-legend-item';
+          const swatch=document.createElement('span');swatch.className='map-overlay-swatch';
+          swatch.style.backgroundColor='rgb('+entry.rgb.join(',')+')';
+          item.append(swatch,document.createTextNode(entry.value+' × '+entry.count));
+          legend.append(item);
+        }
+        $('map-overlay-status').textContent=overlay.distinctValues+
+          ' distinct raw '+overlay.field+' value(s) in the visible viewport'+
+          (overlay.legendTruncated?' (top 12 shown)':'')+
+          '. Colours distinguish byte values only; NOT verified collision or walkability.';
+      }
       const projected=projectRenderedMapMarkers(rendered,markerIndex,eventMarkerIndex);
       context.font='bold 7px sans-serif';
       for(const marker of projected){
@@ -1996,6 +2019,7 @@ $('map-inspect').addEventListener('click',()=>safeRun(()=>{
 }));
 
 $('map-render-enabled').addEventListener('change',()=>{clearRenderedMap();if(model)$('map-inspect').click();});
+$('map-raw-overlay-mode').addEventListener('change',()=>{clearRenderedMap();if(model)$('map-inspect').click();});
 $('map-render-canvas').addEventListener('click',event=>safeRun(()=>{
  if(!activeRenderedMap||activeRenderedMap.rom!==model)
   throw Error('Rendered map changed; inspect again');
