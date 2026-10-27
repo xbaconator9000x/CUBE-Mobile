@@ -209,6 +209,7 @@
         <div class="input-wrap"><label for="map-preview-collision">Proposed raw high bits (0–63)</label><input id="map-preview-collision" type="number" min="0" max="63" step="1" placeholder="Keep existing"></div>
       </div>
       <button type="button" id="map-preview-cell" class="subtle-button" disabled>Preview original and proposed bytes</button>
+      <button type="button" id="map-review-cell-add" class="secondary-button" disabled>Add last cell preview to change review</button>
       <output id="map-preview-status" class="palette-note" aria-live="polite">Select an explicit vanilla header and coordinates to preview bytes. No writes.</output>
     </div>
     <output id="map-summary-status" class="palette-note" aria-live="polite">No raw blockmap statistics scanned. Requires matching selected vanilla header.</output>
@@ -232,6 +233,7 @@
         <div class="input-wrap"><label for="map-warp-preview-target-bank">Target bank</label><input id="map-warp-preview-target-bank" type="number" min="0" max="255" step="1"></div>
       </div>
       <button type="button" id="map-warp-preview" class="subtle-button" disabled>Preview exact eight-byte record</button>
+      <button type="button" id="map-review-warp-add" class="secondary-button" disabled>Add last warp preview to change review</button>
       <output id="map-warp-preview-status" class="palette-note" aria-live="polite">Select a raw warp record to preview proposed bytes. No writes.</output>
     </div>
     <button type="button" id="map-event-inspect" class="subtle-button" disabled>Inspect vanilla objects, scripts and signposts</button>
@@ -246,7 +248,18 @@
         <div class="input-wrap"><label for="map-event-preview-elevation">Proposed elevation</label><input id="map-event-preview-elevation" type="number" min="0" max="65535" step="1"></div>
       </div>
       <button type="button" id="map-event-preview" class="subtle-button" disabled>Preview exact event record bytes</button>
+      <button type="button" id="map-review-event-add" class="secondary-button" disabled>Add last event preview to change review</button>
       <output id="map-event-preview-status" class="palette-note" aria-live="polite">Select a raw event record to preview proposed bytes. No writes.</output>
+    </div>
+    <div class="toolbar-card" aria-label="Immutable multi-change map review">
+      <h3>Review proposed map changes together (no writes)</h3>
+      <p class="palette-note">Queue up to 64 previews from any selected vanilla maps. Check stale original bytes, overlapping ranges and proposed changes before any future authenticated editing. This cannot apply or export ROM changes.</p>
+      <div class="input-row">
+        <button type="button" id="map-review-run" class="subtle-button" disabled>Check queued changes</button>
+        <button type="button" id="map-review-clear" class="secondary-button" disabled>Clear review queue</button>
+      </div>
+      <output id="map-review-status" class="palette-note" aria-live="polite">No proposed changes queued.</output>
+      <div id="map-review-list" class="anchor-list" aria-label="Immutable proposed byte change review"></div>
     </div>
     <button type="button" id="map-script-pointer-inspect" class="subtle-button" disabled>Inspect raw object/trigger script pointer fields (read only)</button>
     <output id="map-script-pointer-status" class="palette-note" aria-live="polite">No raw script pointer fields inspected.</output>
@@ -3812,6 +3825,95 @@ function previewVanillaEventCoordinateChange(source,{
  });
 }
 
+/**
+ * Immutable, bounded review of multiple proposed vanilla byte changes.
+ * Accepts only the shapes emitted by the existing blockmap/warp/event
+ * preview helpers. It is NOT a writer, relocation engine or ROM authenticator.
+ */
+function reviewReader(source){
+ if(source instanceof Uint8Array)return {length:source.length,read:i=>source[i]};
+ if(source&&Number.isSafeInteger(source.length)&&source.length>=0&&
+    typeof source.read==='function')return source;
+ throw new TypeError('Expected ROM bytes or staged read-only accessor');
+}
+function reviewBytes(value,length,label){
+ if(!Array.isArray(value)||value.length!==length||
+    value.some(n=>!Number.isInteger(n)||n<0||n>255))
+  throw new TypeError(label+' must be '+length+' exact bytes');
+ return value;
+}
+function previewShape(preview){
+ if(!preview||preview.previewOnly!==true||preview.readOnly!==true||
+    preview.writeAuthorized!==false||preview.layoutAuthenticated!==false)
+  throw new TypeError('Expected an unauthenticated immutable vanilla change preview');
+ if(Number.isSafeInteger(preview.byteOffset)&&preview.before?.bytes&&preview.after?.bytes)
+  return {kind:'blockmap',offset:preview.byteOffset,length:2,
+   before:preview.before.bytes,after:preview.after.bytes};
+ if(Number.isSafeInteger(preview.recordOffset)&&Array.isArray(preview.before)&&
+    Array.isArray(preview.after)){
+  if(Number.isSafeInteger(preview.warpIndex)&&preview.before.length===8)
+   return {kind:'warp',offset:preview.recordOffset,length:8,
+    before:preview.before,after:preview.after};
+  if(['objects','scripts','signposts'].includes(preview.kind)){
+   const sizes={objects:24,scripts:16,signposts:12};
+   if(preview.recordLength!==sizes[preview.kind])throw new RangeError('Event record length mismatch');
+   return {kind:preview.kind,offset:preview.recordOffset,length:sizes[preview.kind],
+    before:preview.before,after:preview.after};
+  }
+ }
+ throw new TypeError('Unsupported vanilla preview shape');
+}
+/**
+ * Re-check every expected original byte and reject overlapping proposals.
+ * No ROM mutation, save/export or semantic write permission is possible here.
+ */
+function reviewVanillaChangeSet(source,previews,{
+ maxChanges=64,maxBytes=2048
+}={}){
+ const rom=reviewReader(source);
+ if(!Array.isArray(previews)||previews.length<1||
+    !Number.isSafeInteger(maxChanges)||maxChanges<1||maxChanges>256||
+    previews.length>maxChanges)
+  throw new RangeError('Provide 1–256 bounded proposed changes');
+ if(!Number.isSafeInteger(maxBytes)||maxBytes<1||maxBytes>8192)
+  throw new RangeError('Total byte limit must be 1–8192');
+ const spans=[];let totalBytes=0,changedBytes=0;
+ for(const [index,preview] of previews.entries()){
+  const p=previewShape(preview);
+  if(!Number.isSafeInteger(p.offset)||p.offset<0||
+     p.offset>rom.length-p.length)
+   throw new RangeError('Proposed record extends outside ROM');
+  reviewBytes(p.before,p.length,'Original record');
+  reviewBytes(p.after,p.length,'Proposed record');
+  totalBytes+=p.length;
+  if(totalBytes>maxBytes)throw new RangeError('Change review exceeds byte limit');
+  for(let i=0;i<p.length;i++){
+   const actual=rom.read(p.offset+i);
+   if(!Number.isInteger(actual)||actual<0||actual>255)
+    throw new RangeError('Invalid staged ROM byte');
+   if(actual!==p.before[i])
+    throw new RangeError('Original ROM bytes changed; rebuild the previews');
+   if(p.after[i]!==p.before[i])changedBytes++;
+  }
+  spans.push({index,...p});
+ }
+ spans.sort((a,b)=>a.offset-b.offset||a.index-b.index);
+ for(let i=1;i<spans.length;i++)
+  if(spans[i].offset<spans[i-1].offset+spans[i-1].length)
+   throw new RangeError('Proposed ROM byte ranges overlap; resolve conflict before reviewing');
+ const entries=spans.map(p=>Object.freeze({
+  sourceIndex:p.index,kind:p.kind,offset:p.offset,length:p.length,
+  changed:p.after.some((n,i)=>n!==p.before[i]),
+  before:Object.freeze([...p.before]),after:Object.freeze([...p.after])
+ }));
+ return Object.freeze({
+  count:entries.length,totalBytes,changedBytes,
+  entries:Object.freeze(entries),readOnly:true,previewOnly:true,
+  writeAuthorized:false,layoutAuthenticated:false,
+  ownershipVerified:false,transactionCommitted:false
+ });
+}
+
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let pcsReference=null,pcsReferenceName='';
@@ -3819,6 +3921,7 @@ let fingerprintResult=null,fingerprintAbort=null;
 let metadataFingerprints=[],metadataImportSerial=0;
 let inspectedWarpMap=null,selectedWarpPreview=null,selectedEventPreview=null,inspectedEventMap=null,inspectedMapAtlas=null,atlasBatchStart=0,atlasCoordinateBatchStart=0;
 let activeRenderedMap=null,selectedRenderedHit=null;
+let mapReviewQueue=[],mapReviewRom=null,lastMapPreviews={cell:null,warp:null,event:null};
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
@@ -3903,7 +4006,7 @@ function updateIndicators(){
   if(active)showRomInfo();
   drawMetadataFingerprintStatus();
 }
-function installModel(name,bytes){clearMapAtlas('ROM replaced; declared atlas invalidated.');metadataImportSerial++;metadataFingerprints=[];clearRenderedMap('ROM replaced. Select vanilla header again.');$('map-grid').innerHTML='<div class="empty-state">No blockmap inspected.</div>';$('map-bank-status').textContent='ROM replaced. Re-enter independently verified vanilla bank location and counts.';clearWarpInspection('ROM replaced. Select a vanilla map header again.');clearConnectionInspection('ROM replaced. Select a vanilla map header again.');$('map-layout-status').textContent='ROM replaced. No vanilla-format layout inspected.';$('map-status').textContent='ROM replaced. Enter a verified offset and inspect again.';pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
+function installModel(name,bytes){clearMapChangeReview();clearMapAtlas('ROM replaced; declared atlas invalidated.');metadataImportSerial++;metadataFingerprints=[];clearRenderedMap('ROM replaced. Select vanilla header again.');$('map-grid').innerHTML='<div class="empty-state">No blockmap inspected.</div>';$('map-bank-status').textContent='ROM replaced. Re-enter independently verified vanilla bank location and counts.';clearWarpInspection('ROM replaced. Select a vanilla map header again.');clearConnectionInspection('ROM replaced. Select a vanilla map header again.');$('map-layout-status').textContent='ROM replaced. No vanilla-format layout inspected.';$('map-status').textContent='ROM replaced. Enter a verified offset and inspect again.';pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
 $('rom-picker').addEventListener('change',async e=>{
   const file=e.target.files?.[0];e.target.value='';if(!file)return;
   if(file.size<0xC0 || file.size>MAX_BYTES)return toast('ROM must be 192 bytes to 128 MiB',true);
@@ -4173,7 +4276,7 @@ if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostn
 // engine, game fingerprints and pointer allocator have been ported and tested.
 let displayedAnchors=[], selectedInspection=null;
 const encodeHex=bytes=>Array.from(bytes).map((b,i)=>hex(b,2)+(i%16===15?'\n':' ')).join('').trim();
-function metadataReset(){metadataImportSerial++;metadataFingerprints=[];clearWarpInspection('Metadata reset; inspect warps again.');clearConnectionInspection('Metadata reset; inspect connections again.');clearMapGrid('Metadata reset; inspect map again.');metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
+function metadataReset(){metadataImportSerial++;metadataFingerprints=[];clearWarpInspection('Metadata reset; inspect warps again.');clearMapChangeReview();clearConnectionInspection('Metadata reset; inspect connections again.');clearMapGrid('Metadata reset; inspect map again.');metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
 function snapshotMatchedWords(words=metadataMatchedWords){
   if(!model)return [];
   return words.map(word=>{
@@ -4525,6 +4628,7 @@ function clearRenderedMap(message='Rendered preview invalidated; inspect again.'
  $('map-render-status').textContent=message;
 }
 function clearMapGrid(message='Map structure changed; inspect again.'){
+  lastMapPreviews.cell=null;$('map-review-cell-add').disabled=true;
   clearMapAtlas(message+' Reinspect declared bank counts.');
   clearRenderedMap();
   const root=$('map-grid');root.replaceChildren();
@@ -4537,14 +4641,16 @@ function clearMapGrid(message='Map structure changed; inspect again.'){
 function clearWarpInspection(message='Select a vanilla map header to inspect warp events.'){
   clearEventInspection('Map or ROM changed; inspect vanilla event records again.');
   clearBlocksetInspection('Map or ROM changed; inspect blockset headers again.');
-  inspectedWarpMap=null;selectedWarpPreview=null;
+  inspectedWarpMap=null;selectedWarpPreview=null;lastMapPreviews.warp=null;
+  $('map-review-warp-add').disabled=true;
   $('map-warp-preview').disabled=true;
   $('map-warp-preview-status').textContent='Select a raw warp record to preview proposed bytes. No writes.';
   $('map-warp-list').replaceChildren();
   $('map-warp-status').textContent=message;
 }
 function clearEventInspection(message='Select a vanilla map header to inspect object, script and signpost records.'){
-  inspectedEventMap=null;selectedEventPreview=null;
+  inspectedEventMap=null;selectedEventPreview=null;lastMapPreviews.event=null;
+  $('map-review-event-add').disabled=true;
   $('map-event-preview').disabled=true;
   $('map-event-preview-status').textContent='Select a raw event record to preview proposed bytes. No writes.';
   $('map-event-list').replaceChildren();
@@ -4554,6 +4660,60 @@ function clearEventInspection(message='Select a vanilla map header to inspect ob
   $('map-script-preview-list').replaceChildren();
   $('map-script-preview-status').textContent='No raw script byte prefix inspected.';
 }
+function clearMapChangeReview(){
+ mapReviewQueue=[];mapReviewRom=null;
+ lastMapPreviews={cell:null,warp:null,event:null};
+ for(const id of ['map-review-cell-add','map-review-warp-add','map-review-event-add',
+  'map-review-run','map-review-clear'])$(id).disabled=true;
+ $('map-review-list').replaceChildren();
+ $('map-review-status').textContent='No proposed changes queued. No ROM writes.';
+}
+function queueMapChangePreview(kind){
+ ensureModel();
+ const preview=lastMapPreviews[kind];
+ if(!preview)throw Error('Preview the selected '+kind+' record before queueing');
+ if(mapReviewRom&&mapReviewRom!==model)
+  throw Error('ROM changed; clear the review queue');
+ const next=[...mapReviewQueue,preview];
+ reviewVanillaChangeSet(model,next,{maxChanges:64,maxBytes:2048});
+ mapReviewQueue=next;mapReviewRom=model;
+ $('map-review-run').disabled=false;$('map-review-clear').disabled=false;
+ $('map-review-list').replaceChildren();
+ $('map-review-status').textContent=next.length+
+  ' proposed record(s) queued. Recheck originals and overlaps before relying on review; no writes.';
+}
+for(const kind of ['cell','warp','event'])
+ $('map-review-'+kind+'-add').addEventListener('click',()=>safeRun(()=>queueMapChangePreview(kind)));
+$('map-review-run').addEventListener('click',()=>safeRun(()=>{
+ if(!mapReviewQueue.length||mapReviewRom!==model)
+  throw Error('Review queue is empty or belongs to a different ROM');
+ const result=reviewVanillaChangeSet(model,mapReviewQueue,{
+  maxChanges:64,maxBytes:2048});
+ const root=$('map-review-list');root.replaceChildren();
+ $('map-review-status').textContent=result.count+' non-overlapping record(s), '+
+  result.totalBytes+' original bytes checked, '+result.changedBytes+
+  ' proposed byte differences. Preview only; NOT applied, exported or authenticated.';
+ for(const entry of result.entries){
+  const button=document.createElement('button');button.type='button';
+  button.className='secondary-button';button.style.display='block';
+  button.style.margin='8px 0';button.style.textAlign='left';
+  button.textContent=entry.kind+' ROM 0x'+hex(entry.offset)+
+   ' · '+entry.length+' bytes · '+(entry.changed?'change':'unchanged')+
+   ' · inspect original hex';
+  button.addEventListener('click',()=>safeRun(()=>{
+   if(mapReviewRom!==model)throw Error('Review belongs to another ROM');
+   const fresh=reviewVanillaChangeSet(model,mapReviewQueue,{
+    maxChanges:64,maxBytes:2048});
+   if(!fresh.entries.some(e=>e.sourceIndex===entry.sourceIndex&&
+      e.offset===entry.offset&&e.length===entry.length))
+    throw Error('Review changed; run again');
+   setPageForOffset(entry.offset);gotoTab('hex');
+  }));
+  root.append(button);
+ }
+}));
+$('map-review-clear').addEventListener('click',()=>clearMapChangeReview());
+
 function clearBlocksetInspection(message='Select a vanilla map header to inspect tileset pointers.'){
   $('map-blockset-list').replaceChildren();
   $('map-blockset-status').textContent=message;
@@ -5137,6 +5297,7 @@ $('map-warp-preview').addEventListener('click',()=>safeRun(()=>{
    warpId:readField('warp-id'),targetMap:readField('target-map'),
    targetBank:readField('target-bank')}
  });
+ lastMapPreviews.warp=result;$('map-review-warp-add').disabled=false;
  const format=bytes=>bytes.map(n=>hex(n,2)).join(' ');
  $('map-warp-preview-status').textContent='Warp '+result.warpIndex+' ROM 0x'+
   hex(result.recordOffset)+': '+format(result.before)+' → '+format(result.after)+
@@ -5275,6 +5436,7 @@ $('map-event-preview').addEventListener('click',()=>safeRun(()=>{
   index:selection.index,expectedBytes:selection.expectedBytes,
   changes:{x:field('x'),y:field('y'),elevation:field('elevation')}
  });
+ lastMapPreviews.event=result;$('map-review-event-add').disabled=false;
  const format=bytes=>bytes.map(n=>hex(n,2)).join(' ');
  $('map-event-preview-status').textContent=result.kind+' '+result.index+
   ' · ROM 0x'+hex(result.recordOffset)+' ('+result.recordLength+' bytes): '+
@@ -5584,6 +5746,7 @@ $('map-preview-cell').addEventListener('click',()=>safeRun(()=>{
   ...(proposedCollision===''?{}:{collision:Number(proposedCollision)}),
   ...(expectedRaw===undefined?{}:{expectedRaw}),...(atlas?{atlas}:{})
  });
+ lastMapPreviews.cell=result;$('map-review-cell-add').disabled=false;
  const old=result.before.bytes.map(n=>hex(n,2)).join(' ');
  const next=result.after.bytes.map(n=>hex(n,2)).join(' ');
  $('map-preview-status').textContent='ROM 0x'+hex(result.byteOffset)+
