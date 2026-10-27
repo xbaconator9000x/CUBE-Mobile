@@ -74,7 +74,7 @@ export function auditVanillaAtlasWideScriptAliases(source,atlas,{
   });
   if(map.mapPointerSource!==canonical.mapPointerSource||
      map.mapHeaderOffset!==canonical.mapHeaderOffset)
-   throw new RangeError('Declared map pointer source or header changed');
+   throw new RangeError('Declared map pointer changed or source forged');
   if(atlasAliasPointer(rom,map.mapPointerSource)!==0x08000000+map.mapHeaderOffset)
    throw new RangeError('Declared map pointer changed');
   const header=canonical.header;
