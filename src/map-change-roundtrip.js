@@ -10,7 +10,7 @@ import {inspectBlockMap} from './map-blocks.js';
 import {inspectVanillaMapEvents} from './map-events.js';
 import {traceVanillaWarpArrival} from './map-warp-trace.js';
 
-function typedRecord(source,atlas,owner,entry){
+function roundtripTypedRecord(source,atlas,owner,entry){
  const map=atlas.maps.find(m=>m.bankIndex===owner.bankIndex&&
    m.mapIndex===owner.mapIndex&&m.mapHeaderOffset===owner.headerOffset);
  if(!map)throw new RangeError('Reviewed owner is absent from the declared atlas');
@@ -40,7 +40,7 @@ function typedRecord(source,atlas,owner,entry){
   throw new RangeError('Reviewed event record no longer exists');
  return record;
 }
-function value(record,field){
+function roundtripDecodedValue(record,field){
  const result=record[field];
  if(!Number.isSafeInteger(result)||result<0)
   throw new RangeError('Decoded field is not a valid unsigned integer');
@@ -71,11 +71,11 @@ export function auditVanillaQueuedChangeRoundtrip(source,atlas,previews,{
    throw new RangeError('Reviewed owner list is incomplete');
   const owners=[];
   for(const owner of structural.owners){
-   const original=typedRecord(source,atlas,owner,entry);
-   const proposed=typedRecord(overlay.source,atlas,owner,entry);
+   const original=roundtripTypedRecord(source,atlas,owner,entry);
+   const proposed=roundtripTypedRecord(overlay.source,atlas,owner,entry);
    for(const field of entry.fieldChanges){
-    if(value(original,field.field)!==field.before||
-       value(proposed,field.field)!==field.after)
+    if(roundtripDecodedValue(original,field.field)!==field.before||
+       roundtripDecodedValue(proposed,field.field)!==field.after)
      throw new RangeError('Typed map record did not roundtrip as reviewed');
    }
    if(entry.kind==='blockmap'&&original.byteOffset!==entry.offset||
