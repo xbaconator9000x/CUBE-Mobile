@@ -13,7 +13,7 @@ test('pinned upstream CUBE Emerald map-bank declaration is parsed without false 
  assert.equal(report.declarationCount,1);
  assert.equal(report.declarations[0].address,0x102D520);
  assert.equal(report.declarations[0].addressInBounds,true);
- assert.equal(report.status,'vanilla-marker');
+ assert.equal(report.status,'custom-candidate');
  assert.equal(report.multiplicity.ambiguous,false);
  assert.equal(report.multiplicity.counts['map.connections'],1);
  assert.equal(report.hierarchy.sections.layout!==null,true);
