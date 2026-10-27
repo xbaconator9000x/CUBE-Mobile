@@ -44,3 +44,22 @@ test('malformed attributes and metatile offsets are rejected',()=>{
  const r2=fixture();d(r2,0x24c,ptr(0xdff8));
  assert.throws(()=>renderVanillaMapViewport(r2,{address:0x100,family:'RSE'}),/bounds/);
 });
+
+test('horizontal flip reverses 8px tile samples while upper palette-zero remains transparent',()=>{
+ const r=fixture();
+ r.fill(0,0x1000,0x1020);r[0x1000]=0x01;r[0x1003]=0x20;
+ w(r,0x9004,0x03e0);
+ w(r,0x9408,1); // upper tile 1 is transparent
+ let result=renderVanillaMapViewport(r,{address:0x100,family:'RSE'});
+ assert.deepEqual([...result.pixels.slice(0,4)],[255,0,0,255]);
+ w(r,0x9400,0x400);
+ result=renderVanillaMapViewport(r,{address:0x100,family:'RSE'});
+ assert.deepEqual([...result.pixels.slice(0,4)],[0,255,0,255]);
+});
+test('LZ-compressed 4bpp primary tileset renders identically to raw source',()=>{
+ const r=fixture(),before=renderVanillaMapViewport(r,{address:0x100,family:'RSE'});
+ const lz=Uint8Array.from([0x10,32,0,0,...Array.from({length:4},()=>[0,...Array(8).fill(0x11)]).flat()]);
+ r.set(lz,0x1000);r[0x240]=1;
+ const after=renderVanillaMapViewport(r,{address:0x100,family:'RSE'});
+ assert.deepEqual([...after.pixels],[...before.pixels]);
+});
