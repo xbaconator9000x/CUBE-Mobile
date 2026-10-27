@@ -13,13 +13,13 @@ const stripMetadataFingerprint=metadataFingerprint.replace(/^import \{.*?\} from
 const stripMapBlocks=mapBlocks.replace(/\bexport (const|class|function)\b/g,'$1');
 const stripMapLayouts=mapLayouts.replace(/\bexport (const|class|function)\b/g,'$1');
 const stripMapDiscovery=mapDiscovery.replace(/^import \{.*?\} from '\.\/map-layouts\.js';\s*/gm,'').replace(/\bexport (const|class|function)\b/g,'$1');
-const stripMapAtlas=mapAtlas.replace(/^import \\{.*?\\} from '\\.\\/map-discovery\\.js';\\s*/gm,'').replace(/\\bexport (const|class|function)\\b/g,'$1');
+const stripMapAtlas=mapAtlas.replace(/^import \{.*?\} from '\.\/map-discovery\.js';\s*/gm,'').replace(/\bexport (const|class|function)\b/g,'$1');
 const stripMapConnections=mapConnections.replace(/^import \{.*?\} from '\.\/map-layouts\.js';\s*/gm,'').replace(/\bexport (const|class|function)\b/g,'$1');
 const stripMapEvents=mapEvents.replace(/^import \{.*?\} from '\.\/map-layouts\.js';\s*/gm,'').replace(/\bexport (const|class|function)\b/g,'$1');
 const stripMapBlocksets=mapBlocksets.replace(/^import \{.*?\} from '\.\/map-layouts\.js';\s*/gm,'').replace(/\bexport (const|class|function)\b/g,'$1');
 const stripMapViewport=mapViewport.replace(/\bexport (const|class|function)\b/g,'$1');
 const stripMapRender=mapRender.replace(/^import \{.*?\} from '\.\/(?:map-blocksets|map-layouts|map-blocks|core)\.js';\s*/gm,'').replace(/\bexport (const|class|function)\b/g,'$1');
-const html=base.replace(/<link rel="icon"[^>]*>/,'').replace(/<link rel="manifest"[^>]*>/,'').replace(/<link rel="apple-touch-icon"[^>]*>/,'').replace(/<link rel="stylesheet" href="src\/styles.css">/,'<style>'+styles+'</style>').replace(/<script type="module" src="src\/app\.js"><\/script>/,"<script>\n'use strict';\n"+stripExports+"\n"+stripSemantic+"\n"+stripPcsDefault+"\n"+stripPcsReference+"\n"+stripTextInspection+"\n"+stripRomFingerprint+"\n"+stripRomCompatibility+"\n"+stripMetadataFingerprint+"\n"+stripMapBlocks+"\n"+stripMapLayouts+"\n"+stripMapDiscovery+"\n"+stripMapAtlas+"\n"+stripMapConnections"\n"+stripMapEvents+"\n"+stripMapBlocksets+"\n"+stripMapViewport+"\n"+stripMapRender+"\n"+stripImports+"\n</script>");
+const html=base.replace(/<link rel="icon"[^>]*>/,'').replace(/<link rel="manifest"[^>]*>/,'').replace(/<link rel="apple-touch-icon"[^>]*>/,'').replace(/<link rel="stylesheet" href="src\/styles.css">/,'<style>'+styles+'</style>').replace(/<script type="module" src="src\/app\.js"><\/script>/,"<script>\n'use strict';\n"+stripExports+"\n"+stripSemantic+"\n"+stripPcsDefault+"\n"+stripPcsReference+"\n"+stripTextInspection+"\n"+stripRomFingerprint+"\n"+stripRomCompatibility+"\n"+stripMetadataFingerprint+"\n"+stripMapBlocks+"\n"+stripMapLayouts+"\n"+stripMapDiscovery+"\n"+stripMapAtlas+"\n"+stripMapConnections+"\n"+stripMapEvents+"\n"+stripMapBlocksets+"\n"+stripMapViewport+"\n"+stripMapRender+"\n"+stripImports+"\n</script>");
 if(html.includes('src/app.js')||html.includes('src/styles.css'))throw Error('Standalone file still references source assets');
 mkdirSync(new URL('app/',import.meta.url),{recursive:true});
 writeFileSync(new URL('app/CUBHMA_Mobile_Lab_Offline.html',import.meta.url),html);
