@@ -4,7 +4,8 @@
  * Reads TOML only. No ROM upload, ROM mutation, network calls or CUBE trust.
  */
 import {readFile,stat} from 'node:fs/promises';
-import {basename} from 'node:path';
+import {basename,resolve} from 'node:path';
+import {pathToFileURL} from 'node:url';
 import {inspectHmaMapBankAnchorSources} from '../src/hma-map-bank-metadata.js';
 
 const MAX_FILE_BYTES=4*1024*1024;
@@ -70,7 +71,7 @@ export async function inspectLocalHmaMapMetadata(argv){
   });
 }
 
-if(process.argv[1]&&import.meta.url===new URL('file://'+process.argv[1]).href){
+if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
   try {
     const report=await inspectLocalHmaMapMetadata(process.argv.slice(2));
     process.stdout.write(JSON.stringify(report,null,2)+'\n');
