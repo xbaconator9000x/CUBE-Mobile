@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {inspectVanillaMapAtlas} from '../src/map-atlas.js';
-import {auditVanillaMapLinks} from '../src/map-link-audit.js';
+import {auditVanillaMapLinks,auditVanillaAtlasLinkBatch} from '../src/map-link-audit.js';
 
 const ptr=n=>0x08000000+n;
 function u32(rom,at,value){for(let i=0;i<4;i++)rom[at+i]=(value>>>(8*i))&255;}
@@ -61,4 +61,32 @@ test('invalid map selections and malformed target event pointers fail closed',()
  assert.throws(()=>auditVanillaMapLinks(rom,{}, {bankIndex:0,mapIndex:0}));
  u32(rom,0x948,0x07000000);
  assert.throws(()=>auditVanillaMapLinks(rom,catalog,{bankIndex:0,mapIndex:0}),/pointer/i);
+});
+
+test('bounded atlas batches count every link and paginate without mutating ROM',()=>{
+ const rom=fixture(),before=rom.slice(),catalog=atlas(rom);
+ const first=auditVanillaAtlasLinkBatch(rom,catalog,{start:0,limit:1,maxFindings:2});
+ assert.equal(first.scannedMaps,1);
+ assert.equal(first.nextStart,1);
+ assert.deepEqual(first.counts,{declared:2,undeclared:2,special:1,needsReview:1});
+ assert.equal(first.totalFindings,4);
+ assert.equal(first.findings.length,2);
+ assert.equal(first.truncated,true);
+ assert.deepEqual(first.findings.map(x=>x.status),['undeclared','special']);
+ assert.equal(first.findings[0].headerOffset,0x200);
+ assert.ok(Object.isFrozen(first.findings)&&Object.isFrozen(first.findings[0]));
+ const second=auditVanillaAtlasLinkBatch(rom,catalog,{start:1,limit:16});
+ assert.equal(second.scannedMaps,1);
+ assert.equal(second.nextStart,null);
+ assert.equal(second.totalFindings,0);
+ assert.equal(second.counts.declared,1);
+ assert.deepEqual(rom,before);
+});
+test('batch audit rejects invalid windows and malformed event pointers without partial result',()=>{
+ const rom=fixture(),catalog=atlas(rom);
+ for(const options of [{start:-1},{start:2},{limit:0},{limit:33},{maxFindings:0},{maxFindings:257}])
+  assert.throws(()=>auditVanillaAtlasLinkBatch(rom,catalog,options),RangeError);
+ assert.throws(()=>auditVanillaAtlasLinkBatch(rom,{}),TypeError);
+ u32(rom,0x948,0x07000000);
+ assert.throws(()=>auditVanillaAtlasLinkBatch(rom,catalog,{limit:2}),/pointer/i);
 });

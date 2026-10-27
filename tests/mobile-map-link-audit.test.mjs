@@ -15,3 +15,15 @@ test('read-only map-link audit is reachable from modular and offline mobile view
  assert.match(offline,/outside supplied counts/);
  assert.doesNotMatch(offline,/^import \{.*?\} from '\.\//m);
 });
+
+test('batch atlas audit controls and offline bundle stay synchronized',()=>{
+ const app=read('src/app.js');
+ for(const path of ['index.html','app/CUBHMA_Mobile_Lab_Offline.html']){
+  const html=read(path);
+  for(const id of ['map-atlas-batch-audit','map-atlas-batch-status','map-atlas-batch-list'])
+   assert.match(html,new RegExp('id="'+id+'"'));
+ }
+ assert.match(app,/auditVanillaAtlasLinkBatch\(model,atlas/);
+ assert.match(app,/atlasBatchStart=result.nextStart/);
+ assert.match(read('app/CUBHMA_Mobile_Lab_Offline.html'),/function auditVanillaAtlasLinkBatch/);
+});

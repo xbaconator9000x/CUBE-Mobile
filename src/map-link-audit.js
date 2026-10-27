@@ -58,3 +58,45 @@ export function auditVanillaMapLinks(source,atlas,{bankIndex,mapIndex}={}) {
  return Object.freeze({bankIndex,mapIndex,headerOffset:selected.mapHeaderOffset,
   counts,records:Object.freeze(records),readOnly:true,layoutAuthenticated:false});
 }
+
+/**
+ * Inspect a bounded page of the explicitly declared vanilla atlas. Only
+ * non-declared link statuses are retained; counters cover every link.
+ * A caller must revalidate ROM/atlas identity before each page.
+ */
+export function auditVanillaAtlasLinkBatch(source,atlas,{start=0,limit=16,maxFindings=128}={}) {
+ if(!atlas||atlas.readOnly!==true||atlas.layoutAuthenticated!==false||
+    !Array.isArray(atlas.maps)||!['RSE','FRLG'].includes(atlas.family))
+  throw new TypeError('A read-only declared vanilla atlas is required');
+ if(!Number.isSafeInteger(start)||start<0||start>=atlas.maps.length)
+  throw new RangeError('Batch start must select a declared map');
+ if(!Number.isSafeInteger(limit)||limit<1||limit>32)
+  throw new RangeError('Batch size must be 1–32 maps');
+ if(!Number.isSafeInteger(maxFindings)||maxFindings<1||maxFindings>256)
+  throw new RangeError('Finding limit must be 1–256');
+ const end=Math.min(atlas.maps.length,start+limit);
+ const counts={declared:0,undeclared:0,special:0,needsReview:0};
+ const findings=[];let totalFindings=0;
+ for(let i=start;i<end;i++){
+  const map=atlas.maps[i];
+  const result=auditVanillaMapLinks(source,atlas,{
+   bankIndex:map.bankIndex,mapIndex:map.mapIndex
+  });
+  for(const key of Object.keys(counts))counts[key]+=result.counts[key];
+  for(const record of result.records){
+   if(record.status==='declared')continue;
+   totalFindings++;
+   if(findings.length<maxFindings)findings.push(Object.freeze({
+    bankIndex:map.bankIndex,mapIndex:map.mapIndex,
+    headerOffset:map.mapHeaderOffset,...record
+   }));
+  }
+ }
+ return Object.freeze({
+  start,end,scannedMaps:end-start,totalMaps:atlas.maps.length,
+  nextStart:end<atlas.maps.length?end:null,
+  counts:Object.freeze(counts),totalFindings,
+  truncated:totalFindings>findings.length,
+  findings:Object.freeze(findings),readOnly:true,layoutAuthenticated:false
+ });
+}

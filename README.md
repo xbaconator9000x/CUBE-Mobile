@@ -8,6 +8,10 @@
 
 The opt-in vanilla map canvas now displays read-only raw warp/event coordinate badges and lets you tap a rendered metatile to inspect its blockmap and attribute source offsets, behavior and layer, with an explicit jump to hex. It does not authenticate CUBE layouts or interpret walkability. See [touch checkpoint](docs/MAP_CANVAS_TOUCH_CHECKPOINT.md).
 
+## Development checkpoint — bounded atlas-wide link audit
+
+Review 16 declared vanilla maps per tap for raw warp/connection targets, with bounded findings and exact ROM offsets. No automatic map discovery, CUBE authentication or semantic writes. See [map-link audit](docs/VANILLA_MAP_LINK_AUDIT.md).
+
 ## Development checkpoint — explicit vanilla map atlas
 
 The Blockmaps screen can now inspect a bounded catalog of vanilla map headers using a known bank-table offset and **explicit per-bank map counts**. A selector opens declared maps; warp and connection records can navigate to declared targets. Counts and layouts are not automatically discovered or CUBE-authenticated, and the workflow remains read-only. See [atlas checkpoint](docs/VANILLA_MAP_ATLAS_CHECKPOINT.md).
@@ -114,7 +118,7 @@ Open `http://localhost:8000/` for the modular web app. The standalone builder re
 
 ## Privacy, licence and ROM safety
 
-**This GitHub repository is private.** Do not enable GitHub Pages or copy a workflow that deploys the site unless you deliberately want that deployment: Pages visibility is not determined solely by repository privacy. The CI workflow only runs tests; it does not publish the app.
+**This GitHub repository is currently public (changed by its owner on 27 October 2026).** Do not enable GitHub Pages or copy a workflow that deploys the site unless you deliberately want that deployment: Pages visibility is not determined solely by repository privacy. The CI workflow only runs tests; it does not publish the app.
 
 Do not commit copyrighted game ROMs, extracted proprietary assets, user saves or user-specific project files. `.gitignore` excludes common formats as a guard, not an infallible blocker. Never force-push over working checkpoints. Preserve source originals and verify compiled output in an emulator before considering ROM edits reliable.
 
