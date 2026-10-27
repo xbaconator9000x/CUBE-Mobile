@@ -1,3 +1,9 @@
+## Checkpoint — read-only directed vanilla warp graph (28 October 2026)
+- [x] Revalidate every canonical bank/map pointer and decode raw vanilla warp/connection references across a bounded declared atlas.
+- [x] Count valid destinations, unresolved/special links, missing direct reverse links and raw directed reachability from a selected origin, without claiming gameplay accessibility.
+- [x] Add synthetic regression tests and source-grounded documentation; preserve immutable ROM access and strict zero parity credit.
+- [ ] Add touchscreen graph exploration and independently authenticate CUBE formats, ROM save/reopen, emulator and Android acceptance. See [warp graph](docs/VANILLA_WARP_GRAPH.md).
+
 ## Checkpoint — mobile/offline raw-cell census (28 October 2026)
 - [x] Add bounded touch-first inspection of raw six-bit vanilla blockmap values across a declared atlas, with shared-blockmap deduplication and physical-versus-logical cell totals.
 - [x] Revalidate canonical ROM provenance and all declarations before hex navigation; regenerate offline HTML and add UI regression coverage.
