@@ -82,6 +82,9 @@
     <output id="map-atlas-status" class="palette-note" aria-live="polite">No atlas loaded. Supply all bank counts explicitly; these values are not discovered or authenticated.</output>
     <div class="input-wrap"><label for="map-atlas-select">Declared maps</label><select id="map-atlas-select" disabled><option value="">Inspect an atlas first</option></select></div>
     <button type="button" id="map-atlas-open" class="subtle-button" disabled>Open selected declared map</button>
+    <button type="button" id="map-atlas-audit" class="subtle-button" disabled>Audit selected map warp/connection targets (read only)</button>
+    <output id="map-atlas-audit-status" class="palette-note" aria-live="polite">No declared map links audited.</output>
+    <div id="map-atlas-audit-list" class="anchor-list" aria-label="Read-only declared map link audit"></div>
     <button type="button" id="map-bank-inspect" class="subtle-button" disabled>Follow vanilla bank → map (read only)</button>
     <output id="map-bank-status" class="palette-note" aria-live="polite">Requires independently verified vanilla bank table and explicit counts; no automatic CUBE map-bank discovery.</output>
     <div class="input-wrap"><label for="map-layout-offset">Optional known VANILLA map header/layout ROM offset (hex)</label><input id="map-layout-offset" inputmode="text" spellcheck="false" placeholder="e.g. 1A2B3C"></div>
