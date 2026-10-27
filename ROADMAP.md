@@ -1,5 +1,9 @@
 # Roadmap
 
+## Checkpoint — LZ10 streaming (27 October 2026)
+- [x] Decode and scan staged ROM graphics without full-ROM snapshots; preserve bounded LZ output and offline parity.
+- [ ] Render composed metatiles/maps; verify Android performance and ROM-independent CUBE layouts.
+
 ## Watchdog checkpoint — vanilla blockset pointers and graphics preview (27 October 2026)
 - [x] Decode vanilla primary/secondary blockset headers, graphics/palette/metatile/attribute/animation pointers and RSE/FRLG field ordering read-only.
 - [x] Connect verified-offset pointer inspection to the existing raw/LZ 4bpp graphics viewer, with no semantic ROM writes.

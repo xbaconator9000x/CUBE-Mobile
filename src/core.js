@@ -144,51 +144,64 @@ export function paletteAt(bytes,offset){
 }
 /** GBA BIOS LZ77 (0x10) decompression. Bounded to avoid untrusted-ROM zip bombs. */
 export const MAX_GRAPHIC_BYTES = 512 * 1024;
-export function decodeLz10(bytes, offset=0, {maxOutput=MAX_GRAPHIC_BYTES}={}) {
-  if (!(bytes instanceof Uint8Array)) throw Error('Expected ROM bytes');
-  if (!Number.isInteger(offset) || offset < 0 || offset + 4 > bytes.length) throw Error('LZ77 header outside ROM');
-  if (bytes[offset] !== 0x10) throw Error('Not a GBA LZ77 (0x10) stream at this offset');
-  const size = bytes[offset+1] | (bytes[offset+2] << 8) | (bytes[offset+3] << 16);
-  if (!size || size > maxOutput) throw Error(`LZ77 output must be 1–${maxOutput} bytes`);
-  const output = new Uint8Array(size);
-  let ip=offset+4, op=0;
-  while (op < size) {
-    if (ip >= bytes.length) throw Error('Truncated LZ77 flags');
-    const flags=bytes[ip++];
-    for (let bit=7;bit>=0 && op<size;bit--) {
-      if (flags & (1<<bit)) {
-        if (ip+2>bytes.length) throw Error('Truncated LZ77 back-reference');
-        const b0=bytes[ip++],b1=bytes[ip++];
-        const count=(b0>>>4)+3, distance=(((b0&15)<<8)|b1)+1;
-        if (distance>op) throw Error('Invalid LZ77 back-reference before beginning');
-        if (op+count>size) throw Error('LZ77 back-reference exceeds output length');
-        for (let j=0;j<count;j++) {output[op]=output[op-distance];op++;}
-      } else {
-        if (ip>=bytes.length) throw Error('Truncated LZ77 literal');
-        output[op++]=bytes[ip++];
-      }
-    }
-  }
-  return {data:output,consumed:ip-offset};
+function lz10Reader(source){
+ if(source instanceof Uint8Array)return {length:source.length,read:i=>source[i]};
+ if(source&&Number.isSafeInteger(source.length)&&source.length>=0&&typeof source.read==='function')return source;
+ throw new TypeError('Expected ROM bytes or read-only accessor');
 }
-/** Scan one bounded ROM interval for syntactically valid LZ77 tile candidates.
- * Not a sprite classifier: a decoded 4bpp-looking stream can still be non-graphic data.
- */
-export function scanLz10Graphics(bytes, {start=0,end=bytes.length,maxResults=128,minBytes=256,maxBytes=MAX_GRAPHIC_BYTES}={}) {
-  if (!(bytes instanceof Uint8Array)) throw Error('Expected ROM bytes');
-  if (!Number.isInteger(start)||!Number.isInteger(end)||start<0||end<start||end>bytes.length) throw Error('Invalid scan region');
-  const matches=[];
-  for (let offset=start;offset<Math.min(end,bytes.length-3);offset++) {
-    if(bytes[offset]!==0x10)continue;
-    const size=bytes[offset+1]|(bytes[offset+2]<<8)|(bytes[offset+3]<<16);
-    if(size<minBytes||size>maxBytes||size%32!==0)continue;
-    try {
-      const {consumed}=decodeLz10(bytes,offset,{maxOutput:maxBytes});
-      matches.push({offset,size,compressedBytes:consumed,tileCount:size/32});
-      if(matches.length>=maxResults)break;
-    }catch(_){ /* A 0x10 byte is not sufficient evidence of a valid stream. */ }
+function lz10Byte(rom,i){
+ const b=rom.read(i);
+ if(!Number.isInteger(b)||b<0||b>255)throw new RangeError('Invalid ROM accessor byte');
+ return b;
+}
+/** Bounded GBA BIOS LZ10 decoding directly from staged ROM bytes, no full-ROM snapshot. */
+export function decodeLz10(source,offset=0,{maxOutput=MAX_GRAPHIC_BYTES}={}){
+ const rom=lz10Reader(source);
+ if(!Number.isSafeInteger(offset)||offset<0||offset>rom.length-4)throw new RangeError('LZ77 header outside ROM');
+ if(lz10Byte(rom,offset)!==0x10)throw new Error('Not a GBA LZ77 (0x10) stream at this offset');
+ const size=lz10Byte(rom,offset+1)|(lz10Byte(rom,offset+2)<<8)|(lz10Byte(rom,offset+3)<<16);
+ if(!Number.isSafeInteger(maxOutput)||maxOutput<1||!size||size>maxOutput)
+   throw new RangeError('LZ77 output must be 1–'+maxOutput+' bytes');
+ const output=new Uint8Array(size);let ip=offset+4,op=0;
+ while(op<size){
+  if(ip>=rom.length)throw new RangeError('Truncated LZ77 flags');
+  const flags=lz10Byte(rom,ip++);
+  for(let bit=7;bit>=0&&op<size;bit--){
+   if(flags&(1<<bit)){
+    if(ip>rom.length-2)throw new RangeError('Truncated LZ77 back-reference');
+    const b0=lz10Byte(rom,ip++),b1=lz10Byte(rom,ip++);
+    const count=(b0>>>4)+3,distance=(((b0&15)<<8)|b1)+1;
+    if(distance>op)throw new RangeError('Invalid LZ77 back-reference before beginning');
+    if(op+count>size)throw new RangeError('LZ77 back-reference exceeds output length');
+    for(let j=0;j<count;j++){output[op]=output[op-distance];op++;}
+   }else{
+    if(ip>=rom.length)throw new RangeError('Truncated LZ77 literal');
+    output[op++]=lz10Byte(rom,ip++);
+   }
   }
-  return matches;
+ }
+ return {data:output,consumed:ip-offset};
+}
+/** Header scan is bounded; candidate compressed streams can cross scan chunk boundaries. */
+export function scanLz10Graphics(source,{start=0,end=source.length,maxResults=128,
+ minBytes=256,maxBytes=MAX_GRAPHIC_BYTES}={}){
+ const rom=lz10Reader(source);
+ if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start<0||end<start||end>rom.length)
+   throw new RangeError('Invalid scan region');
+ if(!Number.isSafeInteger(maxResults)||maxResults<1||maxResults>4096)
+   throw new RangeError('Invalid maximum scan results');
+ const matches=[];
+ for(let offset=start;offset<Math.min(end,rom.length-3);offset++){
+  if(lz10Byte(rom,offset)!==0x10)continue;
+  const size=lz10Byte(rom,offset+1)|(lz10Byte(rom,offset+2)<<8)|(lz10Byte(rom,offset+3)<<16);
+  if(size<minBytes||size>maxBytes||size%32!==0)continue;
+  try{
+   const {consumed}=decodeLz10(rom,offset,{maxOutput:maxBytes});
+   matches.push({offset,size,compressedBytes:consumed,tileCount:size/32});
+   if(matches.length>=maxResults)break;
+  }catch(_){/* Reject invalid LZ candidate. */}
+ }
+ return matches;
 }
 export function gba4bppTile(bytes,tileOffset,palette){
   if(tileOffset<0 || tileOffset+32>bytes.length)throw Error('Tile needs 32 bytes');

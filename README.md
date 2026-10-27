@@ -4,6 +4,10 @@
 
 > **Status: v0.5.9 — early foundation, NOT a complete port.** The working code today is an offline ROM inspection / patching workbench and a limited read-only CUBHMA TOML named-anchor inspector. The desktop editor's semantic engine, map/collision/event editors, scripts, sprites, trainers, Pokémon, sound and CUBE upgrades are **not yet ported**.
 
+## Development checkpoint — streamed LZ10 graphics
+
+The graphics inspector now reads staged ROM bytes directly for bounded LZ10 decoding and candidate scans, avoiding a full-ROM snapshot. See [checkpoint](docs/LZ_ACCESSOR_CHECKPOINT.md). Map rendering and CUBE authentication remain unfinished.
+
 ## Development checkpoint — exact TOML import identity (mobile + offline)
 
 Local and pinned-upstream TOML imports now hash **raw bytes before UTF-8 decoding** and commit file digests atomically alongside successfully parsed metadata. The named-data screen displays each file's SHA-256 and a fail-closed ROM compatibility status; replacing the ROM, applying a patch or resetting metadata invalidates stale results. Import reads are rejected if the ROM changes or a newer import starts. Raw TOML buffers are not retained after import. The generated offline HTML includes this workflow. The curated CUBE profile registry is **still empty**, multiple overlays still require an authenticated manifest, and no semantic writes are enabled. See [exact metadata binding checkpoint](docs/EXACT_METADATA_BINDING.md).
