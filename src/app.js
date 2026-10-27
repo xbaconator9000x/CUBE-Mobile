@@ -22,6 +22,7 @@ import {traceVanillaWarpArrival} from './map-warp-trace.js';
 import {previewVanillaWarpRecordChange} from './map-warp-edit-preview.js';
 import {previewVanillaEventCoordinateChange} from './map-event-edit-preview.js';
 import {reviewVanillaChangeSet} from './map-change-review.js';
+import {auditVanillaChangeImpact} from './map-change-impact.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
@@ -773,8 +774,10 @@ function clearMapChangeReview(){
  mapReviewQueue=[];mapReviewRom=null;
  lastMapPreviews={cell:null,warp:null,event:null};
  for(const id of ['map-review-cell-add','map-review-warp-add','map-review-event-add',
-  'map-review-run','map-review-clear'])$(id).disabled=true;
+  'map-review-run','map-review-clear','map-review-impact'])$(id).disabled=true;
  $('map-review-list').replaceChildren();
+ $('map-review-impact-list').replaceChildren();
+ $('map-review-impact-status').textContent='No structural impact audit run.';
  $('map-review-status').textContent='No proposed changes queued. No ROM writes.';
 }
 function queueMapChangePreview(kind){
@@ -787,6 +790,9 @@ function queueMapChangePreview(kind){
  reviewVanillaChangeSet(model,next,{maxChanges:64,maxBytes:2048});
  mapReviewQueue=next;mapReviewRom=model;
  $('map-review-run').disabled=false;$('map-review-clear').disabled=false;
+ $('map-review-impact').disabled=!inspectedMapAtlas||inspectedMapAtlas.rom!==model;
+ $('map-review-impact-list').replaceChildren();
+ $('map-review-impact-status').textContent='Queue changed; rerun impact audit.';
  $('map-review-list').replaceChildren();
  $('map-review-status').textContent=next.length+
   ' proposed record(s) queued. Recheck originals and overlaps before relying on review; no writes.';
@@ -821,6 +827,46 @@ $('map-review-run').addEventListener('click',()=>safeRun(()=>{
   root.append(button);
  }
 }));
+$('map-review-impact').addEventListener('click',()=>safeRun(()=>{
+ requireVanillaMapFormat();
+ if(!mapReviewQueue.length||mapReviewRom!==model||
+    !inspectedMapAtlas||inspectedMapAtlas.rom!==model)
+  throw Error('Queue changes and inspect a vanilla atlas for this ROM first');
+ const atlas=inspectedMapAtlas.atlas;
+ const counts=parseVanillaBankMapCounts($('map-atlas-counts').value);
+ if(parseOffset($('map-bank-offset').value)!==atlas.address||
+    $('map-layout-family').value!==atlas.family||
+    counts.length!==atlas.bankCount||
+    counts.some((n,i)=>n!==atlas.bankMapCounts[i]))
+  throw Error('Atlas inputs changed; inspect again before auditing');
+ const result=auditVanillaChangeImpact(model,atlas,mapReviewQueue,{
+  maxChanges:64,maxBytes:2048,maxOwners:12,maxConflicts:16});
+ const root=$('map-review-impact-list');root.replaceChildren();
+ $('map-review-impact-status').textContent=result.reviewed+' queued records across '+
+  result.totalMaps+' declared maps: '+result.sharedRecords+' shared, '+
+  result.conflictedRecords+' intersecting other structures. Read-only structural hints; NOT authenticated or applied.';
+ for(const entry of result.entries){
+  const item=document.createElement('button');item.type='button';
+  item.className='secondary-button';item.style.display='block';
+  item.style.margin='8px 0';item.style.textAlign='left';
+  const refs=entry.owners.map(m=>'bank '+m.bankIndex+'/map '+m.mapIndex).join(', ');
+  const conflicts=entry.conflicts.map(c=>c.kind+' at 0x'+hex(c.offset)).join(', ');
+  item.textContent=entry.kind+' at 0x'+hex(entry.offset)+
+   ' · '+entry.ownerCount+' map owner(s): '+refs+
+   (entry.ownersTruncated?' (more omitted)':'')+
+   (entry.conflictCount?' · WARNING: '+entry.conflictCount+
+    ' structural intersection(s): '+conflicts+
+    (entry.conflictsTruncated?' (more omitted)':''):'')+
+   ' · inspect original hex';
+  item.addEventListener('click',()=>safeRun(()=>{
+   if(mapReviewRom!==model)throw Error('Review belongs to another ROM');
+   auditVanillaChangeImpact(model,inspectedMapAtlas?.atlas,mapReviewQueue,{
+    maxChanges:64,maxBytes:2048,maxOwners:12,maxConflicts:16});
+   setPageForOffset(entry.offset);gotoTab('hex');
+  }));
+  root.append(item);
+ }
+}));
 $('map-review-clear').addEventListener('click',()=>clearMapChangeReview());
 
 function clearBlocksetInspection(message='Select a vanilla map header to inspect tileset pointers.'){
@@ -838,6 +884,9 @@ function requireVanillaMapFormat(){
 }
 function clearMapAtlas(message='Declared atlas invalidated; inspect again.') {
  inspectedMapAtlas=null;atlasBatchStart=0;atlasCoordinateBatchStart=0;
+ $('map-review-impact').disabled=true;
+ $('map-review-impact-list').replaceChildren();
+ $('map-review-impact-status').textContent='Declared atlas invalidated; inspect again.';
  $('map-atlas-batch-audit').disabled=true;
  $('map-atlas-alias-audit').disabled=true;
  $('map-event-ownership-audit').disabled=true;
@@ -932,6 +981,7 @@ $('map-atlas-inspect').addEventListener('click',()=>safeRun(()=>{
   family:$('map-layout-family').value
  });
  inspectedMapAtlas={atlas,rom:model};
+ $('map-review-impact').disabled=!mapReviewQueue.length||mapReviewRom!==model;
  const select=$('map-atlas-select'),options=document.createDocumentFragment();
  for(let i=0;i<atlas.maps.length;i++){
   const entry=atlas.maps[i];
