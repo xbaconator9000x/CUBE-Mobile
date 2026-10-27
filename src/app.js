@@ -14,6 +14,7 @@ import {auditVanillaMapLinks,auditVanillaAtlasLinkBatch,auditVanillaMapEventCoor
 import {inspectVanillaMapConnections} from './map-connections.js';
 import {auditVanillaAtlasEventOwnership} from './map-event-ownership.js';
 import {inspectVanillaMapEvents,inspectVanillaEventScriptPointers,previewVanillaEventScriptBytes} from './map-events.js';
+import {inspectVanillaScriptCommandPrefix} from './vanilla-script-prefix.js';
 import {inspectVanillaMapBlocksets} from './map-blocksets.js';
 import {panMapViewport,indexMapWarpMarkers,indexMapEventMarkers,inspectRenderedMapPixel,projectRenderedMapMarkers} from './map-viewport.js';
 import {renderVanillaMapViewport} from './map-render.js';
@@ -1902,6 +1903,47 @@ $('map-script-pointer-inspect').addEventListener('click',()=>safeRun(()=>{
       '. Raw prefix only; command boundaries, script length, ownership and CUBE grammar unverified.';
    }));
    root.append(preview);
+   const decode=document.createElement('button');decode.type='button';
+   decode.className='secondary-button';decode.style.margin='0 0 8px 8px';
+   decode.textContent='Inspect vanilla command prefix (limited)';
+   decode.addEventListener('click',()=>safeRun(()=>{
+    requireVanillaMapFormat();
+    if(model!==original||$('map-layout-source').value!=='header'||
+       parseOffset($('map-layout-offset').value)!==address||
+       $('map-layout-family').value!==family)
+      throw Error('Map/ROM selection changed; reinspect script pointers');
+    const pointer=previewVanillaEventScriptBytes(model,{
+      address,family,kind:record.kind,index:record.index,byteCount:1
+    });
+    if(pointer.targetOffset!==record.targetOffset)
+      throw Error('Script pointer changed; reinspect');
+    const decoded=inspectVanillaScriptCommandPrefix(model,{
+      address:pointer.targetOffset,family,maxBytes:64,maxCommands:16
+    });
+    const list=$('map-script-preview-list');list.replaceChildren();
+    for(const command of decoded.commands){
+      const item=document.createElement('button');item.type='button';
+      item.className='secondary-button';item.style.display='block';
+      item.style.margin='8px 0';item.style.textAlign='left';
+      item.textContent='ROM 0x'+hex(command.offset)+' · '+command.name+
+       ' ('+command.length+' bytes) · '+
+       command.bytes.map(value=>hex(value,2)).join(' ')+
+       (command.args.length?' · '+
+        command.args.map(arg=>arg.type+'='+arg.value+
+          (arg.target?' ['+arg.target.status+']':'')).join(', '):'');
+      item.addEventListener('click',()=>safeRun(()=>{
+        if(model!==original)throw Error('ROM replaced; reinspect script');
+        setPageForOffset(command.offset);gotoTab('hex');
+      }));
+      list.append(item);
+    }
+    $('map-script-preview-status').textContent=
+      'Vanilla fixed-width subset · '+decoded.commands.length+
+      ' commands · stopped: '+decoded.stopReason+
+      ' at ROM 0x'+hex(decoded.stopOffset)+
+      '. Unknown commands stop decoding. No CUBE grammar authentication, script length, control-flow following or write permission.';
+   }));
+   root.append(decode);
   }
  }
  if(!result.records.length){
