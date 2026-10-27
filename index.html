@@ -123,6 +123,13 @@
     </div>
     <p class="palette-note">You must independently verify the map's blockmap offset and dimensions. Header identity alone cannot verify CUBE layouts. No bytes are changed. Collision values are raw metadata, not passability colours.</p>
     <output id="map-status" class="palette-note" aria-live="polite">Open a ROM and enter a known blockmap offset.</output>
+    <div class="input-row" role="group" aria-label="Read-only raw collision and tile statistics">
+      <div class="input-wrap"><label for="map-summary-start">First cell index (decimal)</label><input id="map-summary-start" type="number" min="0" step="1" value="0"></div>
+      <button type="button" id="map-summary-scan" class="subtle-button" disabled>Scan 4096 raw cells</button>
+      <button type="button" id="map-summary-next" class="secondary-button" disabled>Next cells</button>
+    </div>
+    <output id="map-summary-status" class="palette-note" aria-live="polite">No raw blockmap statistics scanned. Requires matching selected vanilla header.</output>
+    <div id="map-summary-list" class="anchor-list" aria-label="Raw six-bit collision/elevation distribution"></div>
   </div>
   <div class="toolbar-card">
     <button type="button" id="map-warp-inspect" class="subtle-button" disabled>Inspect vanilla warps for selected header</button>
