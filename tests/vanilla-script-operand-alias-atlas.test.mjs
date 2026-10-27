@@ -41,6 +41,9 @@ test('finds two independent message pointer fields sharing one target',()=>{
  assert.equal(result.totalGroups,1);
  assert.equal(result.groups[0].targetOffset,0xa00);
  assert.equal(result.groups[0].sourceCount,2);
+ assert.equal(result.mixedRoleGroups,0);
+ assert.equal(result.groups[0].mixedRoles,false);
+ assert.deepEqual(result.groups[0].roles,['message-text']);
  assert.deepEqual(result.groups[0].references.map(r=>r.pointerSourceOffset),
   [0x901,0x921]);
  assert.deepEqual(result.groups[0].references.map(r=>r.role),
@@ -83,4 +86,20 @@ test('invalid or unknown command pointers are not asserted as shared targets',()
  const after=audit(rom,atlas);
  assert.equal(after.operandFields,1);
  assert.equal(after.totalGroups,0);
+});
+
+test('mixed operand roles sharing one raw target are review hints, not ownership proof',()=>{
+ const {rom,atlas}=fixture();
+ // Second script applies a movement pointer to the same raw target as
+ // the first script's message pointer. Neither target format is validated.
+ rom[0x920]=0x4f;rom[0x921]=1;rom[0x922]=0;
+ d(rom,0x923,ptr(0xa00));rom[0x927]=0x02;
+ const result=audit(rom,atlas);
+ assert.equal(result.totalGroups,1);
+ assert.equal(result.mixedRoleGroups,1);
+ assert.equal(result.groups[0].mixedRoles,true);
+ assert.deepEqual(result.groups[0].roles,['message-text','movement-data']);
+ assert.equal(result.targetFormatVerified,false);
+ assert.equal(result.writeAuthorized,false);
+ assert.ok(Object.isFrozen(result.groups[0].roles));
 });
