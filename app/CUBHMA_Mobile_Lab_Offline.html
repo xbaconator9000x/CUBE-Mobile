@@ -75,6 +75,11 @@
 .map-compare-grid>div{min-width:0;overflow:auto}
 .map-compare-grid strong{display:block;margin-bottom:6px}
 .map-compare-grid canvas{image-rendering:pixelated;width:min(100%,384px);height:auto;border:1px solid var(--border,#64748b)}
+
+/* Categorical raw-byte overlays: never indicate passability or walkability. */
+.map-overlay-legend{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.map-overlay-legend-item{display:inline-flex;align-items:center;gap:5px;font-size:.8rem;padding:3px 6px;border:1px solid var(--border,#64748b);border-radius:5px}
+.map-overlay-swatch{display:inline-block;width:14px;height:14px;border:1px solid rgba(0,0,0,.35);border-radius:3px}
 </style>
 </head><body>
 <div class="shell" id="app">
@@ -196,6 +201,15 @@
     <output id="map-layout-status" class="palette-note" aria-live="polite">This optional decoder is ONLY for independently verified vanilla-format structures, not CUBE expansion layouts. ROM header identity does not verify a structure.</output>
     <button type="button" id="map-inspect" class="subtle-button" disabled>Inspect 12 × 10 cells</button>
     <label class="control-label"><input type="checkbox" id="map-render-enabled"> Show rendered vanilla metatiles (read-only)</label>
+    <div class="input-wrap"><label for="map-raw-overlay-mode">Raw map attribute colours (not passability)</label>
+      <select id="map-raw-overlay-mode">
+        <option value="none">No colour overlay</option>
+        <option value="highBits">Raw blockmap high bits (0–63)</option>
+        <option value="behavior">Raw metatile behavior byte</option>
+        <option value="terrain">FRLG raw terrain attribute</option>
+        <option value="encounter">FRLG raw encounter attribute</option>
+      </select>
+    </div>
     <div class="input-row" role="group" aria-label="Pan blockmap viewport">
       <button type="button" id="map-pan-up" class="secondary-button" disabled>↑ Up 10</button>
       <button type="button" id="map-pan-down" class="secondary-button" disabled>↓ Down 10</button>
@@ -295,7 +309,7 @@
     <output id="map-connection-status" class="palette-note" aria-live="polite">Select a known vanilla map header to inspect connection records. Read only.</output>
     <div id="map-connection-list" class="anchor-list" aria-label="Read-only map connections"><div class="empty-state">No connections inspected.</div></div>
   </div>
-  <div class="editor-card"><output id="map-render-status" class="palette-note" aria-live="polite">Rendered preview disabled; vanilla layout is unverified.</output><div class="blockmap-scroller"><canvas id="map-render-canvas" hidden aria-label="Composed vanilla map viewport; tap a metatile for raw inspection"></canvas></div><output id="map-render-selection" class="palette-note" aria-live="polite">Tap a rendered metatile to inspect its raw source offsets.</output><button type="button" id="map-render-jump" class="subtle-button" disabled>Inspect selected metatile bytes in hex</button></div>
+  <div class="editor-card"><output id="map-render-status" class="palette-note" aria-live="polite">Rendered preview disabled; vanilla layout is unverified.</output><output id="map-overlay-status" class="palette-note" aria-live="polite">No raw attribute overlay. Enable rendered metatiles to inspect.</output><div id="map-overlay-legend" class="map-overlay-legend" aria-label="Raw map attribute colour legend"></div><div class="blockmap-scroller"><canvas id="map-render-canvas" hidden aria-label="Composed vanilla map viewport; tap a metatile for raw inspection"></canvas></div><output id="map-render-selection" class="palette-note" aria-live="polite">Tap a rendered metatile to inspect its raw source offsets.</output><button type="button" id="map-render-jump" class="subtle-button" disabled>Inspect selected metatile bytes in hex</button></div>
   <div class="editor-card"><div id="map-grid" class="blockmap-scroller" aria-label="Read-only map block cells"><div class="empty-state">No blockmap inspected.</div></div></div>
 </section>
 <section class="view" id="view-graphics">
@@ -4371,6 +4385,50 @@ function compareVanillaBlockmapVisualChange(source,{preview,x=0,y=0,viewportWidt
  });
 }
 
+/**
+ * Read-only raw attribute overlay for a bounded vanilla rendered viewport.
+ * The colours distinguish byte values, NOT passability or collision semantics.
+ */
+const modes=Object.freeze({highBits:['collision',63],behavior:['behavior',255],
+ terrain:['terrain',255],encounter:['encounter',3]});
+function rgbFor(value){
+ // Bijective red channel over 8-bit inputs; stable categorical swatches.
+ return Object.freeze([(value*53+48)&255,(value*97+80)&255,(value*193+128)&255]);
+}
+function buildVanillaRawMapOverlay(rendered,{mode='highBits',maxLegend=12}={}){
+ if(!rendered||!Array.isArray(rendered.attributes)||
+    !Number.isSafeInteger(rendered.columns)||!Number.isSafeInteger(rendered.rows)||
+    rendered.columns<1||rendered.rows<1||rendered.columns>12||rendered.rows>10||
+    rendered.attributes.length!==rendered.rows)
+  throw new TypeError('Expected a bounded rendered vanilla viewport');
+ if(!Object.hasOwn(modes,mode))throw new RangeError('Unsupported raw attribute overlay mode');
+ if(!Number.isSafeInteger(maxLegend)||maxLegend<1||maxLegend>64)
+  throw new RangeError('Legend limit must be 1–64');
+ const [field,max]=modes[mode],counts=new Map(),cells=[];
+ for(let row=0;row<rendered.rows;row++){
+  const attrs=rendered.attributes[row];
+  if(!Array.isArray(attrs)||attrs.length!==rendered.columns)
+   throw new RangeError('Rendered attribute grid is inconsistent');
+  for(let column=0;column<rendered.columns;column++){
+   const attr=attrs[column],value=attr?.[field];
+   if(!Number.isSafeInteger(value)||value<0||value>max)
+    throw new RangeError('Raw '+field+' value is unavailable or invalid for this ROM family');
+   const rgb=rgbFor(value);
+   cells.push(Object.freeze({column,row,x:attr.x,y:attr.y,value,rgb}));
+   const existing=counts.get(value);
+   if(existing)existing.count++;
+   else counts.set(value,{value,count:1,rgb,firstX:attr.x,firstY:attr.y});
+  }
+ }
+ const ordered=[...counts.values()].sort((a,b)=>b.count-a.count||a.value-b.value);
+ return Object.freeze({
+  mode,field,cells:Object.freeze(cells),legend:Object.freeze(
+   ordered.slice(0,maxLegend).map(item=>Object.freeze({...item}))),
+  distinctValues:ordered.length,legendTruncated:ordered.length>maxLegend,
+  readOnly:true,layoutAuthenticated:false,walkabilityVerified:false
+ });
+}
+
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let pcsReference=null,pcsReferenceName='';
@@ -5082,6 +5140,8 @@ function clearRenderedMap(message='Rendered preview invalidated; inspect again.'
  $('map-preview-status').textContent='Select an explicit vanilla header and coordinates to preview bytes. No writes.';
  $('map-render-jump').disabled=true;
  $('map-render-canvas').hidden=true;
+ $('map-overlay-legend').replaceChildren();
+ $('map-overlay-status').textContent='No raw attribute overlay. Enable rendered metatiles to inspect.';
  $('map-visual-compare').disabled=true;
  for(const id of ['map-compare-before','map-compare-after'])$(id).hidden=true;
  $('map-compare-status').textContent='No proposed visual comparison. Preview a cell first.';
@@ -6307,6 +6367,26 @@ $('map-inspect').addEventListener('click',()=>safeRun(()=>{
       canvas.width=rendered.width;canvas.height=rendered.height;
       const image=context.createImageData(rendered.width,rendered.height);
       image.data.set(rendered.pixels);context.putImageData(image,0,0);
+      const overlayMode=$('map-raw-overlay-mode').value;
+      if(overlayMode!=='none'){
+        const overlay=buildVanillaRawMapOverlay(rendered,{mode:overlayMode,maxLegend:12});
+        for(const cell of overlay.cells){
+          context.fillStyle='rgba('+cell.rgb.join(',')+',0.46)';
+          context.fillRect(cell.column*16,cell.row*16,16,16);
+        }
+        const legend=$('map-overlay-legend');legend.replaceChildren();
+        for(const entry of overlay.legend){
+          const item=document.createElement('span');item.className='map-overlay-legend-item';
+          const swatch=document.createElement('span');swatch.className='map-overlay-swatch';
+          swatch.style.backgroundColor='rgb('+entry.rgb.join(',')+')';
+          item.append(swatch,document.createTextNode(entry.value+' × '+entry.count));
+          legend.append(item);
+        }
+        $('map-overlay-status').textContent=overlay.distinctValues+
+          ' distinct raw '+overlay.field+' value(s) in the visible viewport'+
+          (overlay.legendTruncated?' (top 12 shown)':'')+
+          '. Colours distinguish byte values only; NOT verified collision or walkability.';
+      }
       const projected=projectRenderedMapMarkers(rendered,markerIndex,eventMarkerIndex);
       context.font='bold 7px sans-serif';
       for(const marker of projected){
@@ -6342,6 +6422,7 @@ $('map-inspect').addEventListener('click',()=>safeRun(()=>{
 }));
 
 $('map-render-enabled').addEventListener('change',()=>{clearRenderedMap();if(model)$('map-inspect').click();});
+$('map-raw-overlay-mode').addEventListener('change',()=>{clearRenderedMap();if(model)$('map-inspect').click();});
 $('map-render-canvas').addEventListener('click',event=>safeRun(()=>{
  if(!activeRenderedMap||activeRenderedMap.rom!==model)
   throw Error('Rendered map changed; inspect again');
