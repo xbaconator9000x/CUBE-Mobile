@@ -116,7 +116,7 @@
     <output id="map-connection-status" class="palette-note" aria-live="polite">Select a known vanilla map header to inspect connection records. Read only.</output>
     <div id="map-connection-list" class="anchor-list" aria-label="Read-only map connections"><div class="empty-state">No connections inspected.</div></div>
   </div>
-  <div class="editor-card"><output id="map-render-status" class="palette-note" aria-live="polite">Rendered preview disabled; vanilla layout is unverified.</output><div class="blockmap-scroller"><canvas id="map-render-canvas" hidden aria-label="Composed vanilla map viewport"></canvas></div></div>
+  <div class="editor-card"><output id="map-render-status" class="palette-note" aria-live="polite">Rendered preview disabled; vanilla layout is unverified.</output><div class="blockmap-scroller"><canvas id="map-render-canvas" hidden aria-label="Composed vanilla map viewport; tap a metatile for raw inspection"></canvas></div><output id="map-render-selection" class="palette-note" aria-live="polite">Tap a rendered metatile to inspect its raw source offsets.</output><button type="button" id="map-render-jump" class="subtle-button" disabled>Inspect selected metatile bytes in hex</button></div>
   <div class="editor-card"><div id="map-grid" class="blockmap-scroller" aria-label="Read-only map block cells"><div class="empty-state">No blockmap inspected.</div></div></div>
 </section>
 <section class="view" id="view-graphics">

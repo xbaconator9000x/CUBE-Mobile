@@ -1,5 +1,11 @@
 # Roadmap
 
+## Checkpoint — touch rendered map and raw event markers (27 October 2026)
+- [x] Hit-test touch coordinates against native 16px rendered metatiles and preserve blockmap/attribute source provenance.
+- [x] Project inspected raw warp and event coordinate badges onto the composed map canvas, with invalidation and no inferred passability.
+- [ ] Add verified CUBE sprite/event semantics, mobile hardware acceptance, and safe map/warp editing after ownership gates.
+
+
 ## Checkpoint — explicit vanilla map atlas (27 October 2026)
 - [x] Traverse explicitly counted vanilla bank/map pointer arrays and validate map header, layout and blockmap bounds, with a 4096-map cap.
 - [x] Add touch-friendly map catalog selection and conditional warp/connection target navigation; invalidate on ROM/metadata changes.

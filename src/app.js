@@ -13,7 +13,7 @@ import {parseVanillaBankMapCounts,inspectVanillaMapAtlas,lookupVanillaMapAtlasTa
 import {inspectVanillaMapConnections} from './map-connections.js';
 import {inspectVanillaMapEvents} from './map-events.js';
 import {inspectVanillaMapBlocksets} from './map-blocksets.js';
-import {panMapViewport,indexMapWarpMarkers,indexMapEventMarkers} from './map-viewport.js';
+import {panMapViewport,indexMapWarpMarkers,indexMapEventMarkers,inspectRenderedMapPixel,projectRenderedMapMarkers} from './map-viewport.js';
 import {renderVanillaMapViewport} from './map-render.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
@@ -22,6 +22,7 @@ let pcsReference=null,pcsReferenceName='';
 let fingerprintResult=null,fingerprintAbort=null;
 let metadataFingerprints=[],metadataImportSerial=0;
 let inspectedWarpMap=null,inspectedEventMap=null,inspectedMapAtlas=null;
+let activeRenderedMap=null,selectedRenderedHit=null;
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
@@ -714,6 +715,9 @@ $('metadata-stock').addEventListener('click',async()=>{
 
 
 function clearRenderedMap(message='Rendered preview invalidated; inspect again.'){
+ activeRenderedMap=null;selectedRenderedHit=null;
+ $('map-render-selection').textContent='Tap a rendered metatile to inspect its raw source offsets.';
+ $('map-render-jump').disabled=true;
  $('map-render-canvas').hidden=true;
  $('map-render-status').textContent=message;
 }
@@ -1087,6 +1091,19 @@ $('map-inspect').addEventListener('click',()=>safeRun(()=>{
       canvas.width=rendered.width;canvas.height=rendered.height;
       const image=context.createImageData(rendered.width,rendered.height);
       image.data.set(rendered.pixels);context.putImageData(image,0,0);
+      const projected=projectRenderedMapMarkers(rendered,markerIndex,eventMarkerIndex);
+      context.font='bold 7px sans-serif';
+      for(const marker of projected){
+        const left=marker.column*16,top=marker.row*16;
+        const label=marker.warps.length?
+          'W'+(marker.events.length||marker.warps.length>1?'+':String(marker.warps[0])):
+          'E'+(marker.events.length>1?'+':'');
+        context.fillStyle='rgba(10,15,28,0.86)';
+        context.fillRect(left,top,16,8);
+        context.fillStyle='#ffffff';
+        context.fillText(label,left+1,top+6,14);
+      }
+      activeRenderedMap={rom:model,rendered,warpIndex:markerIndex,eventIndex:eventMarkerIndex};
       canvas.style.width=(rendered.width*2)+'px';
       canvas.style.height=(rendered.height*2)+'px';
       canvas.hidden=false;
@@ -1109,6 +1126,34 @@ $('map-inspect').addEventListener('click',()=>safeRun(()=>{
 }));
 
 $('map-render-enabled').addEventListener('change',()=>{clearRenderedMap();if(model)$('map-inspect').click();});
+$('map-render-canvas').addEventListener('click',event=>safeRun(()=>{
+ if(!activeRenderedMap||activeRenderedMap.rom!==model)
+  throw Error('Rendered map changed; inspect again');
+ const canvas=$('map-render-canvas'),rect=canvas.getBoundingClientRect();
+ if(!rect.width||!rect.height)throw Error('Rendered canvas has no visible dimensions');
+ const pixelX=(event.clientX-rect.left)*canvas.width/rect.width;
+ const pixelY=(event.clientY-rect.top)*canvas.height/rect.height;
+ const hit=inspectRenderedMapPixel(activeRenderedMap.rendered,pixelX,pixelY);
+ if(!hit)return;
+ selectedRenderedHit={rom:model,hit};
+ const key=hit.cell.x+','+hit.cell.y;
+ const warps=activeRenderedMap.warpIndex?.[key]||[];
+ const events=activeRenderedMap.eventIndex?.[key]||[];
+ $('map-render-selection').textContent='Cell ('+hit.cell.x+', '+hit.cell.y+
+  '): metatile '+hit.cell.tileId+', raw collision/elevation '+hit.cell.collision+
+  ', behavior 0x'+hex(hit.attribute.behavior,2)+', layer '+hit.attribute.layer+
+  ', blockmap ROM 0x'+hex(hit.cell.byteOffset)+
+  ', attributes ROM 0x'+hex(hit.attribute.attributeOffset)+
+  (warps.length?', raw warp(s) '+warps.join(', '):'')+
+  (events.length?', raw event(s) '+events.join(', '):'')+
+  '. Coordinates and walkability are NOT authenticated.';
+ $('map-render-jump').disabled=false;
+}));
+$('map-render-jump').addEventListener('click',()=>safeRun(()=>{
+ if(!selectedRenderedHit||selectedRenderedHit.rom!==model||!activeRenderedMap)
+  throw Error('Rendered selection expired; inspect again');
+ setPageForOffset(selectedRenderedHit.hit.cell.byteOffset);gotoTab('hex');
+}));
 
 for(const id of ['map-layout-offset','map-layout-family','map-layout-source','map-offset','map-width','map-height','map-x','map-y']){
  $(id).addEventListener('change',()=>clearRenderedMap('Map selection changed; inspect again.'));
