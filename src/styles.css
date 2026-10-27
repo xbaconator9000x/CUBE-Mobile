@@ -60,4 +60,5 @@
 .blockmap-scroller{overflow:auto;max-width:100%;padding:12px;-webkit-overflow-scrolling:touch}
 .blockmap-grid{display:grid;gap:4px;min-width:max-content}
 .blockmap-cell{min-width:64px;min-height:48px;padding:8px 4px;border:1px solid #435079;border-radius:6px;background:#18243a;color:#e5ebf7;font:600 12px/1.2 ui-monospace,monospace;touch-action:manipulation}
+.blockmap-cell.has-event{border-style:dashed;border-width:2px}
 .blockmap-cell:focus-visible{outline:3px solid #b4a7ff;outline-offset:2px}
