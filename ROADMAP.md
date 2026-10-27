@@ -194,3 +194,10 @@
 - [x] Read current staged ROM bytes through a bounded accessor rather than copying up to 128 MiB; reject malformed map layouts and invalid bytes.
 - [x] Bundle in offline HTML and add mobile/offline wiring and staged-read regression tests.
 - [ ] Authenticated map-bank/header/layout discovery, tile graphics, collision semantics, warps/events, save-roundtrip, CUBE layouts and Android hardware validation remain unfinished.
+
+## Watchdog checkpoint — vanilla map header/layout resolution (27 October 2026)
+- [x] Source-grounded, bounded read-only vanilla RSE/FRLG map layout and header pointer interpretation from explicitly supplied ROM offsets.
+- [x] Mobile/offline Blockmaps UI resolves layout dimensions and blockmap pointer without copying or writing ROM bytes; staged reads supported.
+- [x] Add synthetic pointer/bounds/overlap/immutability tests and UI/offline parity assertions.
+- [ ] Authenticate CUBE/expansion layout grammar and bank pointers from exact ROM + TOML metadata; vanilla structures are NOT a safe fallback for expansion layouts.
+- [ ] Render actual map graphics, inspect warps/events, test on Android and validate roundtrip before structured writes.
