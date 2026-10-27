@@ -21,7 +21,7 @@ import {previewVanillaBlockmapCellChange} from './map-edit-preview.js';
 import {traceVanillaWarpArrival,auditVanillaWarpReturns} from './map-warp-trace.js';
 import {previewVanillaWarpRecordChange} from './map-warp-edit-preview.js';
 import {previewVanillaEventCoordinateChange} from './map-event-edit-preview.js';
-import {reviewVanillaChangeSet} from './map-change-review.js';
+import {reviewVanillaChangeSet,exportVanillaChangeReviewJson} from './map-change-review.js';
 import {auditVanillaChangeImpact} from './map-change-impact.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
@@ -774,7 +774,7 @@ function clearMapChangeReview(){
  mapReviewQueue=[];mapReviewRom=null;
  lastMapPreviews={cell:null,warp:null,event:null};
  for(const id of ['map-review-cell-add','map-review-warp-add','map-review-event-add',
-  'map-review-run','map-review-clear','map-review-impact'])$(id).disabled=true;
+  'map-review-run','map-review-clear','map-review-impact','map-review-export'])$(id).disabled=true;
  $('map-review-list').replaceChildren();
  $('map-review-impact-list').replaceChildren();
  $('map-review-impact-status').textContent='No structural impact audit run.';
@@ -803,6 +803,7 @@ function queueMapChangePreview(kind){
  reviewVanillaChangeSet(model,next,{maxChanges:64,maxBytes:2048});
  mapReviewQueue=next;mapReviewRom=model;
  $('map-review-run').disabled=false;$('map-review-clear').disabled=false;
+ $('map-review-export').disabled=false;
  $('map-review-impact').disabled=!inspectedMapAtlas||inspectedMapAtlas.rom!==model;
  $('map-review-impact-list').replaceChildren();
  $('map-review-impact-status').textContent='Queue changed; rerun impact audit.';
@@ -820,7 +821,7 @@ $('map-review-run').addEventListener('click',()=>safeRun(()=>{
  const root=$('map-review-list');root.replaceChildren();
  $('map-review-status').textContent=result.count+' non-overlapping record(s), '+
   result.totalBytes+' original bytes checked, '+result.changedBytes+
-  ' proposed byte differences. Preview only; NOT applied, exported or authenticated.';
+  ' proposed byte differences. Preview only; NOT applied or authenticated.';
  for(const entry of result.entries){
   const button=document.createElement('button');button.type='button';
   button.className='secondary-button';button.style.display='block';
@@ -848,6 +849,15 @@ $('map-review-run').addEventListener('click',()=>safeRun(()=>{
    removeQueuedMapPreview(entry.sourceIndex)));
   root.append(remove);
  }
+}));
+$('map-review-export').addEventListener('click',()=>safeRun(()=>{
+ requireVanillaMapFormat();
+ if(!mapReviewQueue.length||mapReviewRom!==model)
+  throw Error('Review queue is empty or belongs to another ROM');
+ const json=exportVanillaChangeReviewJson(model,mapReviewQueue);
+ downloadFile(safeName(model.name)+'_map-review.json',json,'application/json');
+ $('map-review-status').textContent='Review-only JSON field summary download started. '+
+  'No raw ROM byte arrays, executable patch, authenticated layout or ROM writes.';
 }));
 $('map-review-impact').addEventListener('click',()=>safeRun(()=>{
  requireVanillaMapFormat();

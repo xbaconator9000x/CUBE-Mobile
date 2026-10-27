@@ -263,6 +263,7 @@
       <div class="input-row">
         <button type="button" id="map-review-run" class="subtle-button" disabled>Check queued changes</button>
         <button type="button" id="map-review-impact" class="subtle-button" disabled>Audit shared map impact</button>
+        <button type="button" id="map-review-export" class="secondary-button" disabled>Download review-only JSON (no ROM bytes)</button>
         <button type="button" id="map-review-clear" class="secondary-button" disabled>Clear review queue</button>
       </div>
       <output id="map-review-status" class="palette-note" aria-live="polite">No proposed changes queued.</output>
@@ -4136,6 +4137,28 @@ function reviewVanillaChangeSet(source,previews,{
  });
 }
 
+
+/**
+ * Portable, review-only JSON summary of typed field changes.
+ * Revalidates all original ROM bytes before export, but intentionally omits
+ * both raw ROM byte arrays and patch/apply instructions. NOT a patch format.
+ */
+function exportVanillaChangeReviewJson(source,previews){
+ const result=reviewVanillaChangeSet(source,previews,{maxChanges:64,maxBytes:2048});
+ const report={
+  schema:'cube-mobile-map-review/1',
+  previewOnly:true,writeAuthorized:false,layoutAuthenticated:false,
+  containsRomBytes:false,applicablePatch:false,
+  warning:'Review-only field summary; CUBE layout, ownership and runtime behavior are not authenticated. Do not apply as a ROM patch.',
+  count:result.count,totalBytesChecked:result.totalBytes,changedBytes:result.changedBytes,
+  entries:result.entries.map(e=>({
+   kind:e.kind,offset:e.offset,length:e.length,changed:e.changed,
+   fields:e.fieldChanges.map(f=>({field:f.field,before:f.before,after:f.after}))
+  }))
+ };
+ return JSON.stringify(report,null,2)+'\n';
+}
+
 /**
  * Read-only structural impact audit for queued vanilla map previews.
  * Grounded in pinned CUBHMA MapModel.cs: AllMapsModel, BlockCells,
@@ -5020,7 +5043,7 @@ function clearMapChangeReview(){
  mapReviewQueue=[];mapReviewRom=null;
  lastMapPreviews={cell:null,warp:null,event:null};
  for(const id of ['map-review-cell-add','map-review-warp-add','map-review-event-add',
-  'map-review-run','map-review-clear','map-review-impact'])$(id).disabled=true;
+  'map-review-run','map-review-clear','map-review-impact','map-review-export'])$(id).disabled=true;
  $('map-review-list').replaceChildren();
  $('map-review-impact-list').replaceChildren();
  $('map-review-impact-status').textContent='No structural impact audit run.';
@@ -5049,6 +5072,7 @@ function queueMapChangePreview(kind){
  reviewVanillaChangeSet(model,next,{maxChanges:64,maxBytes:2048});
  mapReviewQueue=next;mapReviewRom=model;
  $('map-review-run').disabled=false;$('map-review-clear').disabled=false;
+ $('map-review-export').disabled=false;
  $('map-review-impact').disabled=!inspectedMapAtlas||inspectedMapAtlas.rom!==model;
  $('map-review-impact-list').replaceChildren();
  $('map-review-impact-status').textContent='Queue changed; rerun impact audit.';
@@ -5066,7 +5090,7 @@ $('map-review-run').addEventListener('click',()=>safeRun(()=>{
  const root=$('map-review-list');root.replaceChildren();
  $('map-review-status').textContent=result.count+' non-overlapping record(s), '+
   result.totalBytes+' original bytes checked, '+result.changedBytes+
-  ' proposed byte differences. Preview only; NOT applied, exported or authenticated.';
+  ' proposed byte differences. Preview only; NOT applied or authenticated.';
  for(const entry of result.entries){
   const button=document.createElement('button');button.type='button';
   button.className='secondary-button';button.style.display='block';
@@ -5094,6 +5118,15 @@ $('map-review-run').addEventListener('click',()=>safeRun(()=>{
    removeQueuedMapPreview(entry.sourceIndex)));
   root.append(remove);
  }
+}));
+$('map-review-export').addEventListener('click',()=>safeRun(()=>{
+ requireVanillaMapFormat();
+ if(!mapReviewQueue.length||mapReviewRom!==model)
+  throw Error('Review queue is empty or belongs to another ROM');
+ const json=exportVanillaChangeReviewJson(model,mapReviewQueue);
+ downloadFile(safeName(model.name)+'_map-review.json',json,'application/json');
+ $('map-review-status').textContent='Review-only JSON field summary download started. '+
+  'No raw ROM byte arrays, executable patch, authenticated layout or ROM writes.';
 }));
 $('map-review-impact').addEventListener('click',()=>safeRun(()=>{
  requireVanillaMapFormat();
