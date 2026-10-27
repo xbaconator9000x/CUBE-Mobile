@@ -158,6 +158,9 @@
     <button type="button" id="map-atlas-audit" class="subtle-button" disabled>Audit selected map warp/connection targets (read only)</button>
     <output id="map-atlas-audit-status" class="palette-note" aria-live="polite">No declared map links audited.</output>
     <div id="map-atlas-audit-list" class="anchor-list" aria-label="Read-only declared map link audit"></div>
+    <button type="button" id="map-event-coordinate-audit" class="subtle-button" disabled>Review selected map event coordinates and shared cells (read only)</button>
+    <output id="map-event-coordinate-status" class="palette-note" aria-live="polite">No event coordinate audit run.</output>
+    <div id="map-event-coordinate-list" class="anchor-list" aria-label="Raw event coordinate findings"></div>
     <button type="button" id="map-atlas-batch-audit" class="subtle-button" disabled>Audit next 16 declared maps (read only)</button>
     <output id="map-atlas-batch-status" class="palette-note" aria-live="polite">No atlas-wide link batch inspected.</output>
     <div id="map-atlas-batch-list" class="anchor-list" aria-label="Read-only atlas batch findings"></div>
@@ -2829,6 +2832,84 @@ function auditVanillaAtlasLinkBatch(source,atlas,{start=0,limit=16,maxFindings=1
 }
 
 /**
+ * Read-only spatial audit of vanilla event coordinates against the current
+ * map blockmap. Raw collision bits are shown as bytes, never interpreted as
+ * walkability. Shared cells are informational, not necessarily defects.
+ *
+ * Coordinates and record widths follow pinned CUBHMA MapModel.cs vanilla
+ * EventsFormat / WarpsFormat. No CUBE expansion layout is authenticated.
+ */
+function auditVanillaMapEventCoordinates(source,atlas,{
+ bankIndex,mapIndex,maxFindings=128
+}={}){
+ if(!atlas||atlas.readOnly!==true||atlas.layoutAuthenticated!==false||
+    !Array.isArray(atlas.maps)||!['RSE','FRLG'].includes(atlas.family))
+  throw new TypeError('A read-only declared vanilla atlas is required');
+ if(!Number.isSafeInteger(maxFindings)||maxFindings<1||maxFindings>256)
+  throw new RangeError('Finding limit must be 1–256');
+ const selected=lookupVanillaMapAtlasTarget(atlas,bankIndex,mapIndex);
+ if(!selected)throw new RangeError('Map is outside the declared atlas');
+ const header=inspectVanillaMapHeader(source,{
+  address:selected.mapHeaderOffset,family:atlas.family
+ });
+ const layout=header.layout;
+ if(layout.width!==selected.width||layout.height!==selected.height||
+    layout.blockmapOffset!==selected.blockmapOffset)
+  throw new RangeError('Map layout changed since atlas inspection; reinspect');
+ const events=inspectVanillaMapEvents(source,{
+  address:selected.mapHeaderOffset,family:atlas.family
+ });
+ const rows=[],occupants=new Map();
+ for(const kind of ['warps','objects','scripts','signposts']){
+  for(const record of events.arrays[kind]){
+   const inside=record.x<layout.width&&record.y<layout.height;
+   const row={kind,index:record.index,offset:record.offset,
+    x:record.x,y:record.y,inside};
+   rows.push(row);
+   if(inside){
+    const key=record.x+','+record.y;
+    occupants.set(key,(occupants.get(key)||0)+1);
+   }
+  }
+ }
+ const read=source instanceof Uint8Array?i=>source[i]:
+  source&&typeof source.read==='function'?i=>source.read(i):null;
+ if(!read)throw new TypeError('Expected ROM bytes or a read-only accessor');
+ const counts={total:rows.length,withinMap:0,outsideMap:0,sharedCell:0};
+ const findings=[];let totalFindings=0;
+ for(const row of rows){
+  if(row.inside)counts.withinMap++;else counts.outsideMap++;
+  const shared=row.inside&&occupants.get(row.x+','+row.y)>1;
+  if(shared)counts.sharedCell++;
+  if(row.inside&&!shared)continue;
+  totalFindings++;
+  let cellOffset=null,rawCell=null,rawTileId=null,rawCollision=null;
+  if(row.inside){
+   cellOffset=layout.blockmapOffset+(row.y*layout.width+row.x)*2;
+   const low=read(cellOffset),high=read(cellOffset+1);
+   if(!Number.isInteger(low)||low<0||low>255||
+      !Number.isInteger(high)||high<0||high>255)
+    throw new RangeError('Invalid blockmap accessor byte');
+   rawCell=low|(high<<8);
+   rawTileId=rawCell&0x3ff;
+   rawCollision=rawCell>>>10;
+  }
+  if(findings.length<maxFindings)findings.push(Object.freeze({
+   kind:row.kind,index:row.index,offset:row.offset,
+   x:row.x,y:row.y,status:row.inside?'shared-cell':'outside-map',
+   cellOffset,rawCell,rawTileId,rawCollision
+  }));
+ }
+ return Object.freeze({bankIndex,mapIndex,headerOffset:selected.mapHeaderOffset,
+  width:layout.width,height:layout.height,
+  counts:Object.freeze(counts),totalFindings,
+  truncated:totalFindings>findings.length,
+  findings:Object.freeze(findings),readOnly:true,
+  layoutAuthenticated:false,walkabilityVerified:false});
+}
+
+
+/**
  * Read-only vanilla RSE/FRLG map blockset headers.
  * Source: kcradi/CUBHMA MapModel.cs Format.BlockDataFormat.
  * 24-byte header: compressed, secondary, padding, tileset, palette, blocks,
@@ -3875,6 +3956,9 @@ function clearMapAtlas(message='Declared atlas invalidated; inspect again.') {
  select.disabled=true;
  $('map-atlas-open').disabled=true;
  $('map-atlas-audit').disabled=true;
+ $('map-event-coordinate-audit').disabled=true;
+ $('map-event-coordinate-list').replaceChildren();
+ $('map-event-coordinate-status').textContent='No event coordinate audit run.';
  $('map-atlas-audit-list').replaceChildren();
  $('map-atlas-audit-status').textContent='No declared map links audited.';
  $('map-atlas-status').textContent=message;
@@ -3956,6 +4040,7 @@ $('map-atlas-inspect').addEventListener('click',()=>safeRun(()=>{
  select.replaceChildren(options);select.disabled=false;
  $('map-atlas-open').disabled=false;
  $('map-atlas-audit').disabled=false;
+ $('map-event-coordinate-audit').disabled=false;
  $('map-atlas-batch-audit').disabled=false;
  $('map-atlas-status').textContent='Inspected '+atlas.mapCount+' explicitly declared maps across '+
   atlas.bankCount+' vanilla-format banks. Pointer/layout bounds checked; no ROM identity, CUBE layout or warp topology authenticated.';
@@ -4017,6 +4102,53 @@ $('map-atlas-audit').addEventListener('click',()=>safeRun(()=>{
  }
 }));
 
+
+$('map-event-coordinate-audit').addEventListener('click',()=>safeRun(()=>{
+ requireVanillaMapFormat();
+ if(!inspectedMapAtlas||inspectedMapAtlas.rom!==model)
+  throw Error('Reinspect the declared atlas before auditing event coordinates');
+ const atlas=inspectedMapAtlas.atlas;
+ const counts=parseVanillaBankMapCounts($('map-atlas-counts').value);
+ if(parseOffset($('map-bank-offset').value)!==atlas.address||
+    $('map-layout-family').value!==atlas.family||
+    counts.length!==atlas.bankCount||
+    counts.some((n,i)=>n!==atlas.bankMapCounts[i]))
+  throw Error('Atlas inputs changed; reinspect before coordinate auditing');
+ const i=Number($('map-atlas-select').value);
+ if(!Number.isSafeInteger(i)||i<0||i>=atlas.maps.length)
+  throw Error('Select a declared map first');
+ const entry=atlas.maps[i];
+ const result=auditVanillaMapEventCoordinates(model,atlas,{
+  bankIndex:entry.bankIndex,mapIndex:entry.mapIndex,maxFindings:128
+ });
+ const root=$('map-event-coordinate-list');root.replaceChildren();
+ $('map-event-coordinate-status').textContent='Map '+entry.bankIndex+'/'+entry.mapIndex+
+  ' ('+result.width+'×'+result.height+'): '+result.counts.total+
+  ' raw events, '+result.counts.outsideMap+' outside the blockmap, '+
+  result.counts.sharedCell+' sharing in-map coordinates. '+
+  result.totalFindings+' review hints'+(result.truncated?' (first 128 shown)':'')+
+  '. Shared tiles can be intentional; collision bits are raw, not walkability. Read only; CUBE layout unverified.';
+ for(const finding of result.findings){
+  const button=document.createElement('button');button.type='button';
+  button.className='secondary-button';button.style.display='block';
+  button.style.margin='8px 0';button.style.textAlign='left';
+  button.textContent=finding.kind+' '+finding.index+' at ('+finding.x+','+
+   finding.y+') · '+finding.status+' · ROM 0x'+hex(finding.offset)+
+   (finding.cellOffset===null?'':' · block cell 0x'+hex(finding.cellOffset)+
+   ' tile '+finding.rawTileId+' raw high bits '+finding.rawCollision);
+  button.addEventListener('click',()=>safeRun(()=>{
+   if(inspectedMapAtlas?.rom!==model)throw Error('Atlas expired; reinspect');
+   setPageForOffset(finding.offset);gotoTab('hex');
+  }));
+  root.append(button);
+ }
+ if(!result.findings.length){
+  const empty=document.createElement('div');empty.className='empty-state';
+  empty.textContent='All raw event coordinates lie within the declared blockmap, with no shared in-map cells.';
+  root.append(empty);
+ }
+}));
+
 $('map-atlas-batch-audit').addEventListener('click',()=>safeRun(()=>{
  requireVanillaMapFormat();
  if(!inspectedMapAtlas||inspectedMapAtlas.rom!==model)
@@ -4063,6 +4195,8 @@ $('map-atlas-batch-audit').addEventListener('click',()=>safeRun(()=>{
 $('map-atlas-select').addEventListener('change',()=>{
  $('map-atlas-audit-list').replaceChildren();
  $('map-atlas-audit-status').textContent='Map selection changed; audit again.';
+ $('map-event-coordinate-list').replaceChildren();
+ $('map-event-coordinate-status').textContent='Map selection changed; audit coordinates again.';
 });
 for(const id of ['map-atlas-counts','map-bank-offset','map-layout-family'])
  $(id).addEventListener('change',()=>clearMapAtlas('Declared atlas inputs changed; inspect again.'));
