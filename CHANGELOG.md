@@ -1,3 +1,9 @@
+## Unreleased — vanilla object, script and signpost inspector (27 October 2026)
+- Decode bounded vanilla object, warp, script-trigger and signpost arrays with raw pointers and source offsets, without executing scripts or modifying ROM bytes.
+- Cross-check event arrays against each other and the map structures; fail closed on overlap, malformed pointers and truncated records.
+- Add touch-friendly object/script/signpost lists with tap-to-hex navigation and offline bundle support, plus synthetic and UI regression tests.
+- CUBE-specific authentication, event editing, map rendering, emulator validation and measured 20% feature parity remain outstanding.
+
 ## Unreleased — byte-exact TOML import identity in mobile and offline UI (27 October 2026)
 - Hash local and pinned-upstream metadata from exact bytes before UTF-8 decoding; show per-file SHA-256 in the named-data screen without retaining source buffers.
 - Commit metadata hashes only after successful parsing and collision checks. Reject stale ROM snapshots and superseded async imports; clear hashes on ROM replacement, patch reset or metadata reset.

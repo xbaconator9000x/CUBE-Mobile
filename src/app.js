@@ -10,6 +10,7 @@ import {inspectBlockMap} from './map-blocks.js';
 import {inspectVanillaMapLayout,inspectVanillaMapHeader} from './map-layouts.js';
 import {inspectVanillaMapBankEntry,inspectVanillaMapWarps} from './map-discovery.js';
 import {inspectVanillaMapConnections} from './map-connections.js';
+import {inspectVanillaMapEvents} from './map-events.js';
 import {panMapViewport,indexMapWarpMarkers} from './map-viewport.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
@@ -22,7 +23,7 @@ let model=null, currentTab='home', page=0, selected=null, patchFile=null, palett
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
 ctx.imageSmoothingEnabled=false;
-const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-layout-inspect','map-bank-inspect','map-warp-inspect','map-connection-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','discard-button','edit-unlock'];
+const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-layout-inspect','map-bank-inspect','map-warp-inspect','map-connection-inspect','map-event-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','discard-button','edit-unlock'];
 const tabs={home:['YOUR WORKSPACE','ROM Workbench'],hex:['BINARY INSPECTOR','Hex editor'],anchors:['ROM SEMANTICS','Named data'],maps:['RAW MAP CELLS','Blockmap inspector'],graphics:['GBA GRAPHICS','Graphics explorer'],patches:['PATCH WORKFLOW','Patch tools'],changes:['REVIEW & EXPORT','Changes']};
 function toast(message,bad=false){const t=$('toast');t.textContent=message;t.classList.toggle('error',bad);t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),4300);}
 function safeRun(fn){try{const result=fn();if(result?.catch) result.catch(err=>toast(err.message||String(err),true));}catch(err){toast(err.message||String(err),true);}}
@@ -718,9 +719,14 @@ function clearMapGrid(message='Map structure changed; inspect again.'){
   $('map-bank-status').textContent=message+' Recheck bank pointer provenance.';
 }
 function clearWarpInspection(message='Select a vanilla map header to inspect warp events.'){
+  clearEventInspection('Map or ROM changed; inspect vanilla event records again.');
   inspectedWarpMap=null;
   $('map-warp-list').replaceChildren();
   $('map-warp-status').textContent=message;
+}
+function clearEventInspection(message='Select a vanilla map header to inspect object, script and signpost records.'){
+  $('map-event-list').replaceChildren();
+  $('map-event-status').textContent=message;
 }
 function clearConnectionInspection(message='Select a vanilla map header to inspect connections.'){
   $('map-connection-list').replaceChildren();
@@ -753,6 +759,7 @@ $('map-bank-inspect').addEventListener('click',()=>safeRun(()=>{
   $('map-layout-inspect').click();
   $('map-warp-inspect').click();
   $('map-connection-inspect').click();
+  $('map-event-inspect').click();
 }));
 $('map-warp-inspect').addEventListener('click',()=>safeRun(()=>{
   clearWarpInspection('Inspecting vanilla events…');
@@ -820,6 +827,49 @@ $('map-connection-inspect').addEventListener('click',()=>safeRun(()=>{
     button.setAttribute('aria-label',button.textContent+'; inspect raw hex');
     button.addEventListener('click',()=>safeRun(()=>{setPageForOffset(connection.offset);gotoTab('hex');}));
     root.append(button);
+  }
+}));
+
+// Read-only raw event records; script pointers and signpost arguments are NOT
+// dereferenced or treated as executable semantics.
+$('map-event-inspect').addEventListener('click',()=>safeRun(()=>{
+  clearEventInspection('Inspecting vanilla object, script and signpost records…');
+  requireVanillaMapFormat();
+  if($('map-layout-source').value!=='header')
+    throw Error('Select a vanilla map header, not a layout, for event inspection');
+  const address=parseOffset($('map-layout-offset').value);
+  const result=inspectVanillaMapEvents(model,{address,family:$('map-layout-family').value});
+  const root=$('map-event-list');
+  $('map-event-status').textContent=result.eventsOffset===null?
+    'No vanilla events pointer. Read only; layout unverified.':
+    'Raw vanilla records: '+result.counts.objects+' objects, '+
+    result.counts.scripts+' script triggers, '+result.counts.signposts+
+    ' signposts. Pointers and flags are unverified; no scripts are executed.';
+  const labels=[
+    ['objects','Object',event=>'ID '+event.id+', graphics '+event.graphics+
+      ', elevation '+event.elevation+', movement '+event.movement+
+      ', flag '+event.flag+', raw script pointer 0x'+hex(event.scriptPointer)],
+    ['scripts','Script trigger',event=>'elevation '+event.elevation+
+      ', trigger '+event.trigger+', index '+event.indexValue+
+      ', raw script pointer 0x'+hex(event.scriptPointer)],
+    ['signposts','Signpost',event=>'elevation '+event.elevation+
+      ', kind '+event.kind+', raw argument 0x'+hex(event.rawArgument)]
+  ];
+  let total=0;
+  for(const [key,label,describe] of labels)for(const event of result.arrays[key]){
+    total++;
+    const button=document.createElement('button');button.type='button';
+    button.className='secondary-button';button.style.display='block';
+    button.style.margin='8px 0';button.style.textAlign='left';
+    button.textContent=label+' '+event.index+' ('+event.x+', '+event.y+
+      '), '+describe(event)+' · ROM 0x'+hex(event.offset);
+    button.setAttribute('aria-label',button.textContent+'; inspect raw hex');
+    button.addEventListener('click',()=>safeRun(()=>{setPageForOffset(event.offset);gotoTab('hex');}));
+    root.append(button);
+  }
+  if(!total){
+    const empty=document.createElement('div');empty.className='empty-state';
+    empty.textContent='No object, script trigger or signpost records.';root.append(empty);
   }
 }));
 

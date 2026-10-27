@@ -1,5 +1,12 @@
 # Roadmap
 
+## Watchdog checkpoint — read-only vanilla object/script/signpost inspection (27 October 2026)
+- [x] Decode all four vanilla event arrays with raw source offsets, pointers, coordinates and flags, preserving the source ROM and staged edits.
+- [x] Reject malformed pointers, truncated arrays and cross-array/map-structure overlaps; expose touch-to-hex inspection in modular and offline builds.
+- [ ] Authenticated CUBE event layouts, script disassembly, real map rendering, movement/collision semantics, event editing, repointing and device/emulator acceptance remain incomplete.
+- [ ] Independently measure complete desktop-to-mobile feature parity; test counts do not establish 20% completion.
+
+
 ## Checkpoint v0.5 (26 October 2026)
 - [x] Preserve a reproducible v0.5 offline HTML checkpoint.
 - [x] Restore editable web modules from the standalone build.
