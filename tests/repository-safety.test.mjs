@@ -8,7 +8,7 @@ test('rejects ROMs, saves, patches, archives, keys, APKs and env files',()=>{
 });
 test('detects secret-like credentials without embedding real secrets',()=>{
  assert.equal(detectCredentialSignature('ghp_'+('A'.repeat(36))),true);
- assert.equal(detectCredentialSignature('-----BEGIN PRIVATE KEY-----'),true);
+ assert.equal(detectCredentialSignature('-----BEGIN '+'PRIVATE KEY-----'),true);
  assert.equal(detectCredentialSignature('This is a sample documentation line.'),false);
 });
 test('inspects tracked files and fails on credential patterns and oversized entries',()=>{
