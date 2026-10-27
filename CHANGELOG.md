@@ -1,3 +1,9 @@
+## Unreleased — declared vanilla atlas raw-cell census (28 October 2026)
+- Count raw six-bit blockmap high-bit values across bounded, canonical source-validated map banks, deduplicating exact shared blockmaps.
+- Expose a touch-friendly, read-only atlas summary and stale-checked tap-to-hex inspection in both web and standalone offline builds.
+- Add optional SHA-256-checked local-ROM aggregate reporting and synthetic provenance, overlap, budget and UI regressions.
+- Do not interpret raw high bits as passability, enable ROM writes or claim authenticated CUBE parity.
+
 ## Unreleased — map visual comparison and raw attribute colours (27 October 2026)
 - Add read-only, byte-exact before/after metatile appearance comparison for proposed vanilla blockmap cell edits, with changed-pixel reporting.
 - Add categorical raw attribute colour overlays to rendered maps and an independent raw high-bit grid fallback with visible-cell legends.
