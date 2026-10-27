@@ -7,13 +7,13 @@
 import {inspectVanillaEventScriptPointers} from './map-events.js';
 import {inspectVanillaMapHeader} from './map-layouts.js';
 
-function reader(source){
+function scriptAliasReader(source){
  if(source instanceof Uint8Array)return {length:source.length,read:i=>source[i]};
  if(source&&Number.isSafeInteger(source.length)&&source.length>=0&&
     typeof source.read==='function')return source;
  throw new TypeError('Expected ROM bytes or a read-only accessor');
 }
-function readPointer(rom,offset){
+function scriptAliasReadPointer(rom,offset){
  if(!Number.isSafeInteger(offset)||offset<0||offset>rom.length-4)
   throw new RangeError('Atlas map pointer source outside ROM');
  let value=0;
@@ -28,7 +28,7 @@ function readPointer(rom,offset){
 export function auditVanillaAtlasScriptAliases(source,atlas,{
  startMap=0,maxMaps=16,maxGroups=32,maxReferences=16
 }={}){
- const rom=reader(source);
+ const rom=scriptAliasReader(source);
  if(!atlas||atlas.readOnly!==true||atlas.layoutAuthenticated!==false||
     !['RSE','FRLG'].includes(atlas.family)||!Array.isArray(atlas.maps)||
     atlas.maps.length<1||atlas.maps.length>4096)
@@ -47,7 +47,7 @@ export function auditVanillaAtlasScriptAliases(source,atlas,{
      !Number.isSafeInteger(map.bankIndex)||map.bankIndex<0||
      !Number.isSafeInteger(map.mapIndex)||map.mapIndex<0)
    throw new RangeError('Invalid declared map provenance');
-  if(readPointer(rom,map.mapPointerSource)!==0x08000000+map.mapHeaderOffset)
+  if(scriptAliasReadPointer(rom,map.mapPointerSource)!==0x08000000+map.mapHeaderOffset)
    throw new RangeError('Declared map header pointer is stale');
   const header=inspectVanillaMapHeader(rom,{
    address:map.mapHeaderOffset,family:atlas.family});
