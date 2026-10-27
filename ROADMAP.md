@@ -1,3 +1,9 @@
+## Checkpoint — exact CUBHMA map-bank TOML provenance (28 October 2026)
+- [x] Resolve the upstream `data.maps.banks` named anchor from actual imported TOML source texts, rather than trusting an arbitrary format string.
+- [x] Preserve source/line/address evidence, reject conflicting overlay declarations and malformed/out-of-ROM metadata, then extract only bounded read-only custom map-format hints.
+- [x] Add synthetic regression tests and document missing genuine CUBE ROM/layout acceptance. No UI control or strict parity credit yet. See [metadata provenance](docs/HMA_MAP_BANK_METADATA_PROVENANCE.md).
+- [ ] Integrate the provenance report into mobile/offline Named Data, authenticate versioned metadata + ROM identity, then implement custom map decoding and real emulator/Android roundtrip acceptance.
+
 ## Checkpoint — upstream CUBHMA custom map-format hierarchy (28 October 2026)
 - [x] Port bounded read-only nested pointer-format extraction from pinned CUBHMA MapModel.cs, including custom layout/events/warp/connection metadata structure hints.
 - [x] Add synthetic malformed, vanilla-marker and nested-format tests without reading or writing ROM bytes.
