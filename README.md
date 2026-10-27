@@ -8,6 +8,11 @@
 
 Local and pinned-upstream TOML imports now hash **raw bytes before UTF-8 decoding** and commit file digests atomically alongside successfully parsed metadata. The named-data screen displays each file's SHA-256 and a fail-closed ROM compatibility status; replacing the ROM, applying a patch or resetting metadata invalidates stale results. Import reads are rejected if the ROM changes or a newer import starts. Raw TOML buffers are not retained after import. The generated offline HTML includes this workflow. The curated CUBE profile registry is **still empty**, multiple overlays still require an authenticated manifest, and no semantic writes are enabled. See [exact metadata binding checkpoint](docs/EXACT_METADATA_BINDING.md).
 
+
+## Development checkpoint — read-only map blockmap codec
+
+`src/map-blocks.js` now implements a source-grounded, **read-only** GBA map blockmap cell decoder, matching upstream CUBHMA's 10-bit tile ID and 6-bit collision/elevation field. It inspects bounded map viewports with strict ROM bounds and preserves exact byte offsets. This is a foundation for map/collision inspection, **not a map editor**: it does not discover map pointers, infer walkability, render graphics, edit maps, or validate CUBE-specific layout ownership. See `tests/map-blocks.test.mjs`.
+
 ## Current working code
 
 - **Exact ROM comparison (unreleased):** after computing the local staged-ROM SHA-256, optionally paste a published expected SHA-256 to compare exact bytes. A matching user-provided digest does **not** authenticate its provenance, CUBE layout or TOML. The bundled curated-profile registry is intentionally **empty** until independently verified CUBE ROM and matching metadata digests exist; no semantic writes are unlocked. See [ROM fingerprint registry requirements](docs/ROM_FINGERPRINT_REGISTRY.md).
