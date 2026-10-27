@@ -17,6 +17,7 @@ import {inspectVanillaMapEvents,inspectVanillaEventScriptPointers,previewVanilla
 import {inspectVanillaScriptCommandPrefix} from './vanilla-script-prefix.js';
 import {auditVanillaScriptBranchTargets} from './vanilla-script-branches.js';
 import {auditVanillaScriptOperandPointers} from './vanilla-script-operand-pointers.js';
+import {auditVanillaAtlasScriptAliases} from './vanilla-script-aliases.js';
 import {inspectVanillaMapBlocksets} from './map-blocksets.js';
 import {panMapViewport,indexMapWarpMarkers,indexMapEventMarkers,inspectRenderedMapPixel,projectRenderedMapMarkers} from './map-viewport.js';
 import {renderVanillaMapViewport} from './map-render.js';
@@ -35,7 +36,7 @@ let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffs
 let pcsReference=null,pcsReferenceName='';
 let fingerprintResult=null,fingerprintAbort=null;
 let metadataFingerprints=[],metadataImportSerial=0;
-let inspectedWarpMap=null,selectedWarpPreview=null,selectedEventPreview=null,inspectedEventMap=null,inspectedMapAtlas=null,atlasBatchStart=0,atlasCoordinateBatchStart=0,atlasIncomingStart=0,atlasIncomingTarget=null;
+let inspectedWarpMap=null,selectedWarpPreview=null,selectedEventPreview=null,inspectedEventMap=null,inspectedMapAtlas=null,atlasBatchStart=0,atlasCoordinateBatchStart=0,atlasScriptAliasStart=0,atlasIncomingStart=0,atlasIncomingTarget=null;
 let activeRenderedMap=null,selectedRenderedHit=null;
 let mapReviewQueue=[],mapReviewRom=null,lastMapPreviews={cell:null,warp:null,event:null};
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
@@ -982,7 +983,7 @@ function requireVanillaMapFormat(){
     throw Error('Imported metadata declares a non-vanilla layout; vanilla map interpretation refused.');
 }
 function clearMapAtlas(message='Declared atlas invalidated; inspect again.') {
- inspectedMapAtlas=null;atlasBatchStart=0;atlasCoordinateBatchStart=0;atlasIncomingStart=0;atlasIncomingTarget=null;
+ inspectedMapAtlas=null;atlasBatchStart=0;atlasCoordinateBatchStart=0;atlasScriptAliasStart=0;atlasIncomingStart=0;atlasIncomingTarget=null;
  $('map-review-impact').disabled=true;
  $('map-review-roundtrip').disabled=true;
  $('map-review-roundtrip-list').replaceChildren();
@@ -994,6 +995,9 @@ function clearMapAtlas(message='Declared atlas invalidated; inspect again.') {
  $('map-atlas-batch-audit').disabled=true;
  $('map-atlas-alias-audit').disabled=true;
  $('map-event-ownership-audit').disabled=true;
+ $('map-script-alias-audit').disabled=true;
+ $('map-script-alias-list').replaceChildren();
+ $('map-script-alias-status').textContent='No shared script-target page reviewed.';
  $('map-event-ownership-list').replaceChildren();
  $('map-event-ownership-status').textContent='No event ownership review run.';
  $('map-atlas-alias-list').replaceChildren();
@@ -1108,6 +1112,8 @@ $('map-atlas-inspect').addEventListener('click',()=>safeRun(()=>{
  $('map-atlas-batch-audit').disabled=false;
  $('map-atlas-alias-audit').disabled=false;
  $('map-event-ownership-audit').disabled=false;
+ $('map-script-alias-audit').disabled=false;
+ atlasScriptAliasStart=0;
  $('map-coordinate-batch-audit').disabled=false;
  $('map-atlas-status').textContent='Inspected '+atlas.mapCount+' explicitly declared maps across '+
   atlas.bankCount+' vanilla-format banks. Pointer/layout bounds checked; no ROM identity, CUBE layout or warp topology authenticated.';
@@ -1475,6 +1481,76 @@ $('map-atlas-alias-audit').addEventListener('click',()=>safeRun(()=>{
  if(!result.groups.length){
   const empty=document.createElement('div');empty.className='empty-state';
   empty.textContent='No exact shared header, layout or blockmap pointers in the declared atlas.';
+  root.append(empty);
+ }
+}));
+
+$('map-script-alias-audit').addEventListener('click',()=>safeRun(()=>{
+ requireVanillaMapFormat();
+ if(!inspectedMapAtlas||inspectedMapAtlas.rom!==model)
+  throw Error('Reinspect the declared atlas before scanning script aliases');
+ const atlas=inspectedMapAtlas.atlas;
+ const counts=parseVanillaBankMapCounts($('map-atlas-counts').value);
+ function inputsUnchanged(){
+  const current=parseVanillaBankMapCounts($('map-atlas-counts').value);
+  return inspectedMapAtlas?.rom===model&&
+   parseOffset($('map-bank-offset').value)===atlas.address&&
+   $('map-layout-family').value===atlas.family&&
+   current.length===atlas.bankCount&&
+   current.every((n,i)=>n===atlas.bankMapCounts[i]);
+ }
+ if(!inputsUnchanged()||counts.length!==atlas.bankCount)
+  throw Error('Atlas inputs changed; reinspect before script alias scan');
+ const result=auditVanillaAtlasScriptAliases(model,atlas,{
+  startMap:atlasScriptAliasStart,maxMaps:16,maxGroups:32,maxReferences:8
+ });
+ atlasScriptAliasStart=result.nextStartMap??0;
+ $('map-script-alias-audit').textContent=result.nextStartMap===null?
+  'Review shared script targets (restart at map 1)':
+  'Review shared script targets (next 16 maps)';
+ const root=$('map-script-alias-list');root.replaceChildren();
+ $('map-script-alias-status').textContent='Inspected declared maps '+
+  (result.startMap+1)+'–'+(result.startMap+result.mapsInspected)+
+  ' of '+result.totalMaps+': '+result.pointerFields+' object/trigger pointer fields, '+
+  result.inRomPointers+' in-ROM, '+result.totalGroups+
+  ' shared targets within this page'+
+  (result.truncated?' (first 32 groups shown)':'')+
+  '. Cross-page aliases are not detected. No CUBE ownership or writes.';
+ function addNavigation(label,offset,group,reference){
+  const button=document.createElement('button');button.type='button';
+  button.className='secondary-button';button.style.display='block';
+  button.style.margin='8px 0';button.style.textAlign='left';
+  button.textContent=label;
+  button.addEventListener('click',()=>safeRun(()=>{
+   requireVanillaMapFormat();
+   if(!inputsUnchanged())throw Error('Atlas inputs changed; reinspect before navigation');
+   const fresh=auditVanillaAtlasScriptAliases(model,atlas,{
+    startMap:result.startMap,maxMaps:16,maxGroups:32,maxReferences:8
+   });
+   const match=fresh.groups.find(g=>g.targetOffset===group.targetOffset&&
+    g.referenceCount===group.referenceCount);
+   if(!match||reference&&!match.references.some(x=>
+      x.pointerSourceOffset===reference.pointerSourceOffset&&
+      x.bankIndex===reference.bankIndex&&x.mapIndex===reference.mapIndex&&
+      x.kind===reference.kind&&x.index===reference.index))
+    throw Error('Shared script target changed; rescan before navigation');
+   setPageForOffset(offset);gotoTab('hex');
+  }));
+  root.append(button);
+ }
+ for(const group of result.groups){
+  addNavigation('Shared script target ROM 0x'+hex(group.targetOffset)+
+   ' · '+group.referenceCount+' references'+
+   (group.referencesTruncated?' (first 8 shown)':'')+
+   ' · inspect raw target',group.targetOffset,group,null);
+  for(const ref of group.references)
+   addNavigation('Bank '+ref.bankIndex+' / map '+ref.mapIndex+
+    ' · '+ref.kind+' '+ref.index+' · pointer source ROM 0x'+
+    hex(ref.pointerSourceOffset),ref.pointerSourceOffset,group,ref);
+ }
+ if(!result.groups.length){
+  const empty=document.createElement('div');empty.className='empty-state';
+  empty.textContent='No shared script targets within this page. This does not rule out cross-page sharing.';
   root.append(empty);
  }
 }));
