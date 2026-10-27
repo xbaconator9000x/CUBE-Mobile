@@ -17,6 +17,8 @@ jobs:
           node-version: '22'
       - name: Unit tests
         run: npm test
+      - name: Guard tracked ROM assets and credential signatures
+        run: npm run safety:check
       - name: Validate conservative feature parity baseline
         run: npm run parity:check
       - name: Generate standalone offline HTML
