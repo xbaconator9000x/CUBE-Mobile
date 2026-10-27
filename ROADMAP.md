@@ -1,5 +1,11 @@
 # Roadmap
 
+## Checkpoint — touch-friendly object, trigger and signpost coordinate previews (27 October 2026)
+- [x] Select inspected vanilla object/trigger/signpost records and preview exact 24/16/12-byte before/after records for x/y/elevation, preserving script pointers and all other fields.
+- [x] Reject stale expected bytes, changed ROM/map selection, malformed field values and out-of-map proposed coordinates; regenerate offline HTML and add regression coverage.
+- [ ] Authenticate CUBE event-array ownership, layouts, safe transactions and Android/emulator save roundtrips before allowing writes. Strict parity unchanged.
+
+
 ## Checkpoint — mobile vanilla event ownership review (27 October 2026)
 - [x] Show shared event-group/object/warp/trigger/signpost arrays and partial/cross-kind ROM-span overlaps across the explicitly declared vanilla atlas, with exact pointer-source navigation.
 - [x] Revalidate bank pointers and event layouts on review and before navigation; bound output and preserve full counts; include modular/offline UI and synthetic tests.
