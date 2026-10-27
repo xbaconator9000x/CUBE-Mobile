@@ -11,6 +11,7 @@ import {inspectVanillaMapAtlas,auditVanillaAtlasPointerAliases}
  from '../src/map-atlas.js';
 import {inspectVanillaMapEvents} from '../src/map-events.js';
 import {auditVanillaAtlasRawCells} from '../src/map-cell-census.js';
+import {auditVanillaAtlasWarpGraph} from '../src/map-warp-graph.js';
 import {auditVanillaMapEventScripts} from '../src/vanilla-map-script-audit.js';
 import {auditVanillaAtlasWideScriptAliases} from '../src/vanilla-script-alias-atlas.js';
 import {auditVanillaAtlasScriptOperandAliases} from '../src/vanilla-script-operand-alias-atlas.js';
@@ -36,7 +37,8 @@ function manifestFromText(text){
     m.bankMapCounts.reduce((a,n)=>a+n,0)>4096||
     m.scanAllScriptAliases!==undefined&&typeof m.scanAllScriptAliases!=='boolean'||
     m.scanAllOperandAliases!==undefined&&typeof m.scanAllOperandAliases!=='boolean'||
-    m.scanRawCellCensus!==undefined&&typeof m.scanRawCellCensus!=='boolean')
+    m.scanRawCellCensus!==undefined&&typeof m.scanRawCellCensus!=='boolean'||
+    m.scanRawWarpGraph!==undefined&&typeof m.scanRawWarpGraph!=='boolean')
   fail('Manifest requires schema, SHA-256, family, aligned bank offset and bounded explicit counts');
  return m;
 }
@@ -92,6 +94,11 @@ function main(){
   auditVanillaAtlasRawCells(rom,atlas,{
    maxMaps:4096,maxUniqueCells:1048576,maxRows:1,chunkSize:4096
   }):null;
+ const rawWarpGraph=manifest.scanRawWarpGraph===true?
+  auditVanillaAtlasWarpGraph(rom,atlas,{
+   originBank:0,originMap:0,maxMaps:4096,maxLinks:65536,
+   maxRows:1,maxFindings:1
+  }):null;
  const report={
   schema:'cube-mobile-local-map-smoke-report/1',
   romSha256:actualSha256,romSize:size,family:manifest.family,
@@ -122,6 +129,16 @@ function main(){
    groupsTruncated:operandAliasAtlas.truncated,
    layoutAuthenticated:false,grammarAuthenticated:false,
    ownershipAuthenticated:false
+  }:null,
+  rawWarpGraph:rawWarpGraph?{
+   mapsInspected:rawWarpGraph.mapsInspected,
+   linksInspected:rawWarpGraph.linksInspected,
+   reachableByRawLinks:rawWarpGraph.reachableByRawLinks,
+   notReachedByRawLinks:rawWarpGraph.notReachedByRawLinks,
+   isolatedMaps:rawWarpGraph.isolatedMaps,
+   counts:rawWarpGraph.counts,
+   gameplayReachabilityVerified:false,
+   cubeCompatibilityVerified:false
   }:null,
   rawCellCensus:rawCellCensus?{
    mapsInspected:rawCellCensus.mapsInspected,
