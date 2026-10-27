@@ -8,7 +8,8 @@
     "parity:check": "node scripts/parity-audit.mjs",
     "safety:check": "node scripts/repository-safety.mjs",
     "build:standalone": "node build-standalone.mjs",
-    "start": "python3 -m http.server 8000"
+    "start": "python3 -m http.server 8000",
+    "smoke:local": "node scripts/local-map-smoke.mjs"
   },
   "license": "MIT"
 }
