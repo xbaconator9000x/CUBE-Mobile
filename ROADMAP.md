@@ -1,3 +1,8 @@
+## Checkpoint — mobile whole-atlas operand alias explorer (28 October 2026)
+- [x] Add touch-friendly read-only shared script operand target review, with source/target hex navigation and full stale-result revalidation.
+- [x] Limit synchronous mobile scans to 512 declared maps; reject oversized scans without presenting partial coverage. Regenerate standalone offline HTML and test script integrity.
+- [ ] CUBE authentication, script grammar, ROM transactions, emulator and Android hardware acceptance remain unverified. No strict parity credit. See [mobile operand explorer](docs/MOBILE_SCRIPT_OPERAND_ALIASES.md).
+
 ## Checkpoint — whole-atlas vanilla script operand aliases (28 October 2026)
 - [x] Revalidate canonical declared bank/map pointers, deduplicate event script roots and group shared fixed-width command pointer operands by distinct ROM source field.
 - [x] Add bounded, fail-closed scanner, synthetic tests and opt-in SHA-256-matched local-ROM aggregate report with no exported script bytes or pointer offsets.
