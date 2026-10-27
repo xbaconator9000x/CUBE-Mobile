@@ -48,7 +48,7 @@ export function previewVanillaBlockmapCellChange(source,{
  const nextRaw=(nextCollision<<10)|nextTile;
  const aliases=snapshotAtlas(atlas,header,layout);
  return Object.freeze({
-  headerOffset:header.address,layoutOffset:header.layoutOffset,
+  family,headerOffset:header.address,layoutOffset:header.layoutOffset,
   blockmapOffset:layout.blockmapOffset,width:layout.width,height:layout.height,
   x,y,byteOffset:current.byteOffset,
   before:Object.freeze({raw:current.raw,tileId:current.tileId,
