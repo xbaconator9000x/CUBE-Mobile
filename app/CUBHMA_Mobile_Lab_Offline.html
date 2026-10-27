@@ -4186,6 +4186,48 @@ function exportVanillaChangeReviewJson(source,previews){
  return JSON.stringify(report,null,2)+'\n';
 }
 
+
+/**
+ * Create a bounded, read-only byte overlay for the existing change-review
+ * queue. No full ROM copy, no patch/export and no semantic write authority.
+ * Modified bytes are checked against their expected originals at every read,
+ * so later mutations of the underlying ROM cannot silently stale the overlay.
+ * Non-edited bytes continue to come from the supplied source.
+ */
+function createVanillaReviewedChangeOverlay(source,previews,{
+ maxChanges=64,maxBytes=2048
+}={}){
+ const rom=reviewReader(source);
+ const review=reviewVanillaChangeSet(rom,previews,{maxChanges,maxBytes});
+ const replacements=new Map();
+ for(const entry of review.entries)
+  for(let i=0;i<entry.length;i++)
+   replacements.set(entry.offset+i,Object.freeze({
+    expected:entry.before[i],proposed:entry.after[i]
+   }));
+ const overlay=Object.freeze({
+  length:rom.length,
+  read(offset){
+   if(!Number.isSafeInteger(offset)||offset<0||offset>=rom.length)
+    throw new RangeError('Overlay read is outside ROM bounds');
+   const current=rom.read(offset);
+   if(!Number.isInteger(current)||current<0||current>255)
+    throw new RangeError('ROM accessor returned invalid byte');
+   const replacement=replacements.get(offset);
+   if(!replacement)return current;
+   if(current!==replacement.expected)
+    throw new RangeError('Original ROM bytes changed; rebuild the overlay');
+   return replacement.proposed;
+  }
+ });
+ return Object.freeze({
+  source:overlay,review,
+  readOnly:true,previewOnly:true,writeAuthorized:false,
+  layoutAuthenticated:false,ownershipVerified:false,
+  transactionCommitted:false
+ });
+}
+
 /**
  * Read-only structural impact audit for queued vanilla map previews.
  * Grounded in pinned CUBHMA MapModel.cs: AllMapsModel, BlockCells,
