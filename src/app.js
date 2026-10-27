@@ -18,13 +18,14 @@ import {panMapViewport,indexMapWarpMarkers,indexMapEventMarkers,inspectRenderedM
 import {renderVanillaMapViewport} from './map-render.js';
 import {previewVanillaBlockmapCellChange} from './map-edit-preview.js';
 import {traceVanillaWarpArrival} from './map-warp-trace.js';
+import {previewVanillaWarpRecordChange} from './map-warp-edit-preview.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let pcsReference=null,pcsReferenceName='';
 let fingerprintResult=null,fingerprintAbort=null;
 let metadataFingerprints=[],metadataImportSerial=0;
-let inspectedWarpMap=null,inspectedEventMap=null,inspectedMapAtlas=null,atlasBatchStart=0,atlasCoordinateBatchStart=0;
+let inspectedWarpMap=null,selectedWarpPreview=null,inspectedEventMap=null,inspectedMapAtlas=null,atlasBatchStart=0,atlasCoordinateBatchStart=0;
 let activeRenderedMap=null,selectedRenderedHit=null;
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
 const PER_PAGE=128;
@@ -744,7 +745,9 @@ function clearMapGrid(message='Map structure changed; inspect again.'){
 function clearWarpInspection(message='Select a vanilla map header to inspect warp events.'){
   clearEventInspection('Map or ROM changed; inspect vanilla event records again.');
   clearBlocksetInspection('Map or ROM changed; inspect blockset headers again.');
-  inspectedWarpMap=null;
+  inspectedWarpMap=null;selectedWarpPreview=null;
+  $('map-warp-preview').disabled=true;
+  $('map-warp-preview-status').textContent='Select a raw warp record to preview proposed bytes. No writes.';
   $('map-warp-list').replaceChildren();
   $('map-warp-status').textContent=message;
 }
@@ -1180,6 +1183,25 @@ $('map-warp-inspect').addEventListener('click',()=>safeRun(()=>{
     button.setAttribute('aria-label',button.textContent+'; inspect raw hex');
     button.addEventListener('click',()=>safeRun(()=>{setPageForOffset(warp.offset);gotoTab('hex');}));
     root.append(button);
+    const plan=document.createElement('button');plan.type='button';
+    plan.className='secondary-button';plan.style.margin='0 0 8px 8px';
+    plan.textContent='Plan byte changes for warp '+warp.index;
+    plan.addEventListener('click',()=>safeRun(()=>{
+      if(!model||parseOffset($('map-layout-offset').value)!==address||
+         $('map-layout-family').value!==family||
+         $('map-layout-source').value!=='header')
+        throw Error('Map selection changed; inspect warps again');
+      const bytes=Array.from({length:8},(_,i)=>model.read(warp.offset+i));
+      selectedWarpPreview={rom:model,address,family,warpIndex:warp.index,expectedBytes:bytes};
+      for(const [field,value] of [['x',warp.x],['y',warp.y],
+       ['elevation',warp.elevation],['warp-id',warp.warpId],
+       ['target-map',warp.targetMap],['target-bank',warp.targetBank]])
+        $('map-warp-preview-'+field).value=String(value);
+      $('map-warp-preview').disabled=false;
+      $('map-warp-preview-status').textContent='Warp '+warp.index+' selected at ROM 0x'+
+       hex(warp.offset)+'. Adjust proposed fields and preview; no bytes will be changed.';
+    }));
+    root.append(plan);
     const atlas=inspectedMapAtlas?.rom===model?inspectedMapAtlas.atlas:null;
     const target=atlas&&atlas.family===family?
       lookupVanillaMapAtlasTarget(atlas,warp.targetBank,warp.targetMap):null;
@@ -1236,6 +1258,33 @@ $('map-warp-inspect').addEventListener('click',()=>safeRun(()=>{
      Number($('map-width').value)===layout.width &&
      Number($('map-height').value)===layout.height)
     $('map-inspect').click();
+}));
+
+$('map-warp-preview').addEventListener('click',()=>safeRun(()=>{
+ requireVanillaMapFormat();
+ const selection=selectedWarpPreview;
+ if(!selection||selection.rom!==model||
+    $('map-layout-source').value!=='header'||
+    parseOffset($('map-layout-offset').value)!==selection.address||
+    $('map-layout-family').value!==selection.family)
+  throw Error('Warp selection expired; inspect and select a warp again');
+ const readField=id=>{
+  const value=$('map-warp-preview-'+id).value.trim();
+  if(!value)throw Error('Fill every proposed warp field');
+  return Number(value);
+ };
+ const result=previewVanillaWarpRecordChange(model,{
+  address:selection.address,family:selection.family,warpIndex:selection.warpIndex,
+  expectedBytes:selection.expectedBytes,
+  changes:{x:readField('x'),y:readField('y'),elevation:readField('elevation'),
+   warpId:readField('warp-id'),targetMap:readField('target-map'),
+   targetBank:readField('target-bank')}
+ });
+ const format=bytes=>bytes.map(n=>hex(n,2)).join(' ');
+ $('map-warp-preview-status').textContent='Warp '+result.warpIndex+' ROM 0x'+
+  hex(result.recordOffset)+': '+format(result.before)+' → '+format(result.after)+
+  (result.changed?' (proposed change).':' (no difference).')+
+  ' Preview only — NOT applied. Ownership, CUBE layout and runtime warp behavior are unverified.';
 }));
 
 $('map-connection-inspect').addEventListener('click',()=>safeRun(()=>{
