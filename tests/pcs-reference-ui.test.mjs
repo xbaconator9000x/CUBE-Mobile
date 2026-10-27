@@ -13,7 +13,7 @@ test('mobile PCS reference import is local-only and opt-in',()=>{
   assert.match(html,/unverified<\/b> against this ROM/);
   assert.match(app,/parseHmaPcsReference\(await file\.text\(\)\)/);
   assert.match(app,/pcsReference=parsed/);
-  assert.match(app,/function installModel\(name,bytes\)\{pcsReference=null/);
+  assert.match(app,/function installModel\(name,bytes\)\{[^}\n]*pcsReference=null/);
   assert.match(app,/decodeHmaPcsReference\(model,/);
 });
 

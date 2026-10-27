@@ -177,6 +177,7 @@
 - [x] Add bounded, exact-byte per-file SHA-256 hashing without text normalisation or ROM mutation.
 - [x] Bind a **single** metadata digest to a matching full-ROM profile, with explicit missing/multi-file/mismatch/stale outcomes and no write authority.
 - [x] Add regression coverage for UTF-8 BOM, CRLF, mismatches, stale ROMs, unverified profiles and multi-file overlays.
-- [ ] Integrate raw-file hashing with atomic TOML imports and mobile/standalone status UI.
+- [x] Integrate raw-file hashing with atomic TOML imports, stale-ROM/import cancellation and mobile/standalone status UI (read-only; hashes only, not metadata authentication).
+- [ ] Validate the file-picker, network cancellation, 16 MiB aggregate limits and offline flow on Android hardware.
 - [ ] Add authenticated multi-file manifest support for upstream common + game-specific TOML overlays; verify independent CUBE build fingerprints.
 - [ ] Complete semantic ownership, map/collision/warp roundtrip and emulator/Android acceptance before enabling writes.

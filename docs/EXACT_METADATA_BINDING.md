@@ -12,7 +12,7 @@ This checkpoint adds a **read-only identity primitive**, not an editor or a veri
 
 ## Explicit limitations
 
-The current UI does **not yet invoke** this primitive or retain the raw bytes of imported TOML. The checked-in standalone HTML remains unchanged. Integration must hash `File.arrayBuffer()` / `Response.arrayBuffer()` **before** decoding TOML, associate hashes atomically with successfully parsed metadata, and invalidate bindings when the ROM or metadata changes.
+The mobile named-data UI and checked-in standalone HTML now hash `File.arrayBuffer()` / `Response.arrayBuffer()` **before** decoding TOML with strict UTF-8, display each exact SHA-256, and commit cached fingerprints only after metadata parsing and collision checks succeed. The new `compareRomMetadataFingerprintRecords` API compares cached digest records without retaining raw TOML bytes. ROM replacement and metadata reset clear fingerprints; asynchronous imports fail closed when ROM bytes change or another import supersedes them. Fingerprint statuses update after ROM hashing and staged edits. These are **identity checks only**: the curated CUBE registry remains empty, imported TOML is not authenticated and semantic writes remain disabled.
 
 Upstream CUBHMA's stock metadata can be composed from several TOML files (for example, a common default and a game-specific overlay). A profile's present singular `metadataSha256` cannot authenticate that set. **Do not concatenate decoded files** or treat the hash of just one overlay as sufficient. Future verified profiles need an ordered, source-pinned, exact-file manifest with unambiguous filenames, bytes, hashes and conflict rules.
 

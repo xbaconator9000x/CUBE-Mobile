@@ -1,7 +1,13 @@
+## Unreleased — byte-exact TOML import identity in mobile and offline UI (27 October 2026)
+- Hash local and pinned-upstream metadata from exact bytes before UTF-8 decoding; show per-file SHA-256 in the named-data screen without retaining source buffers.
+- Commit metadata hashes only after successful parsing and collision checks. Reject stale ROM snapshots and superseded async imports; clear hashes on ROM replacement, patch reset or metadata reset.
+- Compare cached digests with the current ROM identity without granting provenance or semantic-write authority. Multiple TOML overlays still require a verified manifest.
+- Bundle the new code into the standalone HTML; add cached-digest parity, stale/multi-file, validation and UI wiring regression tests. Android hardware and authentic CUBE profile verification remain outstanding.
+
 ## Unreleased — exact metadata SHA-256 identity (27 October 2026)
 - Added read-only, bounded exact-byte TOML SHA-256 hashing and one-file binding to a matching ROM profile. No line-ending/BOM normalisation and no ROM mutation.
 - Fail closed for stale or unverified ROMs and multi-file overlays; metadata authentication and semantic writes remain disabled.
-- Added synthetic regression tests and a documented checkpoint. Mobile UI and offline standalone integration remain pending.
+- Added synthetic regression tests and a documented checkpoint. Mobile UI and offline standalone integration subsequently completed (below).
 
 ## Unreleased — exact ROM compatibility comparison (27 October 2026)
 - Add a local expected-SHA-256 comparison for current staged ROM bytes; report exact match/mismatch without treating user-supplied evidence as trusted CUBE provenance.
