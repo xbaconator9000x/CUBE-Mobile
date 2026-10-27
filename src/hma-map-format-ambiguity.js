@@ -8,10 +8,21 @@ import {extractHmaPointerContent} from './hma-map-format-hierarchy.js';
 
 function occurrences(text,name){
  if(text===null)return 0;
- let count=0,at=text.indexOf(name+'<');
- while(at>=0){
-  if(at===0||' [<\n\t'.includes(text[at-1]))count++;
-  at=text.indexOf(name+'<',at+1);
+ // HMA can legitimately reuse a field name inside a nested array, e.g.
+ // connections<[count:: connections<[...]/count>]1>. Only repeated fields
+ // at the SAME nesting depth are ambiguous. Ignore backtick DSL macros.
+ let depth=0,quoted=false,firstDepth=null,count=0;
+ for(let i=0;i<text.length;i++){
+  const ch=text[i];
+  if(ch==='\`'){quoted=!quoted;continue;}
+  if(quoted)continue;
+  if(ch==='['){depth++;continue;}
+  if(ch===']'){depth--;continue;}
+  if(text.startsWith(name+'<',i)&&
+     (i===0||' [<\\n\\t'.includes(text[i-1]))){
+    if(firstDepth===null)firstDepth=depth;
+    if(depth===firstDepth)count++;
+  }
  }
  return count;
 }
