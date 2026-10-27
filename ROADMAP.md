@@ -1,5 +1,10 @@
 # Roadmap
 
+## Checkpoint — atlas-wide event coordinate batches (27 October 2026)
+- [x] Review 16 declared vanilla maps per tap for raw event coordinate bounds and shared cells; aggregate every event and retain at most 128 findings.
+- [x] Revalidate current ROM layouts per map, support staged reads, exact source offsets, offline/mobile parity and pagination regressions.
+- [ ] Authenticate CUBE-specific map formats and complete authentic ROM, emulator, Android and safe-edit acceptance.
+
 ## Checkpoint — read-only vanilla event coordinate review (27 October 2026)
 - [x] Audit warp/object/trigger/signpost coordinates against selected declared vanilla blockmap dimensions; flag out-of-map and shared-cell records without assuming errors.
 - [x] Preserve exact source record/cell offsets and raw tile/high-bit values, bounded findings, staged reads, stale-layout rejection, mobile and offline UI, synthetic regression tests.
