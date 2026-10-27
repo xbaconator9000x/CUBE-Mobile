@@ -1,5 +1,10 @@
 # Roadmap
 
+## Checkpoint — rendered vanilla map canvas (27 October 2026)
+- [x] Read-only 16×16 RSE/FRLG metatile composition with primary/secondary tilesets, palette banks, flips and layers.
+- [x] Opt-in canvas with explicit matching vanilla map header and standalone offline integration.
+- [ ] CUBE layout authentication, emulator/device validation, collision/warp editing and safe semantic roundtrips.
+
 ## Checkpoint — LZ10 streaming (27 October 2026)
 - [x] Decode and scan staged ROM graphics without full-ROM snapshots; preserve bounded LZ output and offline parity.
 - [ ] Render composed metatiles/maps; verify Android performance and ROM-independent CUBE layouts.

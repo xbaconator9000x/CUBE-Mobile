@@ -87,6 +87,7 @@
     <button type="button" id="map-layout-inspect" class="subtle-button" disabled>Read vanilla structure (no writes)</button>
     <output id="map-layout-status" class="palette-note" aria-live="polite">This optional decoder is ONLY for independently verified vanilla-format structures, not CUBE expansion layouts. ROM header identity does not verify a structure.</output>
     <button type="button" id="map-inspect" class="subtle-button" disabled>Inspect 12 × 10 cells</button>
+    <label class="control-label"><input type="checkbox" id="map-render-enabled"> Show rendered vanilla metatiles (read-only)</label>
     <div class="input-row" role="group" aria-label="Pan blockmap viewport">
       <button type="button" id="map-pan-up" class="secondary-button" disabled>↑ Up 10</button>
       <button type="button" id="map-pan-down" class="secondary-button" disabled>↓ Down 10</button>
@@ -110,6 +111,7 @@
     <output id="map-connection-status" class="palette-note" aria-live="polite">Select a known vanilla map header to inspect connection records. Read only.</output>
     <div id="map-connection-list" class="anchor-list" aria-label="Read-only map connections"><div class="empty-state">No connections inspected.</div></div>
   </div>
+  <div class="editor-card"><output id="map-render-status" class="palette-note" aria-live="polite">Rendered preview disabled; vanilla layout is unverified.</output><div class="blockmap-scroller"><canvas id="map-render-canvas" hidden aria-label="Composed vanilla map viewport"></canvas></div></div>
   <div class="editor-card"><div id="map-grid" class="blockmap-scroller" aria-label="Read-only map block cells"><div class="empty-state">No blockmap inspected.</div></div></div>
 </section>
 <section class="view" id="view-graphics">
