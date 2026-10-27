@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {traceVanillaWarpArrival as trace} from '../src/map-warp-trace.js';
+import {traceVanillaWarpArrival as trace,auditVanillaWarpReturns as returns} from '../src/map-warp-trace.js';
 const ptr=n=>0x08000000+n;
 const u16=(b,o,n)=>{b[o]=n&255;b[o+1]=(n>>>8)&255;};
 const u32=(b,o,n)=>{for(let i=0;i<4;i++)b[o+i]=(n>>>(8*i))&255;};
 function fixture(){
  const rom=new Uint8Array(0x900).fill(0xff);
+ u32(rom,0x40,ptr(0x100));u32(rom,0x44,ptr(0x400));
  for(const [header,layout,block,events,warps,border] of [
   [0x100,0x140,0x200,0x300,0x340,0x740],
   [0x400,0x440,0x500,0x600,0x640,0x760]]){
@@ -20,9 +21,9 @@ function fixture(){
  rom.set([1,0,1,0,0,0,0,0],0x640);
  u16(rom,0x506,0x8042);
  const atlas={family:'RSE',readOnly:true,layoutAuthenticated:false,maps:[
-  {bankIndex:0,mapIndex:0,mapHeaderOffset:0x100,layoutOffset:0x140,
+  {bankIndex:0,mapIndex:0,mapPointerSource:0x40,mapHeaderOffset:0x100,layoutOffset:0x140,
    blockmapOffset:0x200,width:2,height:2},
-  {bankIndex:1,mapIndex:0,mapHeaderOffset:0x400,layoutOffset:0x440,
+  {bankIndex:1,mapIndex:0,mapPointerSource:0x44,mapHeaderOffset:0x400,layoutOffset:0x440,
    blockmapOffset:0x500,width:2,height:2}]};
  return {rom,atlas};
 }
@@ -60,4 +61,39 @@ test('staged read accessor retains raw byte provenance',()=>{
  const {rom,atlas}=fixture();
  const source={length:rom.length,read:i=>rom[i]};
  assert.equal(trace(source,atlas,opts).destination.blockmapByteOffset,0x506);
+});
+
+test('raw arrival return path is reciprocal only when target warp points back to exact source index',()=>{
+ const {rom,atlas}=fixture(),before=rom.slice();
+ const result=returns(rom,atlas,{bankIndex:0,mapIndex:0});
+ assert.deepEqual(result.counts,{reciprocal:1,differentWarp:0,differentMap:0,specialReturn:0,unresolved:0});
+ assert.equal(result.records[0].returnTarget.recordOffset,0x640);
+ assert.equal(result.records[0].arrival.x,1);
+ assert.equal(result.reciprocalRequired,false);
+ assert.equal(result.runtimeBehaviorVerified,false);
+ assert.deepEqual(rom,before);
+});
+test('different warp, different map, special return and unresolved arrival are distinct',()=>{
+ const {rom,atlas}=fixture();
+ rom[0x645]=2;
+ assert.equal(returns(rom,atlas,{bankIndex:0,mapIndex:0}).records[0].status,'differentWarp');
+ rom[0x647]=1;
+ assert.equal(returns(rom,atlas,{bankIndex:0,mapIndex:0}).records[0].status,'differentMap');
+ rom[0x647]=0;rom[0x645]=255;
+ assert.equal(returns(rom,atlas,{bankIndex:0,mapIndex:0}).records[0].status,'specialReturn');
+ rom[0x345]=2;
+ assert.equal(returns(rom,atlas,{bankIndex:0,mapIndex:0}).records[0].status,'unresolved');
+});
+test('return-path inspection rejects stale pointers and caps results without writing',()=>{
+ const {rom,atlas}=fixture();
+ const truncated=returns(rom,atlas,{bankIndex:0,mapIndex:0,maxResults:1});
+ assert.equal(truncated.truncated,false);
+ assert.throws(()=>returns(rom,atlas,{bankIndex:0,mapIndex:0,maxResults:0}),RangeError);
+ assert.throws(()=>returns(rom,atlas,{bankIndex:9,mapIndex:0}),RangeError);
+ u32(rom,0x44,ptr(0x100));
+ assert.throws(()=>returns(rom,atlas,{bankIndex:0,mapIndex:0}),/pointer changed/);
+});
+test('return-path inspection accepts staged reader',()=>{
+ const {rom,atlas}=fixture();
+ assert.equal(returns({length:rom.length,read:i=>rom[i]},atlas,{bankIndex:0,mapIndex:0}).counts.reciprocal,1);
 });
