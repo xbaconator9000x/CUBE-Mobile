@@ -1,5 +1,12 @@
 # Roadmap
 
+## Checkpoint — mobile paginated raw collision/elevation review (27 October 2026)
+- [x] Show 4096-cell pages of raw six-bit blockmap values and most frequent tile IDs for explicitly selected matching vanilla map headers.
+- [x] Preserve first occurrence ROM offsets for touch-to-hex inspection; reject mismatched header/dimensions and reset stale UI on map/ROM changes.
+- [x] Sync modular/offline UI, synthetic staged-reader tests and source provenance.
+- [ ] Authenticate CUBE collision behavior and map layout ownership; implement safe semantic writes and verify authentic ROM/emulator/Android roundtrips. **No parity score change.**
+
+
 ## Checkpoint — vanilla atlas pointer alias provenance (27 October 2026)
 - [x] Detect shared header/layout/blockmap pointers across the explicitly declared vanilla map atlas, retaining source pointer offsets and bounded reference lists.
 - [x] Surface ownership hints in mobile/offline UI with synthetic tests and no ROM writes.
