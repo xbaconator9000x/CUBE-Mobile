@@ -8,6 +8,7 @@
  */
 import {parseHmaNamedAnchors} from './semantic.js';
 import {inspectHmaMapFormatHierarchy} from './hma-map-format-hierarchy.js';
+import {auditHmaMapPointerMultiplicity} from './hma-map-format-ambiguity.js';
 
 const MAP_BANK_ANCHOR='data.maps.banks';
 const MAX_SOURCES=64;
@@ -66,14 +67,18 @@ export function inspectHmaMapBankAnchorSources(sources,{romSize=Infinity}={}){
   const first=declarations[0];
   if(first.address%4!==0||first.addressInBounds===false)
     return result('invalid-address',declarations,{...common,hierarchy:null});
-  let hierarchy;
+  let hierarchy,multiplicity;
   try {
-    hierarchy=inspectHmaMapFormatHierarchy(first.format);
+    multiplicity=auditHmaMapPointerMultiplicity(first.format);
+    if(!multiplicity.ambiguous)
+      hierarchy=inspectHmaMapFormatHierarchy(first.format);
   } catch(err) {
     if(!(err instanceof RangeError))throw err;
     return result('malformed-format',declarations,{...common,hierarchy:null});
   }
+  if(multiplicity.ambiguous)
+    return result('ambiguous-format',declarations,{...common,hierarchy:null,multiplicity});
   const status=hierarchy.status==='custom-candidate'?'custom-candidate':
     hierarchy.status==='vanilla-marker'?'vanilla-marker':'unresolved-format';
-  return result(status,declarations,{...common,hierarchy});
+  return result(status,declarations,{...common,hierarchy,multiplicity});
 }

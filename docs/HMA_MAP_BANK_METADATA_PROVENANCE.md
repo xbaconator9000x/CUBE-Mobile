@@ -7,3 +7,7 @@ The read-only inspection retains source name, declaration line, exact address an
 **No ROM bytes are read or written.** The anchor address and format are metadata claims, not proof that a ROM uses those structures. Even a custom-candidate result does not authorize decoding, repointing, saving, collision interpretation or script execution. The implementation does not resolve HMA's full metadata overlay precedence, custom format grammar, actual map pointers or CUBE ROM fingerprints. The API is available for later mobile UI integration; it is not yet a visible app control.
 
 Synthetic tests cover identical and contradictory overlays, bounds, source provenance, unsupported formats, malformed syntax, missing anchors and input budgets. Genuine CUBE ROM and metadata digest authentication, emulator save/reopen and Android hardware acceptance remain prerequisites to strict feature-parity credit.
+
+## Repeated named pointer fields
+
+The map metadata gate now audits the number of `map<`, `layout<`, `events<`, `connections<`, `objects<`, `warps<`, `scripts<`, `signposts<` and blockset pointer fields within their respective extracted format scopes. Repeated same-name fields are classified as `ambiguous-format` instead of silently choosing the first match. This is intentionally conservative; genuine HMA aliases may need an authenticated parser before they can be accepted. It does not attempt to parse the complete HMA DSL or grant ROM write authority.
