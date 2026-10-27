@@ -15,6 +15,7 @@ import {inspectVanillaMapConnections} from './map-connections.js';
 import {auditVanillaAtlasEventOwnership} from './map-event-ownership.js';
 import {inspectVanillaMapEvents,inspectVanillaEventScriptPointers,previewVanillaEventScriptBytes} from './map-events.js';
 import {inspectVanillaScriptCommandPrefix} from './vanilla-script-prefix.js';
+import {auditVanillaScriptBranchTargets} from './vanilla-script-branches.js';
 import {inspectVanillaMapBlocksets} from './map-blocksets.js';
 import {panMapViewport,indexMapWarpMarkers,indexMapEventMarkers,inspectRenderedMapPixel,projectRenderedMapMarkers} from './map-viewport.js';
 import {renderVanillaMapViewport} from './map-render.js';
@@ -1944,6 +1945,59 @@ $('map-script-pointer-inspect').addEventListener('click',()=>safeRun(()=>{
       '. Unknown commands stop decoding. No CUBE grammar authentication, script length, control-flow following or write permission.';
    }));
    root.append(decode);
+   const branches=document.createElement('button');branches.type='button';
+   branches.className='secondary-button';branches.style.margin='0 0 8px 8px';
+   branches.textContent='Audit vanilla branch pointer hints';
+   branches.addEventListener('click',()=>safeRun(()=>{
+    requireVanillaMapFormat();
+    if(model!==original||$('map-layout-source').value!=='header'||
+       parseOffset($('map-layout-offset').value)!==address||
+       $('map-layout-family').value!==family)
+      throw Error('Map/ROM selection changed; reinspect script pointers');
+    const pointer=previewVanillaEventScriptBytes(model,{
+      address,family,kind:record.kind,index:record.index,byteCount:1
+    });
+    if(pointer.targetOffset!==record.targetOffset)
+      throw Error('Script pointer changed; reinspect');
+    const audit=auditVanillaScriptBranchTargets(model,{
+      address:pointer.targetOffset,family,maxBytes:128,
+      maxCommands:32,maxFindings:32
+    });
+    const list=$('map-script-preview-list');list.replaceChildren();
+    for(const finding of audit.findings){
+      const line=document.createElement('div');
+      line.className='palette-note';
+      line.textContent=finding.commandName+
+       ' · pointer field ROM 0x'+hex(finding.pointerSourceOffset)+
+       ' · '+finding.status+
+       (finding.targetOffset===null?'':' · target ROM 0x'+hex(finding.targetOffset));
+      const sourceButton=document.createElement('button');sourceButton.type='button';
+      sourceButton.className='secondary-button';
+      sourceButton.textContent='Inspect pointer bytes';
+      sourceButton.addEventListener('click',()=>safeRun(()=>{
+        if(model!==original)throw Error('ROM replaced; reinspect');
+        setPageForOffset(finding.pointerSourceOffset);gotoTab('hex');
+      }));
+      line.append(sourceButton);
+      if(finding.targetOffset!==null){
+        const targetButton=document.createElement('button');targetButton.type='button';
+        targetButton.className='secondary-button';
+        targetButton.textContent='Inspect target bytes';
+        targetButton.addEventListener('click',()=>safeRun(()=>{
+          if(model!==original)throw Error('ROM replaced; reinspect');
+          setPageForOffset(finding.targetOffset);gotoTab('hex');
+        }));
+        line.append(targetButton);
+      }
+      list.append(line);
+    }
+    $('map-script-preview-status').textContent=
+      'Vanilla branch hints: '+audit.total+' pointer operands ('+
+      audit.findings.length+' displayed), stopped: '+audit.stopReason+
+      (audit.truncated?' · findings truncated':'')+
+      '. Targets outside decoded prefix are unresolved, not invalid. No CUBE script ownership, control-flow following or write permission.';
+   }));
+   root.append(branches);
   }
  }
  if(!result.records.length){
