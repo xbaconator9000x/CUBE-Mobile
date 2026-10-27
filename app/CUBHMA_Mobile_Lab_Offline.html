@@ -143,6 +143,11 @@
       <div class="input-wrap"><label for="map-bank-map-count">Maps in bank (declared)</label><input id="map-bank-map-count" type="number" min="1" max="1024" value="1"></div>
       <div class="input-wrap"><label for="map-bank-map-index">Map index (0-based)</label><input id="map-bank-map-index" type="number" min="0" value="0"></div>
     </div>
+    <div class="input-wrap"><label for="map-atlas-counts">Optional declared map counts for every bank (decimal, comma-separated)</label><input id="map-atlas-counts" inputmode="text" placeholder="e.g. 2, 4, 1" spellcheck="false"></div>
+    <button type="button" id="map-atlas-inspect" class="subtle-button" disabled>Catalog explicitly declared vanilla maps (read only)</button>
+    <output id="map-atlas-status" class="palette-note" aria-live="polite">No atlas loaded. Supply all bank counts explicitly; these values are not discovered or authenticated.</output>
+    <div class="input-wrap"><label for="map-atlas-select">Declared maps</label><select id="map-atlas-select" disabled><option value="">Inspect an atlas first</option></select></div>
+    <button type="button" id="map-atlas-open" class="subtle-button" disabled>Open selected declared map</button>
     <button type="button" id="map-bank-inspect" class="subtle-button" disabled>Follow vanilla bank → map (read only)</button>
     <output id="map-bank-status" class="palette-note" aria-live="polite">Requires independently verified vanilla bank table and explicit counts; no automatic CUBE map-bank discovery.</output>
     <div class="input-wrap"><label for="map-layout-offset">Optional known VANILLA map header/layout ROM offset (hex)</label><input id="map-layout-offset" inputmode="text" spellcheck="false" placeholder="e.g. 1A2B3C"></div>
@@ -2390,6 +2395,66 @@ function inspectVanillaMapWarps(source,{address,family}={}) {
 }
 
 /**
+ * Explicit read-only vanilla RSE/FRLG map atlas.
+ * Upstream: kcradi/CUBHMA MapModel.cs AllMapsModel/MapBankModel.
+ * Counts come from the user, never inferred from headers or sentinel scans.
+ * This does not authenticate CUBE expansion layouts or permit ROM writes.
+ */
+function parseVanillaBankMapCounts(text) {
+ if(typeof text!=='string'||!/^\s*\d+(?:\s*[,\s]\s*\d+)*\s*$/.test(text))
+  throw new RangeError('Enter comma-separated decimal map counts, one per bank');
+ const parts=text.trim().split(/[\s,]+/);
+ if(parts.length<1||parts.length>256)throw new RangeError('Declare 1–256 vanilla banks');
+ const counts=parts.map(Number);
+ if(counts.some(n=>!Number.isSafeInteger(n)||n<1||n>1024))
+  throw new RangeError('Each declared bank must have 1–1024 maps');
+ return Object.freeze(counts);
+}
+function inspectVanillaMapAtlas(source,{address,bankMapCounts,family,maxMaps=4096}={}) {
+ if(!Array.isArray(bankMapCounts)||bankMapCounts.length<1||bankMapCounts.length>256)
+  throw new RangeError('Explicit map counts required for 1–256 banks');
+ if(!Number.isSafeInteger(maxMaps)||maxMaps<1||maxMaps>4096)
+  throw new RangeError('Atlas map limit must be 1–4096');
+ let total=0;
+ for(const n of bankMapCounts){
+  if(!Number.isSafeInteger(n)||n<1||n>1024)
+   throw new RangeError('Each declared bank must have 1–1024 maps');
+  total+=n;
+  if(total>maxMaps)throw new RangeError('Declared map catalog exceeds bounded map limit');
+ }
+ const maps=[],banks=[];
+ for(let bankIndex=0;bankIndex<bankMapCounts.length;bankIndex++){
+  const mapCount=bankMapCounts[bankIndex];
+  const first=inspectVanillaMapBankEntry(source,{address,bankCount:bankMapCounts.length,
+   bankIndex,mapCount,mapIndex:0,family});
+  for(const bank of banks){
+   if(first.bankOffset<bank.bankOffset+bank.mapCount*4 &&
+      bank.bankOffset<first.bankOffset+mapCount*4)
+    throw new RangeError('Declared map-bank pointer arrays overlap');
+  }
+  banks.push(Object.freeze({bankIndex,mapCount,bankOffset:first.bankOffset,
+   bankPointerSource:first.bankPointerSource}));
+  for(let mapIndex=0;mapIndex<mapCount;mapIndex++){
+   const result=mapIndex===0?first:inspectVanillaMapBankEntry(source,{
+    address,bankCount:bankMapCounts.length,bankIndex,mapCount,mapIndex,family});
+   maps.push(Object.freeze({bankIndex,mapIndex,mapHeaderOffset:result.mapHeaderOffset,
+    mapPointerSource:result.mapPointerSource,layoutOffset:result.header.layoutOffset,
+    blockmapOffset:result.header.layout.blockmapOffset,width:result.header.layout.width,
+    height:result.header.layout.height}));
+  }
+ }
+ return Object.freeze({address,family,bankMapCounts:Object.freeze([...bankMapCounts]),
+  bankCount:banks.length,mapCount:maps.length,banks:Object.freeze(banks),
+  maps:Object.freeze(maps),readOnly:true,layoutAuthenticated:false});
+}
+function lookupVanillaMapAtlasTarget(atlas,bankIndex,mapIndex) {
+ if(!atlas||!Array.isArray(atlas.maps))throw new TypeError('Expected inspected atlas');
+ if(!Number.isSafeInteger(bankIndex)||!Number.isSafeInteger(mapIndex)||
+    bankIndex<0||mapIndex<0)return null;
+ return atlas.maps.find(m=>m.bankIndex===bankIndex&&m.mapIndex===mapIndex)||null;
+}
+
+/**
  * Read-only vanilla map connections (NOT CUBE expansion layout).
  * kcradi/CUBHMA MapModel.cs Format.ConnectionsFormat:
  * [count:: connections<[direction:: offset:: mapGroup. mapNum. unused:]/count>]1
@@ -2829,12 +2894,12 @@ let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffs
 let pcsReference=null,pcsReferenceName='';
 let fingerprintResult=null,fingerprintAbort=null;
 let metadataFingerprints=[],metadataImportSerial=0;
-let inspectedWarpMap=null,inspectedEventMap=null;
+let inspectedWarpMap=null,inspectedEventMap=null,inspectedMapAtlas=null;
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
 ctx.imageSmoothingEnabled=false;
-const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-layout-inspect','map-bank-inspect','map-warp-inspect','map-connection-inspect','map-event-inspect','map-blockset-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','discard-button','edit-unlock'];
+const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-layout-inspect','map-bank-inspect','map-atlas-inspect','map-warp-inspect','map-connection-inspect','map-event-inspect','map-blockset-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','discard-button','edit-unlock'];
 const tabs={home:['YOUR WORKSPACE','ROM Workbench'],hex:['BINARY INSPECTOR','Hex editor'],anchors:['ROM SEMANTICS','Named data'],maps:['RAW MAP CELLS','Blockmap inspector'],graphics:['GBA GRAPHICS','Graphics explorer'],patches:['PATCH WORKFLOW','Patch tools'],changes:['REVIEW & EXPORT','Changes']};
 function toast(message,bad=false){const t=$('toast');t.textContent=message;t.classList.toggle('error',bad);t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),4300);}
 function safeRun(fn){try{const result=fn();if(result?.catch) result.catch(err=>toast(err.message||String(err),true));}catch(err){toast(err.message||String(err),true);}}
@@ -2914,7 +2979,7 @@ function updateIndicators(){
   if(active)showRomInfo();
   drawMetadataFingerprintStatus();
 }
-function installModel(name,bytes){metadataImportSerial++;metadataFingerprints=[];clearRenderedMap('ROM replaced. Select vanilla header again.');$('map-grid').innerHTML='<div class="empty-state">No blockmap inspected.</div>';$('map-bank-status').textContent='ROM replaced. Re-enter independently verified vanilla bank location and counts.';clearWarpInspection('ROM replaced. Select a vanilla map header again.');clearConnectionInspection('ROM replaced. Select a vanilla map header again.');$('map-layout-status').textContent='ROM replaced. No vanilla-format layout inspected.';$('map-status').textContent='ROM replaced. Enter a verified offset and inspect again.';pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
+function installModel(name,bytes){clearMapAtlas('ROM replaced; declared atlas invalidated.');metadataImportSerial++;metadataFingerprints=[];clearRenderedMap('ROM replaced. Select vanilla header again.');$('map-grid').innerHTML='<div class="empty-state">No blockmap inspected.</div>';$('map-bank-status').textContent='ROM replaced. Re-enter independently verified vanilla bank location and counts.';clearWarpInspection('ROM replaced. Select a vanilla map header again.');clearConnectionInspection('ROM replaced. Select a vanilla map header again.');$('map-layout-status').textContent='ROM replaced. No vanilla-format layout inspected.';$('map-status').textContent='ROM replaced. Enter a verified offset and inspect again.';pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
 $('rom-picker').addEventListener('change',async e=>{
   const file=e.target.files?.[0];e.target.value='';if(!file)return;
   if(file.size<0xC0 || file.size>MAX_BYTES)return toast('ROM must be 192 bytes to 128 MiB',true);
@@ -3526,6 +3591,7 @@ function clearRenderedMap(message='Rendered preview invalidated; inspect again.'
  $('map-render-status').textContent=message;
 }
 function clearMapGrid(message='Map structure changed; inspect again.'){
+  clearMapAtlas(message+' Reinspect declared bank counts.');
   clearRenderedMap();
   const root=$('map-grid');root.replaceChildren();
   const empty=document.createElement('div');empty.className='empty-state';
@@ -3559,6 +3625,63 @@ function requireVanillaMapFormat(){
   if(metadataLayoutKind==='expansion'||metadataLayoutKind==='custom')
     throw Error('Imported metadata declares a non-vanilla layout; vanilla map interpretation refused.');
 }
+function clearMapAtlas(message='Declared atlas invalidated; inspect again.') {
+ inspectedMapAtlas=null;
+ const select=$('map-atlas-select');
+ select.replaceChildren(new Option('Inspect an atlas first',''));
+ select.disabled=true;
+ $('map-atlas-open').disabled=true;
+ $('map-atlas-status').textContent=message;
+}
+function openDeclaredAtlasMap(target) {
+ requireVanillaMapFormat();
+ if(!inspectedMapAtlas||inspectedMapAtlas.rom!==model)
+  throw Error('Reinspect the declared atlas for the current ROM');
+ const atlas=inspectedMapAtlas.atlas;
+ const counts=parseVanillaBankMapCounts($('map-atlas-counts').value);
+ if(parseOffset($('map-bank-offset').value)!==atlas.address||
+    $('map-layout-family').value!==atlas.family||
+    counts.length!==atlas.bankCount||
+    counts.some((n,i)=>n!==atlas.bankMapCounts[i]))
+  throw Error('Atlas inputs changed; reinspect before navigation');
+ const entry=lookupVanillaMapAtlasTarget(atlas,target.bankIndex,target.mapIndex);
+ if(!entry||entry.mapHeaderOffset!==target.mapHeaderOffset)
+  throw Error('Target not in the declared atlas');
+ $('map-bank-count').value=String(atlas.bankCount);
+ $('map-bank-index').value=String(entry.bankIndex);
+ $('map-bank-map-count').value=String(atlas.bankMapCounts[entry.bankIndex]);
+ $('map-bank-map-index').value=String(entry.mapIndex);
+ $('map-bank-inspect').click();
+}
+$('map-atlas-inspect').addEventListener('click',()=>safeRun(()=>{
+ clearMapAtlas('Inspecting declared vanilla map pointers…');
+ requireVanillaMapFormat();
+ const atlas=inspectVanillaMapAtlas(model,{
+  address:parseOffset($('map-bank-offset').value),
+  bankMapCounts:parseVanillaBankMapCounts($('map-atlas-counts').value),
+  family:$('map-layout-family').value
+ });
+ inspectedMapAtlas={atlas,rom:model};
+ const select=$('map-atlas-select'),options=document.createDocumentFragment();
+ for(let i=0;i<atlas.maps.length;i++){
+  const entry=atlas.maps[i];
+  options.append(new Option('Bank '+entry.bankIndex+' / map '+entry.mapIndex+
+   ' · '+entry.width+'×'+entry.height+' · header 0x'+hex(entry.mapHeaderOffset),String(i)));
+ }
+ select.replaceChildren(options);select.disabled=false;
+ $('map-atlas-open').disabled=false;
+ $('map-atlas-status').textContent='Inspected '+atlas.mapCount+' explicitly declared maps across '+
+  atlas.bankCount+' vanilla-format banks. Pointer/layout bounds checked; no ROM identity, CUBE layout or warp topology authenticated.';
+}));
+$('map-atlas-open').addEventListener('click',()=>safeRun(()=>{
+ if(!inspectedMapAtlas)throw Error('Inspect an atlas first');
+ const i=Number($('map-atlas-select').value);
+ if(!Number.isSafeInteger(i)||i<0||i>=inspectedMapAtlas.atlas.maps.length)
+  throw Error('Select a declared map');
+ openDeclaredAtlasMap(inspectedMapAtlas.atlas.maps[i]);
+}));
+for(const id of ['map-atlas-counts','map-bank-offset','map-layout-family'])
+ $(id).addEventListener('change',()=>clearMapAtlas('Declared atlas inputs changed; inspect again.'));
 $('map-bank-inspect').addEventListener('click',()=>safeRun(()=>{
   clearWarpInspection();clearConnectionInspection();
   requireVanillaMapFormat();
@@ -3615,6 +3738,16 @@ $('map-warp-inspect').addEventListener('click',()=>safeRun(()=>{
     button.setAttribute('aria-label',button.textContent+'; inspect raw hex');
     button.addEventListener('click',()=>safeRun(()=>{setPageForOffset(warp.offset);gotoTab('hex');}));
     root.append(button);
+    const atlas=inspectedMapAtlas?.rom===model?inspectedMapAtlas.atlas:null;
+    const target=atlas&&atlas.family===family?
+      lookupVanillaMapAtlasTarget(atlas,warp.targetBank,warp.targetMap):null;
+    if(target){
+      const open=document.createElement('button');open.type='button';
+      open.className='secondary-button';open.style.margin='0 0 8px 8px';
+      open.textContent='Open declared warp destination '+target.bankIndex+'/'+target.mapIndex;
+      open.addEventListener('click',()=>safeRun(()=>openDeclaredAtlasMap(target)));
+      root.append(open);
+    }
   }
   // Only annotate the blockmap when its exact selected offset/dimensions
   // match the inspected header. Never overlay on an unrelated raw map.
@@ -3650,6 +3783,16 @@ $('map-connection-inspect').addEventListener('click',()=>safeRun(()=>{
     button.setAttribute('aria-label',button.textContent+'; inspect raw hex');
     button.addEventListener('click',()=>safeRun(()=>{setPageForOffset(connection.offset);gotoTab('hex');}));
     root.append(button);
+    const atlas=inspectedMapAtlas?.rom===model?inspectedMapAtlas.atlas:null;
+    const target=atlas&&atlas.family===$('map-layout-family').value?
+      lookupVanillaMapAtlasTarget(atlas,connection.targetBank,connection.targetMap):null;
+    if(target){
+      const open=document.createElement('button');open.type='button';
+      open.className='secondary-button';open.style.margin='0 0 8px 8px';
+      open.textContent='Open declared connection target '+target.bankIndex+'/'+target.mapIndex;
+      open.addEventListener('click',()=>safeRun(()=>openDeclaredAtlasMap(target)));
+      root.append(open);
+    }
   }
 }));
 
