@@ -9,7 +9,8 @@
     "safety:check": "node scripts/repository-safety.mjs",
     "build:standalone": "node build-standalone.mjs",
     "start": "python3 -m http.server 8000",
-    "smoke:local": "node scripts/local-map-smoke.mjs"
+    "smoke:local": "node scripts/local-map-smoke.mjs",
+    "map:metadata:inspect": "node scripts/hma-map-metadata-report.mjs"
   },
   "license": "MIT"
 }
