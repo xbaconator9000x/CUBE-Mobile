@@ -181,3 +181,10 @@
 - [ ] Validate the file-picker, network cancellation, 16 MiB aggregate limits and offline flow on Android hardware.
 - [ ] Add authenticated multi-file manifest support for upstream common + game-specific TOML overlays; verify independent CUBE build fingerprints.
 - [ ] Complete semantic ownership, map/collision/warp roundtrip and emulator/Android acceptance before enabling writes.
+
+## Watchdog checkpoint — source-grounded blockmap cell inspection (27 October 2026)
+- [x] Implement read-only 16-bit blockmap cell decoding matching upstream `BlockCells` (`tile = word & 0x3FF`, `collision = word >> 10`).
+- [x] Preserve all six high bits rather than assuming they are a walkability flag; expose exact row-major ROM offsets and bounded viewports.
+- [x] Reject unverified offsets, unaligned starts, out-of-ROM full maps and oversized dimensions; verify ROM immutability with synthetic tests.
+- [ ] Connect to authenticated map-bank/layout pointers and named metadata; implement mobile blockmap preview, rendering, event/warp overlays and editor roundtrips.
+- [ ] Independently verify CUBE layout variants and map collision semantics before any write operation.
