@@ -2805,7 +2805,21 @@ function renderVanillaMapViewport(source,{address,family,x=0,y=0,viewportWidth=1
    paint(block(cell.tileId+1).descriptors,0,true);
   }
  }
- return Object.freeze({width,height,pixels:data,cells:view.cells,columns:view.columns,rows:view.rows,
+ const attributes=Object.freeze(view.cells.map(row=>Object.freeze(row.map(cell=>{
+  const id=cell.tileId,key=id<split?'primary':'secondary',local=id<split?id:id-split;
+  const length=family==='FRLG'?4:2,attributeOffset=sets[key].attributesOffset+local*length;
+  span(rom,attributeOffset,length,'Metatile attribute');
+  const raw=Object.freeze(Array.from({length},(_,i)=>byte(rom,attributeOffset+i)));
+  return Object.freeze({
+   x:cell.x,y:cell.y,tileId:id,collision:cell.collision,
+   attributeOffset,rawBytes:raw,behavior:raw[0],
+   layer:family==='FRLG'?raw[3]>>>5:raw[1]>>>4,
+   terrain:family==='FRLG'?raw[1]>>>1:null,
+   encounter:family==='FRLG'?raw[3]&3:null,
+   verifiedWalkability:false
+  });
+ }))));
+ return Object.freeze({width,height,pixels:data,cells:view.cells,attributes,columns:view.columns,rows:view.rows,
   blockmapOffset:layout.blockmapOffset,headerAddress:address,readOnly:true,
   layoutAuthenticated:false,walkabilityVerified:false});
 }
@@ -3806,6 +3820,15 @@ $('map-inspect').addEventListener('click',()=>safeRun(()=>{
       canvas.style.width=(rendered.width*2)+'px';
       canvas.style.height=(rendered.height*2)+'px';
       canvas.hidden=false;
+      let index=0;
+      for(const row of rendered.attributes)for(const attr of row){
+        const button=board.children[index++];
+        button.textContent+=' · B'+hex(attr.behavior,2)+' L'+attr.layer;
+        button.title+=', metatile behavior 0x'+hex(attr.behavior,2)+
+          ', layer '+attr.layer+', raw attributes at 0x'+hex(attr.attributeOffset)+
+          ' (not verified walkability)';
+        button.setAttribute('aria-label',button.title);
+      }
       $('map-render-status').textContent='Rendered '+rendered.columns+' × '+rendered.rows+
         ' vanilla metatiles, including palette banks and layers. Read-only; CUBE layout and walkability unverified.';
     }catch(err){clearRenderedMap('Cannot render selected map: '+err.message);}

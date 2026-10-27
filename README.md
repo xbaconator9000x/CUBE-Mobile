@@ -6,7 +6,7 @@
 
 ## Development checkpoint — rendered vanilla map canvas
 
-An opt-in read-only canvas now composes 16×16 RSE/FRLG metatiles with palette banks, flips and layers from explicitly selected vanilla headers. The raw collision/elevation grid remains separate. This is not CUBE-authenticated map editing. See [rendering checkpoint](docs/VANILLA_METATILE_RENDER_CHECKPOINT.md).
+An opt-in read-only canvas now composes 16×16 RSE/FRLG metatiles with palette banks, flips and layers from explicitly selected vanilla headers. Each rendered cell also displays its raw metatile behavior and layer bytes, without claiming walkability. The raw collision/elevation grid remains separate. This is not CUBE-authenticated map editing. See [rendering checkpoint](docs/VANILLA_METATILE_RENDER_CHECKPOINT.md).
 
 ## Development checkpoint — streamed LZ10 graphics
 

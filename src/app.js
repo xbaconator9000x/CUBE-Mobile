@@ -1011,6 +1011,15 @@ $('map-inspect').addEventListener('click',()=>safeRun(()=>{
       canvas.style.width=(rendered.width*2)+'px';
       canvas.style.height=(rendered.height*2)+'px';
       canvas.hidden=false;
+      let index=0;
+      for(const row of rendered.attributes)for(const attr of row){
+        const button=board.children[index++];
+        button.textContent+=' · B'+hex(attr.behavior,2)+' L'+attr.layer;
+        button.title+=', metatile behavior 0x'+hex(attr.behavior,2)+
+          ', layer '+attr.layer+', raw attributes at 0x'+hex(attr.attributeOffset)+
+          ' (not verified walkability)';
+        button.setAttribute('aria-label',button.title);
+      }
       $('map-render-status').textContent='Rendered '+rendered.columns+' × '+rendered.rows+
         ' vanilla metatiles, including palette banks and layers. Read-only; CUBE layout and walkability unverified.';
     }catch(err){clearRenderedMap('Cannot render selected map: '+err.message);}

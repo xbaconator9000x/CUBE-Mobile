@@ -102,7 +102,21 @@ export function renderVanillaMapViewport(source,{address,family,x=0,y=0,viewport
    paint(block(cell.tileId+1).descriptors,0,true);
   }
  }
- return Object.freeze({width,height,pixels:data,cells:view.cells,columns:view.columns,rows:view.rows,
+ const attributes=Object.freeze(view.cells.map(row=>Object.freeze(row.map(cell=>{
+  const id=cell.tileId,key=id<split?'primary':'secondary',local=id<split?id:id-split;
+  const length=family==='FRLG'?4:2,attributeOffset=sets[key].attributesOffset+local*length;
+  span(rom,attributeOffset,length,'Metatile attribute');
+  const raw=Object.freeze(Array.from({length},(_,i)=>byte(rom,attributeOffset+i)));
+  return Object.freeze({
+   x:cell.x,y:cell.y,tileId:id,collision:cell.collision,
+   attributeOffset,rawBytes:raw,behavior:raw[0],
+   layer:family==='FRLG'?raw[3]>>>5:raw[1]>>>4,
+   terrain:family==='FRLG'?raw[1]>>>1:null,
+   encounter:family==='FRLG'?raw[3]&3:null,
+   verifiedWalkability:false
+  });
+ }))));
+ return Object.freeze({width,height,pixels:data,cells:view.cells,attributes,columns:view.columns,rows:view.rows,
   blockmapOffset:layout.blockmapOffset,headerAddress:address,readOnly:true,
   layoutAuthenticated:false,walkabilityVerified:false});
 }

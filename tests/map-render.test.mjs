@@ -63,3 +63,19 @@ test('LZ-compressed 4bpp primary tileset renders identically to raw source',()=>
  const after=renderVanillaMapViewport(r,{address:0x100,family:'RSE'});
  assert.deepEqual([...after.pixels],[...before.pixels]);
 });
+
+test('metatile attribute inspector preserves raw collision and RSE behavior/layer bytes',()=>{
+ const r=fixture();
+ w(r,0x220,0xa800);r[0xd400]=0x42;r[0xd401]=0x20;
+ const result=renderVanillaMapViewport(r,{address:0x100,family:'RSE'});
+ const a=result.attributes[0][0];
+ assert.equal(a.collision,42);assert.equal(a.behavior,0x42);assert.equal(a.layer,2);
+ assert.deepEqual(a.rawBytes,[0x42,0x20]);assert.equal(a.verifiedWalkability,false);
+ assert.ok(Object.isFrozen(a)&&Object.isFrozen(result.attributes));
+});
+test('FRLG attribute decoding preserves raw terrain and encounter fields',()=>{
+ const r=fixture('FRLG');r[0xd400]=0x33;r[0xd401]=0x06;r[0xd403]=0x21;
+ const a=renderVanillaMapViewport(r,{address:0x100,family:'FRLG'}).attributes[0][0];
+ assert.equal(a.behavior,0x33);assert.equal(a.terrain,3);
+ assert.equal(a.encounter,1);assert.equal(a.layer,1);
+});
