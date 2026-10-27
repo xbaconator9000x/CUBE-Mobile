@@ -5,11 +5,13 @@ import {decodeHmaPcsFallback} from './pcs-default.js';
 import {parseHmaPcsReference,decodeHmaPcsReference} from './pcs-reference.js';
 import {fingerprintRomSha256,fingerprintMatchesRom} from './rom-fingerprint.js';
 import {compareRomIdentity} from './rom-compatibility.js';
+import {fingerprintMetadataFiles,compareRomMetadataFingerprintRecords} from './metadata-fingerprint.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let pcsReference=null,pcsReferenceName='';
 let fingerprintResult=null,fingerprintAbort=null;
+let metadataFingerprints=[],metadataImportSerial=0;
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
@@ -92,8 +94,9 @@ function updateIndicators(){
   $('tiles-forward').disabled=!active||!graphicsSource||tilePage>=lastTilePage();
   $('changes-tab-count').hidden=!active||!model.dirty;$('changes-tab-count').textContent=active ? String(model.edits.size+(model.appliedPatch?1:0)):'0';
   if(active)showRomInfo();
+  drawMetadataFingerprintStatus();
 }
-function installModel(name,bytes){pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
+function installModel(name,bytes){metadataImportSerial++;metadataFingerprints=[];pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
 $('rom-picker').addEventListener('change',async e=>{
   const file=e.target.files?.[0];e.target.value='';if(!file)return;
   if(file.size<0xC0 || file.size>MAX_BYTES)return toast('ROM must be 192 bytes to 128 MiB',true);
@@ -363,7 +366,7 @@ if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostn
 // engine, game fingerprints and pointer allocator have been ported and tested.
 let displayedAnchors=[], selectedInspection=null;
 const encodeHex=bytes=>Array.from(bytes).map((b,i)=>hex(b,2)+(i%16===15?'\n':' ')).join('').trim();
-function metadataReset(){metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
+function metadataReset(){metadataImportSerial++;metadataFingerprints=[];metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
 function snapshotMatchedWords(words=metadataMatchedWords){
   if(!model)return [];
   return words.map(word=>{
@@ -387,6 +390,10 @@ function refreshMatchedWordResolution(){
 }
 function metadataCommit(sources){
   ensureModel();
+  // Hash raw bytes before TOML parsing; never derive identity from decoded text.
+  // A failed parse or collision check leaves the previous fingerprints intact.
+  const nextFingerprints=fingerprintMetadataFiles(sources.map(({name,bytes})=>({name,bytes})));
+
   // Fail closed for known mismatched stock-game TOML before changing active metadata.
   // Custom CUBE/project TOML remains manually importable but is never authenticated by header alone.
   const metadataCheck=checkHmaMetadataSources(sources,model);
@@ -417,6 +424,7 @@ function metadataCommit(sources){
   metadataWordSnapshot=nextWordSnapshot;
   metadata=nextMetadata;metadataResolution=nextResolution;
   metadataSources=sources.map(({name})=>name);metadataLayoutKind=metadataCheck.layout.kind;
+  metadataFingerprints=nextFingerprints;
   selectedAnchor=null;selectedInspection=null;
   drawAnchors();
   toast(`Loaded ${metadata.length} anchor declarations; ${merged.conflictedNames.size} conflicting names; ${metadataResolution.anchoredCount} anchor-length, ${metadataResolution.listCount} list-length and ${metadataResolution.matchedCount} matched-word-length tables · ${metadataLayoutKind} TOML layout · ROM unverified`);
@@ -554,7 +562,30 @@ function drawAnchorDetails(){
   $('anchor-follow-pointer').disabled=inspection.pointer===null;
   $('anchor-to-graphics').disabled=!inspection.isLz10;
 }
+function drawMetadataFingerprintStatus(){
+  const output=$('metadata-fingerprint-status');
+  if(!output)return;
+  if(!metadataFingerprints.length){
+    output.textContent='No metadata fingerprints loaded. Exact TOML identity is unverified.';
+    return;
+  }
+  const hashes=metadataFingerprints.map(file=>file.name+' ('+file.length+' bytes): '+file.sha256).join('\n');
+  let identity='Compute the current ROM SHA-256 to check for a matching curated profile.';
+  if(fingerprintResult){
+    const result=compareRomMetadataFingerprintRecords(model,fingerprintResult,metadataFingerprints);
+    identity={
+      'rom-unverified':'No verified ROM profile matches these bytes.',
+      'metadata-missing':'No matching metadata file.',
+      'multi-file-manifest-required':'Multiple TOML files require an authenticated overlay manifest.',
+      'digest-mismatch':'Metadata digest does not match the ROM profile.',
+      'exact-byte-match':'Metadata bytes match the profile digest; semantic writes remain disabled.'
+    }[result.metadataBindingStatus]||'ROM fingerprint is stale or conflicts with its profile.';
+  }
+  output.textContent='Exact imported TOML SHA-256 (local only):\n'+hashes+
+    '\n'+identity+' Identity does not authenticate CUBE layout or permit semantic writes.';
+}
 function drawAnchors(){
+  drawMetadataFingerprintStatus();
   const root=$('anchor-list'),selector=$('anchor-group');root.replaceChildren();
   const previous=selector.value;
   selector.replaceChildren(new Option('All categories','all'));
@@ -604,31 +635,60 @@ $('pcs-reference-clear').addEventListener('click',()=>{
   $('pcs-reference-status').textContent='No optional PCS reference loaded.';
   drawAnchorDetails();
 });
+// Each import is tied to one ROM byte snapshot and request generation.
+// Replacing/editing the ROM or starting another import invalidates pending reads.
+function metadataImportSnapshot(){
+  const current=ensureModel();
+  return {model:current,base:current.base,edits:new Map(current.edits)};
+}
+function assertMetadataImportCurrent(snapshot,serial){
+  if(serial!==metadataImportSerial||
+     !fingerprintMatchesRom(model,{snapshot}))
+    throw Error('ROM changed or a newer metadata import started; import cancelled');
+}
+function decodeMetadataSource(name,bytes){
+  if(!(bytes instanceof Uint8Array)||bytes.length<1||bytes.length>4*1024*1024)
+    throw Error('Metadata file must contain 1 byte to 4 MiB');
+  return {name,bytes,text:new TextDecoder('utf-8',{fatal:true}).decode(bytes)};
+}
 $('metadata-picker').addEventListener('change',async e=>{
   const files=[...(e.target.files||[])];e.target.value='';if(!files.length)return;
-  try{ensureModel();const sources=[];
-    for(const file of files){if(file.size>4*1024*1024)throw Error('Metadata file is too large');sources.push({name:file.name,text:await file.text()});}
+  try{
+    const snapshot=metadataImportSnapshot(),serial=++metadataImportSerial,sources=[];
+    for(const file of files){
+      if(file.size<1||file.size>4*1024*1024)throw Error('Metadata file must contain 1 byte to 4 MiB');
+      const bytes=new Uint8Array(await file.arrayBuffer());
+      assertMetadataImportCurrent(snapshot,serial);
+      sources.push(decodeMetadataSource(file.name,bytes));
+    }
+    assertMetadataImportCurrent(snapshot,serial);
     metadataCommit(sources);
-  }catch(err){toast(`Metadata import failed: ${err.message}`,true);}
+  }catch(err){toast('Metadata import failed: '+err.message,true);}
 });
 const upstreamPin='3044393183e01af2ae1e907fb37e4a75eda6a8dc';
 $('metadata-stock').addEventListener('click',async()=>{
   try{
-    ensureModel();
-    // Select the upstream metadata by exact game code AND revision. Unknown revisions are not guessed.
+    const snapshot=metadataImportSnapshot(),serial=++metadataImportSerial;
+    // Select upstream metadata by exact game code AND revision, never by filename.
     const {identity,files:names}=resolveHmaStockMetadata(model);
     const code=identity.code;
     if(!await confirmAction('Load stock-game metadata?',`Reference offsets are for stock ${code} ROMs, not necessarily your modified ROM or CUBE. This lookup is read-only. Continue?`))return;
+    assertMetadataImportCurrent(snapshot,serial);
     $('metadata-stock').disabled=true;
     const sources=[];
     for(const name of names){
       const url=`https://raw.githubusercontent.com/kcradi/CUBHMA/${upstreamPin}/src/HexManiac.Core/Models/Code/${name}`;
       const response=await fetch(url,{cache:'force-cache'});
       if(!response.ok)throw Error(`${name} download failed (HTTP ${response.status}). Import files manually if offline.`);
-      sources.push({name:`${name} (upstream ${upstreamPin.slice(0,8)})`,text:await response.text()});
+      const size=Number(response.headers.get('content-length'));
+      if(size>4*1024*1024)throw Error('Upstream metadata exceeds 4 MiB limit');
+      const bytes=new Uint8Array(await response.arrayBuffer());
+      assertMetadataImportCurrent(snapshot,serial);
+      sources.push(decodeMetadataSource(`${name} (upstream ${upstreamPin.slice(0,8)})`,bytes));
     }
+    assertMetadataImportCurrent(snapshot,serial);
     metadataCommit(sources);
-  }catch(err){toast(`Stock metadata: ${err.message}`,true);}finally{$('metadata-stock').disabled=false;}
+  }catch(err){toast('Stock metadata: '+err.message,true);}finally{$('metadata-stock').disabled=false;}
 });
 
 updateIndicators();drawGraphics();drawAnchors();renderTab(routeFromHash());
