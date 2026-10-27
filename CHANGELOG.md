@@ -1,3 +1,7 @@
+## Unreleased — spatial object/script/signpost hints (27 October 2026)
+- Overlay source-matched O/S/P record indexes in raw blockmap cells without treating them as verified sprites or walkability.
+- Add coordinate bounds, stale-state invalidation and mobile/offline regression tests.
+
 ## Unreleased — vanilla object, script and signpost inspector (27 October 2026)
 - Decode bounded vanilla object, warp, script-trigger and signpost arrays with raw pointers and source offsets, without executing scripts or modifying ROM bytes.
 - Cross-check event arrays against each other and the map structures; fail closed on overlap, malformed pointers and truncated records.

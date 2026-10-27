@@ -11,14 +11,14 @@ import {inspectVanillaMapLayout,inspectVanillaMapHeader} from './map-layouts.js'
 import {inspectVanillaMapBankEntry,inspectVanillaMapWarps} from './map-discovery.js';
 import {inspectVanillaMapConnections} from './map-connections.js';
 import {inspectVanillaMapEvents} from './map-events.js';
-import {panMapViewport,indexMapWarpMarkers} from './map-viewport.js';
+import {panMapViewport,indexMapWarpMarkers,indexMapEventMarkers} from './map-viewport.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let pcsReference=null,pcsReferenceName='';
 let fingerprintResult=null,fingerprintAbort=null;
 let metadataFingerprints=[],metadataImportSerial=0;
-let inspectedWarpMap=null;
+let inspectedWarpMap=null,inspectedEventMap=null;
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
@@ -725,6 +725,7 @@ function clearWarpInspection(message='Select a vanilla map header to inspect war
   $('map-warp-status').textContent=message;
 }
 function clearEventInspection(message='Select a vanilla map header to inspect object, script and signpost records.'){
+  inspectedEventMap=null;
   $('map-event-list').replaceChildren();
   $('map-event-status').textContent=message;
 }
@@ -838,7 +839,11 @@ $('map-event-inspect').addEventListener('click',()=>safeRun(()=>{
   if($('map-layout-source').value!=='header')
     throw Error('Select a vanilla map header, not a layout, for event inspection');
   const address=parseOffset($('map-layout-offset').value);
-  const result=inspectVanillaMapEvents(model,{address,family:$('map-layout-family').value});
+  const family=$('map-layout-family').value;
+  const result=inspectVanillaMapEvents(model,{address,family});
+  const layout=inspectVanillaMapHeader(model,{address,family}).layout;
+  inspectedEventMap={address:layout.blockmapOffset,width:layout.width,
+    height:layout.height,arrays:result.arrays};
   const root=$('map-event-list');
   $('map-event-status').textContent=result.eventsOffset===null?
     'No vanilla events pointer. Read only; layout unverified.':
@@ -871,6 +876,10 @@ $('map-event-inspect').addEventListener('click',()=>safeRun(()=>{
     const empty=document.createElement('div');empty.className='empty-state';
     empty.textContent='No object, script trigger or signpost records.';root.append(empty);
   }
+  if($('map-offset').value.trim().toUpperCase()===hex(layout.blockmapOffset) &&
+     Number($('map-width').value)===layout.width &&
+     Number($('map-height').value)===layout.height)
+    $('map-inspect').click();
 }));
 
 // This is an explicit, unverified vanilla-format interpretation only.
@@ -908,18 +917,25 @@ $('map-inspect').addEventListener('click',()=>safeRun(()=>{
   const markerIndex=inspectedWarpMap&&inspectedWarpMap.address===address&&
     inspectedWarpMap.width===width&&inspectedWarpMap.height===height?
     indexMapWarpMarkers(inspectedWarpMap.warps,{width,height}):null;
+  const eventMarkerIndex=inspectedEventMap&&inspectedEventMap.address===address&&
+    inspectedEventMap.width===width&&inspectedEventMap.height===height?
+    indexMapEventMarkers(inspectedEventMap.arrays,{width,height}):null;
   const grid=$('map-grid');grid.replaceChildren();
   const board=document.createElement('div');board.className='blockmap-grid';
   board.style.gridTemplateColumns='repeat('+preview.columns+', minmax(64px,1fr))';
   for(const row of preview.cells)for(const cell of row){
     const button=document.createElement('button');button.type='button';button.className='blockmap-cell';
     const warps=markerIndex?.[cell.x+','+cell.y]||[];
+    const events=eventMarkerIndex?.[cell.x+','+cell.y]||[];
     button.textContent=cell.tileId+' / '+cell.collision+
-      (warps.length?' · W'+warps.join(',W'):'');
+      (warps.length?' · W'+warps.join(',W'):'')+
+      (events.length?' · '+events.join(','):'');
     button.classList.toggle('has-warp',warps.length>0);
+    button.classList.toggle('has-event',events.length>0);
     button.title='('+cell.x+','+cell.y+') tile '+cell.tileId+
       ', raw collision/elevation '+cell.collision+
       (warps.length?', unverified warp(s) '+warps.join(', '):'')+
+      (events.length?', unverified object/script/signpost(s) '+events.join(', '):'')+
       ', ROM 0x'+hex(cell.byteOffset);
     button.setAttribute('aria-label',button.title);
     button.addEventListener('click',()=>safeRun(()=>{setPageForOffset(cell.byteOffset);gotoTab('hex');}));

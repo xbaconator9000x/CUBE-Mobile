@@ -24,3 +24,16 @@ test('standalone contains event decoder without module imports',()=>{
  assert.match(html,/function inspectVanillaMapEvents/);
  assert.doesNotMatch(html,/^import \{.*?\} from '\.\//m);
 });
+
+test('raw spatial event hints require exact matching blockmap identity',()=>{
+ const app=read('src/app.js');
+ assert.match(app,/inspectedEventMap\.address===address/);
+ assert.match(app,/inspectedEventMap\.width===width/);
+ assert.match(app,/inspectedEventMap\.height===height/);
+ assert.match(app,/indexMapEventMarkers\(inspectedEventMap\.arrays/);
+ assert.match(app,/button\.classList\.toggle\('has-event'/);
+ assert.match(app,/function clearEventInspection[\s\S]*?inspectedEventMap=null/);
+ assert.match(app,/clearWarpInspection\('ROM bytes changed/);
+ const offline=read('app/CUBHMA_Mobile_Lab_Offline.html');
+ assert.match(offline,/function indexMapEventMarkers/);
+});
