@@ -37,3 +37,15 @@ test('raw spatial event hints require exact matching blockmap identity',()=>{
  const offline=read('app/CUBHMA_Mobile_Lab_Offline.html');
  assert.match(offline,/function indexMapEventMarkers/);
 });
+
+test('raw script pointer inspector is present in modular and offline UI',()=>{
+ for(const path of ['index.html','app/CUBHMA_Mobile_Lab_Offline.html']){
+  const html=read(path);
+  for(const id of ['map-script-pointer-inspect','map-script-pointer-status','map-script-pointer-list'])
+   assert.match(html,new RegExp('id="'+id+'"'));
+ }
+ const app=read('src/app.js');
+ assert.match(app,/inspectVanillaEventScriptPointers\(model/);
+ assert.match(app,/clearEventInspection[\s\S]*?map-script-pointer-list/);
+ assert.match(read('app/CUBHMA_Mobile_Lab_Offline.html'),/function inspectVanillaEventScriptPointers/);
+});

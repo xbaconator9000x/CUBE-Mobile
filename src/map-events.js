@@ -111,3 +111,34 @@ export function inspectVanillaMapEvents(source,{address,family}={}){
     counts:Object.freeze(counts),offsets:Object.freeze(offsets),arrays:Object.freeze(arrays),
     readOnly:true,layoutAuthenticated:false});
 }
+
+/**
+ * Report raw object/trigger script pointer fields without following code.
+ * A conventional in-bounds GBA ROM address is NOT proof of executable script
+ * ownership, a valid command stream, or CUBE compatibility.
+ */
+export function inspectVanillaEventScriptPointers(source,{address,family}={}){
+ const rom=eventAccessor(source);
+ const events=inspectVanillaMapEvents(rom,{address,family});
+ const records=[];
+ const counts={inRom:0,null:0,outsideRom:0,nonRom:0};
+ for(const [kind,offsetInRecord] of [['objects',16],['scripts',12]]){
+  for(const event of events.arrays[kind]){
+   const raw=event.scriptPointer;
+   let status,targetOffset=null;
+   if(raw===0)status='null';
+   else if(raw>=0x08000000&&raw<0x0a000000){
+    const target=raw-0x08000000;
+    if(target<rom.length){status='in-rom';targetOffset=target;}
+    else status='outside-rom';
+   }else status='non-rom';
+   counts[status==='in-rom'?'inRom':status==='outside-rom'?'outsideRom':
+    status==='non-rom'?'nonRom':'null']++;
+   records.push(Object.freeze({kind,index:event.index,sourceOffset:event.offset+offsetInRecord,
+    rawPointer:raw,status,targetOffset}));
+  }
+ }
+ return Object.freeze({headerOffset:address,counts:Object.freeze(counts),
+  records:Object.freeze(records),readOnly:true,layoutAuthenticated:false,
+  scriptsDecoded:false});
+}

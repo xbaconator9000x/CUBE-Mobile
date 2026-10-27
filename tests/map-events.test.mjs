@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {inspectVanillaMapEvents} from '../src/map-events.js';
+import {inspectVanillaMapEvents,inspectVanillaEventScriptPointers} from '../src/map-events.js';
 const ptr=n=>0x08000000+n;
 function u32(rom,at,n){for(let i=0;i<4;i++)rom[at+i]=(n>>>(8*i))&255;}
 function u16(rom,at,n){rom[at]=n&255;rom[at+1]=(n>>>8)&255;}
@@ -57,4 +57,28 @@ test('unknown format and invalid accessor bytes fail closed',()=>{
  assert.throws(()=>read([]),TypeError);
  assert.throws(()=>read(fixture(),{family:'CUBE'}));
  assert.throws(()=>read({length:0x500,read(){return 300;}}));
+});
+
+test('script pointer field inspector classifies raw references without decoding scripts',()=>{
+ const rom=fixture(),before=rom.slice();
+ const result=inspectVanillaEventScriptPointers(rom,{address:0x100,family:'RSE'});
+ assert.deepEqual(result.counts,{inRom:2,null:0,outsideRom:0,nonRom:0});
+ assert.deepEqual(result.records.map(x=>x.sourceOffset),[0x2b0,0x2ec]);
+ assert.deepEqual(result.records.map(x=>x.targetOffset),[0x350,0x380]);
+ assert.equal(result.scriptsDecoded,false);
+ assert.equal(result.layoutAuthenticated,false);
+ assert.ok(Object.isFrozen(result.records)&&Object.isFrozen(result.records[0]));
+ assert.deepEqual(rom,before);
+});
+test('script pointer inspection retains zero, non-ROM and out-of-ROM values',()=>{
+ const rom=fixture();
+ u32(rom,0x2b0,0);u32(rom,0x2ec,0x07000100);
+ let result=inspectVanillaEventScriptPointers(rom,{address:0x100,family:'RSE'});
+ assert.deepEqual(result.records.map(x=>x.status),['null','non-rom']);
+ u32(rom,0x2ec,ptr(0x600));
+ result=inspectVanillaEventScriptPointers(rom,{address:0x100,family:'RSE'});
+ assert.equal(result.records[1].status,'outside-rom');
+ assert.equal(result.records[1].targetOffset,null);
+ const staged={length:rom.length,read:i=>i>=0x2b0&&i<0x2b4?0:rom[i]};
+ assert.equal(inspectVanillaEventScriptPointers(staged,{address:0x100,family:'RSE'}).records[0].status,'null');
 });
