@@ -1,3 +1,8 @@
+## Checkpoint — mixed-role script operand alias review (28 October 2026)
+- [x] Identify shared raw script operand targets referenced under different decoded command roles, without treating mixed roles as corruption or proven allocation conflict.
+- [x] Expose bounded warnings in mobile/offline hex navigation and aggregate-only local-ROM smoke; test same-role and mixed-role synthetic cases.
+- [ ] CUBE target format authentication, safe semantic edits and real ROM/emulator/Android acceptance remain outstanding. Strict parity unchanged.
+
 ## Checkpoint — mobile whole-atlas operand alias explorer (28 October 2026)
 - [x] Add touch-friendly read-only shared script operand target review, with source/target hex navigation and full stale-result revalidation.
 - [x] Limit synchronous mobile scans to 512 declared maps; reject oversized scans without presenting partial coverage. Regenerate standalone offline HTML and test script integrity.

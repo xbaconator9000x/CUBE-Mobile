@@ -33,3 +33,13 @@ safe relocation, valid target data, authenticated CUBE formats or write
 permission. No ROM bytes are changed. Authentic CUBE layout evidence,
 save/reopen tests, emulator and Android acceptance remain outstanding.
 Strict feature parity is unchanged.
+
+## Mixed-role review hints
+
+Shared targets now include the sorted set of decoded operand roles and a
+`mixedRoles` flag when distinct pointer source fields describe the same
+raw destination differently (for example, message text versus movement
+data). The complete scan reports `mixedRoleGroups` even when group display
+is truncated. This is a **review warning**, not a claim that the ROM is
+invalid: aliases, scripts and game-specific target formats remain
+unauthenticated.

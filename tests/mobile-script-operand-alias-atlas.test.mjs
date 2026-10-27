@@ -10,6 +10,8 @@ test('mobile operand alias explorer uses bounded full-atlas and stale revalidati
  assert.match(app,/maxMaps:512,maxPointerFields:8192,maxScripts:1024/);
  assert.match(app,/maxOperandFields:8192,maxGroups:24,maxReferences:8/);
  assert.match(app,/group\.sourceCount/);
+ assert.match(app,/group\.mixedRoles/);
+ assert.match(app,/result\.mixedRoleGroups/);
  assert.match(app,/ref\.pointerSourceOffset===reference\.pointerSourceOffset/);
  assert.match(app,/Script operand aliases changed; rescan before navigation/);
  assert.match(app,/Atlas inputs changed; reinspect before navigation/);

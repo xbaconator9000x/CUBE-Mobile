@@ -1730,7 +1730,8 @@ $('map-script-operand-atlas-audit').addEventListener('click',()=>safeRun(()=>{
  $('map-script-operand-atlas-status').textContent='Reviewed all '+
   result.mapsInspected+' declared maps: '+result.distinctEventScripts+
   ' distinct script roots, '+result.operandFields+' decoded pointer fields, '+
-  result.totalGroups+' shared operand targets'+
+  result.totalGroups+' shared operand targets ('+
+  result.mixedRoleGroups+' mixed-role target(s))'+
   (result.truncated?' (first 24 groups shown)':'')+
   '. Source aliases only; not CUBE grammar, target ownership or permission to write.';
  function navigate(label,offset,group,reference){
@@ -1756,6 +1757,7 @@ $('map-script-operand-atlas-audit').addEventListener('click',()=>safeRun(()=>{
  for(const group of result.groups){
   navigate('Shared operand target ROM 0x'+hex(group.targetOffset)+
    ' · '+group.sourceCount+' distinct pointer sources'+
+   (group.mixedRoles?' · mixed operand roles: review':'')+
    (group.referencesTruncated?' · first 8 shown':'')+
    ' · inspect target',group.targetOffset,group,null);
   for(const ref of group.references)

@@ -84,10 +84,14 @@ export function auditVanillaAtlasScriptOperandAliases(source,atlas,{
  }
  const shared=[...targets.values()].filter(g=>g.sources.size>1)
   .sort((a,b)=>a.targetOffset-b.targetOffset);
+ const mixedRoleGroups=shared.filter(g=>new Set([...g.sources.values()]
+  .map(ref=>ref.role)).size>1).length;
  const groups=shared.slice(0,maxGroups).map(g=>{
   const all=[...g.sources.values()];
+  const roles=Object.freeze([...new Set(all.map(ref=>ref.role))].sort());
   return Object.freeze({
    targetOffset:g.targetOffset,sourceCount:all.length,
+   roles,mixedRoles:roles.length>1,
    references:Object.freeze(all.slice(0,maxReferences)),
    referencesTruncated:all.length>maxReferences
   });
@@ -98,6 +102,7 @@ export function auditVanillaAtlasScriptOperandAliases(source,atlas,{
   eventScriptReferences,distinctEventScripts:roots.size,
   decodedScripts,operandFields,inRomOperandFields,
   distinctOperandTargets:targets.size,totalGroups:shared.length,
+  mixedRoleGroups,
   groups:Object.freeze(groups),truncated:shared.length>groups.length,
   stopReasons:Object.freeze(stopReasons),
   wholeDeclaredAtlas:true,readOnly:true,

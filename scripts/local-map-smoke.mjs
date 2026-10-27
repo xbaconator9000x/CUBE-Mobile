@@ -112,6 +112,7 @@ function main(){
    inRomOperandFields:operandAliasAtlas.inRomOperandFields,
    distinctOperandTargets:operandAliasAtlas.distinctOperandTargets,
    sharedTargets:operandAliasAtlas.totalGroups,
+   mixedRoleTargets:operandAliasAtlas.mixedRoleGroups,
    groupsTruncated:operandAliasAtlas.truncated,
    layoutAuthenticated:false,grammarAuthenticated:false,
    ownershipAuthenticated:false
