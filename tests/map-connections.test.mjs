@@ -70,5 +70,5 @@ test('staged ROM changes are observed without copying or mutating original',()=>
 });
 test('invalid source or accessor byte fails closed',()=>{
  assert.throws(()=>inspect([]),TypeError);
- assert.throws(()=>inspect({length:1024,read(){return 300;}}),/Invalid ROM byte/);
+ assert.throws(()=>inspect({length:1024,read(){return 300;}}),/invalid byte/i);
 });
