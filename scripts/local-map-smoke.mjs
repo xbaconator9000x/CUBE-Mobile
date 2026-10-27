@@ -12,6 +12,7 @@ import {inspectVanillaMapAtlas,auditVanillaAtlasPointerAliases}
 import {inspectVanillaMapEvents} from '../src/map-events.js';
 import {auditVanillaMapEventScripts} from '../src/vanilla-map-script-audit.js';
 import {auditVanillaAtlasWideScriptAliases} from '../src/vanilla-script-alias-atlas.js';
+import {auditVanillaAtlasScriptOperandAliases} from '../src/vanilla-script-operand-alias-atlas.js';
 
 function fail(message){throw new RangeError(message);}
 function args(argv){
@@ -32,7 +33,8 @@ function manifestFromText(text){
     m.bankMapCounts.length>256||
     m.bankMapCounts.some(n=>!Number.isSafeInteger(n)||n<1||n>1024)||
     m.bankMapCounts.reduce((a,n)=>a+n,0)>4096||
-    m.scanAllScriptAliases!==undefined&&typeof m.scanAllScriptAliases!=='boolean')
+    m.scanAllScriptAliases!==undefined&&typeof m.scanAllScriptAliases!=='boolean'||
+    m.scanAllOperandAliases!==undefined&&typeof m.scanAllOperandAliases!=='boolean')
   fail('Manifest requires schema, SHA-256, family, aligned bank offset and bounded explicit counts');
  return m;
 }
@@ -78,6 +80,12 @@ function main(){
   auditVanillaAtlasWideScriptAliases(rom,atlas,{
    maxMaps:4096,maxPointerFields:32768,maxGroups:16,maxReferences:8
   }):null;
+ const operandAliasAtlas=manifest.scanAllOperandAliases===true?
+  auditVanillaAtlasScriptOperandAliases(rom,atlas,{
+   maxMaps:4096,maxPointerFields:32768,maxScripts:4096,
+   maxOperandFields:65536,maxGroups:16,maxReferences:8,
+   maxBytes:64,maxCommands:16
+  }):null;
  const report={
   schema:'cube-mobile-local-map-smoke-report/1',
   romSha256:actualSha256,romSize:size,family:manifest.family,
@@ -94,6 +102,19 @@ function main(){
    sharedTargets:scriptAliasAtlas.totalGroups,
    groupsTruncated:scriptAliasAtlas.truncated,
    layoutAuthenticated:false,ownershipAuthenticated:false
+  }:null,
+  operandAliasAtlas:operandAliasAtlas?{
+   mapsInspected:operandAliasAtlas.mapsInspected,
+   eventScriptReferences:operandAliasAtlas.eventScriptReferences,
+   distinctEventScripts:operandAliasAtlas.distinctEventScripts,
+   decodedScripts:operandAliasAtlas.decodedScripts,
+   operandFields:operandAliasAtlas.operandFields,
+   inRomOperandFields:operandAliasAtlas.inRomOperandFields,
+   distinctOperandTargets:operandAliasAtlas.distinctOperandTargets,
+   sharedTargets:operandAliasAtlas.totalGroups,
+   groupsTruncated:operandAliasAtlas.truncated,
+   layoutAuthenticated:false,grammarAuthenticated:false,
+   ownershipAuthenticated:false
   }:null,
   readOnly:true,romModified:false,romExported:false,
   hashMatchedUserDeclaration:true,
