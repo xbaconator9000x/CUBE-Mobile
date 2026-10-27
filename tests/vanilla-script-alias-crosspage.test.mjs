@@ -6,11 +6,11 @@ const ptr=n=>0x08000000+n;
 function d(rom,offset,value){for(let i=0;i<4;i++)rom[offset+i]=(value>>>(8*i))&255;}
 function fixture(){
  const rom=new Uint8Array(0x5000).fill(0xff);
- d(rom,0x100,ptr(0x140));d(rom,0x140,ptr(0x200));
+ d(rom,0x100,ptr(0x140));
  for(let i=0;i<17;i++){
   const header=0x400+i*0x40,layout=0x900+i*0x20;
   const events=0xc00+i*0x20,object=0xf00+i*0x20;
-  d(rom,0x200+i*4,ptr(header));
+  d(rom,0x140+i*4,ptr(header));
   d(rom,header,ptr(layout));d(rom,header+4,ptr(events));
   d(rom,header+8,0);d(rom,header+12,0);
   d(rom,layout,2);d(rom,layout+4,2);
@@ -61,6 +61,6 @@ test('bounded caps, stale pointer and staged read accessor fail safely',()=>{
  assert.throws(()=>audit(rom,atlas,{maxMaps:257}),RangeError);
  const accessor={length:rom.length,read:i=>rom[i]};
  assert.equal(audit(accessor,atlas,{maxMaps:17}).totalGroups,1);
- d(rom,0x200+16*4,ptr(0x500));
+ d(rom,0x140+16*4,ptr(0x500));
  assert.throws(()=>audit(rom,atlas,{maxMaps:17}),/pointer changed/);
 });
