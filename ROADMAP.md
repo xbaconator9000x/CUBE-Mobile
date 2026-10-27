@@ -1,3 +1,8 @@
+## Checkpoint — mobile/offline shortest raw map-link route (28 October 2026)
+- [x] Add origin/destination selection and touch-first shortest raw route inspection with per-hop ROM byte and declared destination navigation.
+- [x] Revalidate atlas inputs and recompute the route before navigation; regenerate offline HTML and add modular/offline UI regression tests.
+- [ ] Authenticate real CUBE layouts and in-game movement, ROM save/reopen, emulator and Android acceptance. Strict parity unchanged. See [mobile raw route](docs/MOBILE_RAW_ROUTE_EXPLORER.md).
+
 ## Checkpoint — shortest raw vanilla map-link route (28 October 2026)
 - [x] Add bounded, deterministic shortest directed route inspection across explicitly declared RSE/FRLG maps, with exact raw warp/connection source offsets and invalid/special link exclusion.
 - [x] Revalidate canonical atlas provenance and raw link counts; add synthetic regression tests for shortest/zero-hop/unreachable paths, stale pointers and fail-closed budgets.
