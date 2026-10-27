@@ -4,9 +4,17 @@
 
 > **Status: v0.5.9 — early foundation, NOT a complete port.** The working code today is an offline ROM inspection / patching workbench and a limited read-only CUBHMA TOML named-anchor inspector. The desktop editor's semantic engine, map/collision/event editors, scripts, sprites, trainers, Pokémon, sound and CUBE upgrades are **not yet ported**.
 
+## Development checkpoint — touch-selectable rendered map
+
+The opt-in vanilla map canvas now displays read-only raw warp/event coordinate badges and lets you tap a rendered metatile to inspect its blockmap and attribute source offsets, behavior and layer, with an explicit jump to hex. It does not authenticate CUBE layouts or interpret walkability. See [touch checkpoint](docs/MAP_CANVAS_TOUCH_CHECKPOINT.md).
+
 ## Development checkpoint — explicit vanilla map atlas
 
 The Blockmaps screen can now inspect a bounded catalog of vanilla map headers using a known bank-table offset and **explicit per-bank map counts**. A selector opens declared maps; warp and connection records can navigate to declared targets. Counts and layouts are not automatically discovered or CUBE-authenticated, and the workflow remains read-only. See [atlas checkpoint](docs/VANILLA_MAP_ATLAS_CHECKPOINT.md).
+
+## Development checkpoint — declared vanilla map-link audit
+
+The manually declared vanilla map atlas can now cross-reference raw warp and connection destinations against supplied bank/map counts, inspect destination warp-record indexes and navigate to declared targets or source bytes. Special 0xFF fields remain unresolved and missing declarations are not treated as proof of invalidity. No CUBE authenticity or semantic writes are implied. See [map-link audit checkpoint](docs/VANILLA_MAP_LINK_AUDIT.md).
 
 ## Development checkpoint — rendered vanilla map canvas
 
