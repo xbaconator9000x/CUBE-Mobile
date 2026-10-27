@@ -1,5 +1,11 @@
 # Roadmap
 
+## Checkpoint — local authentic-ROM acceptance groundwork (28 October 2026)
+- [x] Add an opt-in, local-only CLI for independently supplied SHA-256 and explicit vanilla map declarations, with read-only atlas, event and pointer alias summaries.
+- [x] Reject mismatched hashes and malformed declarations; test against ephemeral synthetic ROM bytes without committing ROM fixtures. See [local map smoke](docs/LOCAL_MAP_SMOKE.md).
+- [ ] Obtain independently vetted CUBE ROM/layout declarations and run genuine save/reopen, emulator and Android hardware acceptance before awarding any strict parity credit.
+
+
 ## Checkpoint — read-only vanilla script branch review (28 October 2026)
 - [x] Classify decoded vanilla call/goto/conditional script pointer operands as known command starts, mid-command hints, unresolved outside-prefix, null, non-ROM or out-of-ROM, with exact source offsets and bounded output.
 - [x] Preserve no-follow/no-write behavior and synthetic regression coverage; [branch audit details](docs/VANILLA_SCRIPT_BRANCH_AUDIT.md).
