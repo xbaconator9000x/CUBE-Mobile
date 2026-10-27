@@ -818,8 +818,8 @@ $('map-atlas-probe').addEventListener('click',()=>safeRun(()=>{
   button.addEventListener('click',()=>safeRun(()=>{
    if(model!==original)throw Error('ROM replaced; probe candidate expired');
    if($('map-layout-family').value!==family||
-      $('map-atlas-counts').value!==counts.join(',')&&
-      parseVanillaBankMapCounts($('map-atlas-counts').value).some((n,i)=>n!==counts[i]))
+      (()=>{const current=parseVanillaBankMapCounts($('map-atlas-counts').value);
+       return current.length!==counts.length||current.some((n,i)=>n!==counts[i]);})())
     throw Error('Declared probe inputs changed; scan again');
    $('map-bank-offset').value=hex(candidate.address);
    $('map-atlas-inspect').click();
