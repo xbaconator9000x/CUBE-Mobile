@@ -34,11 +34,12 @@ test('unknown opcode stops before inventing a command boundary',()=>{
  assert.equal(result.stopOffset,1);
 });
 test('truncated command and ROM end do not consume partial operands',()=>{
- const rom=Uint8Array.from([0x16,0x00,0x40,0x00,0x00,0x04,0x00]);
+ const rom=new Uint8Array(12);
+ rom.set([0x16,0x00,0x40,0x00,0x00,0x04,0x00]);
  const a=inspect(rom,{address:0,family:'RSE',maxBytes:6});
  assert.equal(a.stopReason,'truncated-command');
  assert.equal(a.inspectedBytes,5);
- const b=inspect(rom,{address:5,family:'FRLG'});
+ const b=inspect(rom.subarray(0,7),{address:5,family:'FRLG'});
  assert.equal(b.stopReason,'rom-end');
  assert.equal(b.commands.length,0);
 });
