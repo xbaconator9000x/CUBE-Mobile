@@ -11,3 +11,9 @@ Synthetic tests cover identical and contradictory overlays, bounds, source prove
 ## Repeated named pointer fields
 
 The map metadata gate now audits the number of `map<`, `layout<`, `events<`, `connections<`, `objects<`, `warps<`, `scripts<`, `signposts<` and blockset pointer fields within their respective extracted format scopes. Repeated same-name fields are classified as `ambiguous-format` instead of silently choosing the first match. This is intentionally conservative; genuine HMA aliases may need an authenticated parser before they can be accepted. It does not attempt to parse the complete HMA DSL or grant ROM write authority.
+
+## Pinned upstream CUBE Emerald acceptance fixture
+
+A small MIT-licensed metadata-only excerpt from upstream `cube_emerald.toml` at commit `3044393183e01af2ae1e907fb37e4a75eda6a8dc` now exercises the parser against a real CUBE declaration. Its map header contains a legitimate nested `connections<... connections<...> ...>` hierarchy. Duplicate detection therefore counts pointer names at their **own structural bracket depth**, not across nested arrays, while still rejecting repeated fields at the same depth.
+
+The fixture includes no ROM bytes or proprietary graphics. The real upstream CUBE metadata still yields only an upstream `vanilla-marker` format heuristic, **not** proof that any supplied ROM matches it. Genuine ROM fingerprints, emulator validation and Android acceptance remain unverified.
