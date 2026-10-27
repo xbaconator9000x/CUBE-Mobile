@@ -153,6 +153,7 @@ test('opt-in whole-atlas script operand aliases report aggregate counts only',()
  assert.equal(report.operandAliasAtlas.distinctEventScripts,2);
  assert.equal(report.operandAliasAtlas.operandFields,2);
  assert.equal(report.operandAliasAtlas.sharedTargets,1);
+ assert.equal(report.operandAliasAtlas.mixedRoleTargets,0);
  assert.equal(report.operandAliasAtlas.ownershipAuthenticated,false);
  assert.equal(report.independentParityEvidence,false);
  assert.doesNotMatch(result.stdout,/pointerSourceOffset|targetOffset|message-text|fixture.gba/);
