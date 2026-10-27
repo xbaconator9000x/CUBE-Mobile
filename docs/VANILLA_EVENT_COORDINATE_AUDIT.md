@@ -15,3 +15,9 @@ At most 1,020 raw events are inspected (255 records per family); no more than 12
 ## Verification limits
 
 Synthetic ROM unit tests check shared/out-of-map records, exact offsets, raw high-bit preservation, staged reads, stale atlas rejection and bounds. This is **not** a CUBE layout signature, collision/walkability decoder, safe semantic editor, authentic ROM roundtrip, emulator or Android hardware acceptance. No feature family is upgraded to independently verified parity by this checkpoint.
+
+## Atlas-wide review
+
+Use **Review next 16 maps for raw event coordinate issues** to inspect a bounded page of the manually declared vanilla map catalog. All event counts and flagged statuses are aggregated, while at most 128 findings are shown. The next page requires another tap; the cursor resets when the atlas is invalidated. Findings include bank/map IDs and exact ROM record offsets for touch-to-hex navigation.
+
+A malformed event pointer, invalid staged byte or stale layout aborts the batch instead of returning partial results. This does not prove that overlapping events are erroneous or that any raw collision bits imply passability. It does not establish 20% parity.
