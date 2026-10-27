@@ -5473,10 +5473,14 @@ function auditVanillaAtlasScriptOperandAliases(source,atlas,{
  }
  const shared=[...targets.values()].filter(g=>g.sources.size>1)
   .sort((a,b)=>a.targetOffset-b.targetOffset);
+ const mixedRoleGroups=shared.filter(g=>new Set([...g.sources.values()]
+  .map(ref=>ref.role)).size>1).length;
  const groups=shared.slice(0,maxGroups).map(g=>{
   const all=[...g.sources.values()];
+  const roles=Object.freeze([...new Set(all.map(ref=>ref.role))].sort());
   return Object.freeze({
    targetOffset:g.targetOffset,sourceCount:all.length,
+   roles,mixedRoles:roles.length>1,
    references:Object.freeze(all.slice(0,maxReferences)),
    referencesTruncated:all.length>maxReferences
   });
@@ -5487,6 +5491,7 @@ function auditVanillaAtlasScriptOperandAliases(source,atlas,{
   eventScriptReferences,distinctEventScripts:roots.size,
   decodedScripts,operandFields,inRomOperandFields,
   distinctOperandTargets:targets.size,totalGroups:shared.length,
+  mixedRoleGroups,
   groups:Object.freeze(groups),truncated:shared.length>groups.length,
   stopReasons:Object.freeze(stopReasons),
   wholeDeclaredAtlas:true,readOnly:true,
@@ -7192,7 +7197,8 @@ $('map-script-operand-atlas-audit').addEventListener('click',()=>safeRun(()=>{
  $('map-script-operand-atlas-status').textContent='Reviewed all '+
   result.mapsInspected+' declared maps: '+result.distinctEventScripts+
   ' distinct script roots, '+result.operandFields+' decoded pointer fields, '+
-  result.totalGroups+' shared operand targets'+
+  result.totalGroups+' shared operand targets ('+
+  result.mixedRoleGroups+' mixed-role target(s))'+
   (result.truncated?' (first 24 groups shown)':'')+
   '. Source aliases only; not CUBE grammar, target ownership or permission to write.';
  function navigate(label,offset,group,reference){
@@ -7218,6 +7224,7 @@ $('map-script-operand-atlas-audit').addEventListener('click',()=>safeRun(()=>{
  for(const group of result.groups){
   navigate('Shared operand target ROM 0x'+hex(group.targetOffset)+
    ' · '+group.sourceCount+' distinct pointer sources'+
+   (group.mixedRoles?' · mixed operand roles: review':'')+
    (group.referencesTruncated?' · first 8 shown':'')+
    ' · inspect target',group.targetOffset,group,null);
   for(const ref of group.references)
