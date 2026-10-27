@@ -7,7 +7,7 @@ test('fixed-width music, movement, text and item commands retain exact byte boun
  const bytes=[
   0x33,0x23,0x01,0x01, // playsong word + loop byte
   0x44,0x10,0x00,0x02,0x00, // additem two words
-  0x4f,0xff,0x00,0x40,0,0,0x08, // applymovement npc word + pointer
+  0x4f,0xff,0x00,0x1c,0,0,0x08, // applymovement npc word + pointer
   0x51,0,0, // waitmovement word
   0x67,0x60,0,0,0x08, // preparemsg pointer
   0x66,0x6a,0x5a,0x6c,0x02
@@ -18,7 +18,7 @@ test('fixed-width music, movement, text and item commands retain exact byte boun
   ['waitmovement',16,3],['preparemsg',19,5],['waitmsg',24,1],
   ['lock',25,1],['faceplayer',26,1],['release',27,1],['end',28,1]
  ]);
- assert.equal(r.commands[2].args[1].target.offset,64);
+ assert.equal(r.commands[2].args[1].target.offset,28);
  assert.equal(r.commands[4].args[0].offset,20);
  assert.equal(r.stopReason,'terminal');
  assert.equal(r.controlFlowFollowed,false);
