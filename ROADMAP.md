@@ -1,5 +1,11 @@
 # Roadmap
 
+## Checkpoint — queued immutable map change review (27 October 2026)
+- [x] Queue up to 64 byte-exact blockmap, warp and object/trigger/signpost previews in the touch-friendly map UI and inspect a sorted combined review.
+- [x] Reject stale source bytes, overlapping or duplicate ROM ranges and excessive byte budgets before queueing or reviewing; clear on ROM replacement and metadata reset; include offline UI and tests.
+- [ ] No apply/export permission. Authenticate CUBE version/layout, pointer ownership, relocation and rollback, then independently verify authentic ROM/emulator/Android save roundtrips before enabling semantic writes. Strict parity unchanged.
+
+
 ## Checkpoint — touch-friendly object, trigger and signpost coordinate previews (27 October 2026)
 - [x] Select inspected vanilla object/trigger/signpost records and preview exact 24/16/12-byte before/after records for x/y/elevation, preserving script pointers and all other fields.
 - [x] Reject stale expected bytes, changed ROM/map selection, malformed field values and out-of-map proposed coordinates; regenerate offline HTML and add regression coverage.
