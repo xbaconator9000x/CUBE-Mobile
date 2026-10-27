@@ -10,17 +10,19 @@ import {inspectBlockMap} from './map-blocks.js';
 import {inspectVanillaMapLayout,inspectVanillaMapHeader} from './map-layouts.js';
 import {inspectVanillaMapBankEntry,inspectVanillaMapWarps} from './map-discovery.js';
 import {inspectVanillaMapConnections} from './map-connections.js';
+import {panMapViewport,indexMapWarpMarkers} from './map-viewport.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let pcsReference=null,pcsReferenceName='';
 let fingerprintResult=null,fingerprintAbort=null;
 let metadataFingerprints=[],metadataImportSerial=0;
+let inspectedWarpMap=null;
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
 ctx.imageSmoothingEnabled=false;
-const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-layout-inspect','map-bank-inspect','map-warp-inspect','map-connection-inspect','save-rom','save-project','export-ips','discard-button','edit-unlock'];
+const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-layout-inspect','map-bank-inspect','map-warp-inspect','map-connection-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','discard-button','edit-unlock'];
 const tabs={home:['YOUR WORKSPACE','ROM Workbench'],hex:['BINARY INSPECTOR','Hex editor'],anchors:['ROM SEMANTICS','Named data'],maps:['RAW MAP CELLS','Blockmap inspector'],graphics:['GBA GRAPHICS','Graphics explorer'],patches:['PATCH WORKFLOW','Patch tools'],changes:['REVIEW & EXPORT','Changes']};
 function toast(message,bad=false){const t=$('toast');t.textContent=message;t.classList.toggle('error',bad);t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),4300);}
 function safeRun(fn){try{const result=fn();if(result?.catch) result.catch(err=>toast(err.message||String(err),true));}catch(err){toast(err.message||String(err),true);}}
@@ -184,10 +186,10 @@ $('edit-unlock').addEventListener('change',()=>{if(!$('edit-unlock').checked)toa
 $('write-byte').addEventListener('click',()=>safeRun(()=>{
   ensureModel();if(!$('edit-unlock').checked)throw Error('Unlock raw editing first');if(selected===null)throw Error('Tap a byte first');
   const val=$('selected-value').value.trim();if(!/^[0-9a-f]{1,2}$/i.test(val))throw Error('Enter a 1–2 digit hexadecimal byte');
-  if(model.write(selected,parseInt(val,16))){invalidateDecodedGraphic();clearWarpInspection('ROM bytes changed; inspect warps again.');clearConnectionInspection('ROM bytes changed; inspect connections again.');clearConnectionInspection('ROM bytes changed; inspect connections again.');toast(`Staged edit at 0x${hex(selected)}`);}drawHex();updateIndicators();
+  if(model.write(selected,parseInt(val,16))){invalidateDecodedGraphic();clearWarpInspection('ROM bytes changed; inspect warps again.');clearConnectionInspection('ROM bytes changed; inspect connections again.');clearMapGrid('ROM bytes changed; inspect map cells again.');clearConnectionInspection('ROM bytes changed; inspect connections again.');clearMapGrid('ROM bytes changed; inspect map cells again.');toast(`Staged edit at 0x${hex(selected)}`);}drawHex();updateIndicators();
 }));
-$('undo-button').addEventListener('click',()=>safeRun(()=>{if(model.undo()){invalidateDecodedGraphic();clearWarpInspection('ROM bytes changed; inspect warps again.');clearConnectionInspection('ROM bytes changed; inspect connections again.');drawHex();drawGraphics();updateIndicators();}}));
-$('redo-button').addEventListener('click',()=>safeRun(()=>{if(model.redo()){invalidateDecodedGraphic();clearWarpInspection('ROM bytes changed; inspect warps again.');clearConnectionInspection('ROM bytes changed; inspect connections again.');drawHex();drawGraphics();updateIndicators();}}));
+$('undo-button').addEventListener('click',()=>safeRun(()=>{if(model.undo()){invalidateDecodedGraphic();clearWarpInspection('ROM bytes changed; inspect warps again.');clearConnectionInspection('ROM bytes changed; inspect connections again.');clearMapGrid('ROM bytes changed; inspect map cells again.');drawHex();drawGraphics();updateIndicators();}}));
+$('redo-button').addEventListener('click',()=>safeRun(()=>{if(model.redo()){invalidateDecodedGraphic();clearWarpInspection('ROM bytes changed; inspect warps again.');clearConnectionInspection('ROM bytes changed; inspect connections again.');clearMapGrid('ROM bytes changed; inspect map cells again.');drawHex();drawGraphics();updateIndicators();}}));
 $('selected-value').addEventListener('keydown',e=>{if(e.key==='Enter')$('write-byte').click();});
 // The graphic source and the colour palette are deliberately independent:
 // a generic ROM offset has no known sprite layout or matching palette.
@@ -359,7 +361,7 @@ $('fix-checksum').addEventListener('click',()=>safeRun(()=>{ensureModel();const 
 $('discard-button').addEventListener('click',async()=>{
   if(!model||!model.dirty)return toast('Nothing to discard');
   const yes=await confirmAction('Discard all changes?','This resets your in-memory workspace to the original ROM. Any applied patch and all staged raw edits will be lost.');
-  if(yes){model.reset();page=0;selected=null;resetGraphicState();$('edit-unlock').checked=false;drawHex();drawGraphics();drawChanges();updateIndicators();toast('Reset to original ROM.');}
+  if(yes){model.reset();clearWarpInspection('Edits discarded; inspect warps again.');clearConnectionInspection('Edits discarded; inspect connections again.');clearMapGrid('Edits discarded; inspect map cells again.');page=0;selected=null;resetGraphicState();$('edit-unlock').checked=false;drawHex();drawGraphics();drawChanges();updateIndicators();toast('Reset to original ROM.');}
 });
 window.addEventListener('beforeunload',e=>{if(model?.dirty){e.preventDefault();e.returnValue='';}});
 if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')) navigator.serviceWorker.register('./sw.js').catch(()=>{});
@@ -370,7 +372,7 @@ if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostn
 // engine, game fingerprints and pointer allocator have been ported and tested.
 let displayedAnchors=[], selectedInspection=null;
 const encodeHex=bytes=>Array.from(bytes).map((b,i)=>hex(b,2)+(i%16===15?'\n':' ')).join('').trim();
-function metadataReset(){metadataImportSerial++;metadataFingerprints=[];metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
+function metadataReset(){metadataImportSerial++;metadataFingerprints=[];clearWarpInspection('Metadata reset; inspect warps again.');clearConnectionInspection('Metadata reset; inspect connections again.');clearMapGrid('Metadata reset; inspect map again.');metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
 function snapshotMatchedWords(words=metadataMatchedWords){
   if(!model)return [];
   return words.map(word=>{
@@ -429,6 +431,9 @@ function metadataCommit(sources){
   metadata=nextMetadata;metadataResolution=nextResolution;
   metadataSources=sources.map(({name})=>name);metadataLayoutKind=metadataCheck.layout.kind;
   metadataFingerprints=nextFingerprints;
+  clearWarpInspection('Metadata changed; re-inspect vanilla warps.');
+  clearConnectionInspection('Metadata changed; re-inspect vanilla connections.');
+  clearMapGrid('Metadata changed; recheck vanilla map structure compatibility.');
   selectedAnchor=null;selectedInspection=null;
   drawAnchors();
   toast(`Loaded ${metadata.length} anchor declarations; ${merged.conflictedNames.size} conflicting names; ${metadataResolution.anchoredCount} anchor-length, ${metadataResolution.listCount} list-length and ${metadataResolution.matchedCount} matched-word-length tables · ${metadataLayoutKind} TOML layout · ROM unverified`);
@@ -704,7 +709,16 @@ $('metadata-stock').addEventListener('click',async()=>{
 });
 
 
+function clearMapGrid(message='Map structure changed; inspect again.'){
+  const root=$('map-grid');root.replaceChildren();
+  const empty=document.createElement('div');empty.className='empty-state';
+  empty.textContent=message;root.append(empty);
+  $('map-status').textContent=message;
+  $('map-layout-status').textContent=message+' Vanilla layouts remain unverified.';
+  $('map-bank-status').textContent=message+' Recheck bank pointer provenance.';
+}
 function clearWarpInspection(message='Select a vanilla map header to inspect warp events.'){
+  inspectedWarpMap=null;
   $('map-warp-list').replaceChildren();
   $('map-warp-status').textContent=message;
 }
@@ -746,7 +760,11 @@ $('map-warp-inspect').addEventListener('click',()=>safeRun(()=>{
   if($('map-layout-source').value!=='header')
     throw Error('Select a vanilla map header, not a layout, for warp inspection');
   const address=parseOffset($('map-layout-offset').value);
-  const result=inspectVanillaMapWarps(model,{address,family:$('map-layout-family').value});
+  const family=$('map-layout-family').value;
+  const result=inspectVanillaMapWarps(model,{address,family});
+  const layout=inspectVanillaMapHeader(model,{address,family}).layout;
+  inspectedWarpMap={address:layout.blockmapOffset,width:layout.width,
+    height:layout.height,warps:result.warps};
   const root=$('map-warp-list');
   $('map-warp-status').textContent=result.eventsOffset===null?
     'No vanilla events pointer. Read only; layout unverified.':
@@ -768,6 +786,12 @@ $('map-warp-inspect').addEventListener('click',()=>safeRun(()=>{
     button.addEventListener('click',()=>safeRun(()=>{setPageForOffset(warp.offset);gotoTab('hex');}));
     root.append(button);
   }
+  // Only annotate the blockmap when its exact selected offset/dimensions
+  // match the inspected header. Never overlay on an unrelated raw map.
+  if($('map-offset').value.trim().toUpperCase()===hex(layout.blockmapOffset) &&
+     Number($('map-width').value)===layout.width &&
+     Number($('map-height').value)===layout.height)
+    $('map-inspect').click();
 }));
 
 $('map-connection-inspect').addEventListener('click',()=>safeRun(()=>{
@@ -831,13 +855,22 @@ $('map-inspect').addEventListener('click',()=>safeRun(()=>{
   const width=Number($('map-width').value),height=Number($('map-height').value);
   const x=Number($('map-x').value),y=Number($('map-y').value);
   const preview=inspectBlockMap(model,{address,width,height,x,y,viewportWidth:12,viewportHeight:10});
+  const markerIndex=inspectedWarpMap&&inspectedWarpMap.address===address&&
+    inspectedWarpMap.width===width&&inspectedWarpMap.height===height?
+    indexMapWarpMarkers(inspectedWarpMap.warps,{width,height}):null;
   const grid=$('map-grid');grid.replaceChildren();
   const board=document.createElement('div');board.className='blockmap-grid';
   board.style.gridTemplateColumns='repeat('+preview.columns+', minmax(64px,1fr))';
   for(const row of preview.cells)for(const cell of row){
     const button=document.createElement('button');button.type='button';button.className='blockmap-cell';
-    button.textContent=cell.tileId+' / '+cell.collision;
-    button.title='('+cell.x+','+cell.y+') tile '+cell.tileId+', raw collision/elevation '+cell.collision+', ROM 0x'+hex(cell.byteOffset);
+    const warps=markerIndex?.[cell.x+','+cell.y]||[];
+    button.textContent=cell.tileId+' / '+cell.collision+
+      (warps.length?' · W'+warps.join(',W'):'');
+    button.classList.toggle('has-warp',warps.length>0);
+    button.title='('+cell.x+','+cell.y+') tile '+cell.tileId+
+      ', raw collision/elevation '+cell.collision+
+      (warps.length?', unverified warp(s) '+warps.join(', '):'')+
+      ', ROM 0x'+hex(cell.byteOffset);
     button.setAttribute('aria-label',button.title);
     button.addEventListener('click',()=>safeRun(()=>{setPageForOffset(cell.byteOffset);gotoTab('hex');}));
     board.append(button);
@@ -847,5 +880,20 @@ $('map-inspect').addEventListener('click',()=>safeRun(()=>{
     (preview.truncated?' (partial viewport)':'')+
     '. Each cell: tile ID / raw collision-elevation (0–63). Re-inspect after edits.';
 }));
+
+for(const [id,dx,dy] of [
+  ['map-pan-up',0,-10],['map-pan-down',0,10],
+  ['map-pan-left',-12,0],['map-pan-right',12,0]
+]){
+  $(id).addEventListener('click',()=>safeRun(()=>{
+    ensureModel();
+    const next=panMapViewport({
+      width:Number($('map-width').value),height:Number($('map-height').value),
+      x:Number($('map-x').value),y:Number($('map-y').value),dx,dy
+    });
+    $('map-x').value=String(next.x);$('map-y').value=String(next.y);
+    $('map-inspect').click();
+  }));
+}
 
 updateIndicators();drawGraphics();drawAnchors();renderTab(routeFromHash());

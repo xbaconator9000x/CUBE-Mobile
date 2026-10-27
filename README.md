@@ -25,6 +25,10 @@ The Blockmaps screen now follows an **explicitly supplied vanilla bank pointer t
 
 A read-only map connections inspector now follows the selected vanilla header's connections pointer and displays raw direction codes, signed displacement, target bank/map and source offsets with tap-to-hex navigation. It rejects invalid counts, pointers, bounds and overlaps, but does not authenticate map topology or CUBE expansion formats. See [connections checkpoint](docs/VANILLA_CONNECTIONS_CHECKPOINT.md).
 
+## Development checkpoint — touch map navigation and warp hints
+
+The read-only Blockmaps viewport now supports large touch pan controls and optional raw warp-index markers on matching inspected vanilla map cells. Markers are cleared when the ROM or selected map changes and never represent verified passability. See [touch viewport checkpoint](docs/TOUCH_MAP_VIEWPORT_CHECKPOINT.md).
+
 ## Current working code
 
 - **Exact ROM comparison (unreleased):** after computing the local staged-ROM SHA-256, optionally paste a published expected SHA-256 to compare exact bytes. A matching user-provided digest does **not** authenticate its provenance, CUBE layout or TOML. The bundled curated-profile registry is intentionally **empty** until independently verified CUBE ROM and matching metadata digests exist; no semantic writes are unlocked. See [ROM fingerprint registry requirements](docs/ROM_FINGERPRINT_REGISTRY.md).

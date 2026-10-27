@@ -87,6 +87,12 @@
     <button type="button" id="map-layout-inspect" class="subtle-button" disabled>Read vanilla structure (no writes)</button>
     <output id="map-layout-status" class="palette-note" aria-live="polite">This optional decoder is ONLY for independently verified vanilla-format structures, not CUBE expansion layouts. ROM header identity does not verify a structure.</output>
     <button type="button" id="map-inspect" class="subtle-button" disabled>Inspect 12 × 10 cells</button>
+    <div class="input-row" role="group" aria-label="Pan blockmap viewport">
+      <button type="button" id="map-pan-up" class="secondary-button" disabled>↑ Up 10</button>
+      <button type="button" id="map-pan-down" class="secondary-button" disabled>↓ Down 10</button>
+      <button type="button" id="map-pan-left" class="secondary-button" disabled>← Left 12</button>
+      <button type="button" id="map-pan-right" class="secondary-button" disabled>→ Right 12</button>
+    </div>
     <p class="palette-note">You must independently verify the map's blockmap offset and dimensions. Header identity alone cannot verify CUBE layouts. No bytes are changed. Collision values are raw metadata, not passability colours.</p>
     <output id="map-status" class="palette-note" aria-live="polite">Open a ROM and enter a known blockmap offset.</output>
   </div>

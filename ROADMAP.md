@@ -111,6 +111,12 @@
 - [x] Test bounds, overlaps, empty/null arrays, signed values and ROM immutability.
 - [ ] Authenticate target maps, connection directions and CUBE-specific structures; render actual maps and implement safe writes only after acceptance gates.
 
+## Watchdog checkpoint — touch map viewport and warp hints (27 October 2026)
+- [x] Pan bounded raw blockmap viewport using touch buttons with edge clipping.
+- [x] Annotate matching inspected vanilla blockmap cells with raw warp indices, suppress off-map markers and clear stale overlays after ROM/edit changes.
+- [x] Add pure viewport/marker and mobile/offline integration regressions.
+- [ ] Actual tileset rendering, verified event placement, authenticated CUBE layouts, collision edits and Android hardware acceptance remain outstanding.
+
 ## Milestone 1 — semantic read-only CUBHMA engine
 - [ ] Parse HMA metadata and format DSL, beyond named-anchor fields.
 - [ ] Recognise ROM game/version and CUBE-specific metadata without false positives.
