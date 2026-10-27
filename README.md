@@ -11,7 +11,7 @@ Local and pinned-upstream TOML imports now hash **raw bytes before UTF-8 decodin
 
 ## Development checkpoint — read-only map blockmap codec
 
-`src/map-blocks.js` now implements a source-grounded, **read-only** GBA map blockmap cell decoder, matching upstream CUBHMA's 10-bit tile ID and 6-bit collision/elevation field. It inspects bounded map viewports with strict ROM bounds and preserves exact byte offsets. This is a foundation for map/collision inspection, **not a map editor**: it does not discover map pointers, infer walkability, render graphics, edit maps, or validate CUBE-specific layout ownership. See `tests/map-blocks.test.mjs`.
+`src/map-blocks.js` now implements a source-grounded, **read-only** GBA map blockmap cell decoder, matching upstream CUBHMA's 10-bit tile ID and 6-bit collision/elevation field. It inspects bounded map viewports with strict ROM bounds and preserves exact byte offsets. The **Blockmaps** screen now exposes this codec as a touch-friendly 12 × 10 read-only viewport with manual hex offset and decimal dimensions, including staged edits and tap-to-hex navigation. This is **not a map editor**: it does not discover map pointers, infer walkability, render graphics, edit maps, or validate CUBE-specific layout ownership. See `tests/map-blocks.test.mjs`.
 
 ## Current working code
 
