@@ -3,7 +3,8 @@
  * command prefix. Source: pinned kcradi/CUBHMA
  * src/HexManiac.Core/Models/Code/scriptReference.txt and ScriptParser.cs.
  *
- * Only opcodes with an unambiguous fixed-width signature are recognized.
+ * Only unambiguous fixed-width signatures and pinned vanilla trainerbattle
+ * subtypes 00–08 are recognized.
  * The first unknown opcode, incomplete command or terminal stops decoding.
  * No control-flow following, ASM execution, script ownership inference,
  * ROM writes, CUBE expansion opcode support or script-length claim.
@@ -74,6 +75,12 @@ const VANILLA_COMMANDS=Object.freeze({
   0x6a:['lock',[]],0x6b:['releaseall',[]],0x6c:['release',[]],
   0x6d:['waitkeypress',[]],0x6e:['yesnobox',['byte','byte']]
 });
+// Pinned CUBHMA scriptReference.txt: trainerbattle (5C) is subtype-width
+// dependent. Only shared vanilla subtypes 00–08 are safe to decode here.
+// 09+ differ by game or extension and must stop without guessing.
+const TRAINER_BATTLE_POINTER_COUNTS=Object.freeze({
+  0:2,1:3,2:3,3:1,4:3,5:2,6:4,7:3,8:4
+});
 const VANILLA_TERMINALS=new Set([0x02,0x03,0x05,0x08,0x24,0x27,0x39,0x3a,0x3b,0x3c,0x3d]);
 const ARG_WIDTH=Object.freeze({byte:1,word:2,pointer:4});
 function scriptReader(source){
@@ -116,7 +123,20 @@ export function inspectVanillaScriptCommandPrefix(source,{
  const commands=[];let cursor=address,stopReason='byte-budget',stopOffset=cursor;
  while(cursor<limit&&commands.length<maxCommands){
   const opcode=readScriptByte(rom,cursor);
-  const signature=VANILLA_COMMANDS[opcode];
+  let signature=VANILLA_COMMANDS[opcode];
+  if(opcode===0x5c){
+   if(limit-cursor<2){
+    stopReason=cursor+2>rom.length?'rom-end':'truncated-command';
+    stopOffset=cursor;break;
+   }
+   const subtype=readScriptByte(rom,cursor+1);
+   const pointers=TRAINER_BATTLE_POINTER_COUNTS[subtype];
+   if(pointers===undefined){
+    stopReason='unsupported-trainerbattle';stopOffset=cursor;break;
+   }
+   signature=['trainerbattle',['byte','word','word',
+    ...Array(pointers).fill('pointer')]];
+  }
   if(!signature){stopReason='unknown-opcode';stopOffset=cursor;break;}
   const [name,types]=signature;
   const length=1+types.reduce((n,type)=>n+ARG_WIDTH[type],0);
