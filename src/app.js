@@ -20,6 +20,7 @@ import {auditVanillaScriptOperandPointers} from './vanilla-script-operand-pointe
 import {auditVanillaAtlasScriptAliases} from './vanilla-script-aliases.js';
 import {auditVanillaScriptAliasesAcrossPages} from './vanilla-script-alias-crosspage.js';
 import {auditVanillaAtlasWideScriptAliases} from './vanilla-script-alias-atlas.js';
+import {auditVanillaAtlasScriptOperandAliases} from './vanilla-script-operand-alias-atlas.js';
 import {auditVanillaMapEventScripts} from './vanilla-map-script-audit.js';
 import {inspectVanillaMapBlocksets} from './map-blocksets.js';
 import {panMapViewport,indexMapWarpMarkers,indexMapEventMarkers,inspectRenderedMapPixel,projectRenderedMapMarkers} from './map-viewport.js';
@@ -46,7 +47,7 @@ let model=null, currentTab='home', page=0, selected=null, patchFile=null, palett
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
 ctx.imageSmoothingEnabled=false;
-const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-summary-scan','map-preview-cell','map-visual-compare','map-visual-compare-queue','map-layout-inspect','map-bank-inspect','map-atlas-inspect','map-atlas-probe','map-warp-inspect','map-connection-inspect','map-event-inspect','map-script-pointer-inspect','map-script-map-audit','map-blockset-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','discard-button','edit-unlock'];
+const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-summary-scan','map-preview-cell','map-visual-compare','map-visual-compare-queue','map-layout-inspect','map-bank-inspect','map-atlas-inspect','map-atlas-probe','map-warp-inspect','map-connection-inspect','map-event-inspect','map-script-pointer-inspect','map-script-map-audit','map-script-operand-atlas-audit','map-blockset-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','discard-button','edit-unlock'];
 const tabs={home:['YOUR WORKSPACE','ROM Workbench'],hex:['BINARY INSPECTOR','Hex editor'],anchors:['ROM SEMANTICS','Named data'],maps:['RAW MAP CELLS','Blockmap inspector'],graphics:['GBA GRAPHICS','Graphics explorer'],patches:['PATCH WORKFLOW','Patch tools'],changes:['REVIEW & EXPORT','Changes']};
 function toast(message,bad=false){const t=$('toast');t.textContent=message;t.classList.toggle('error',bad);t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),4300);}
 function safeRun(fn){try{const result=fn();if(result?.catch) result.catch(err=>toast(err.message||String(err),true));}catch(err){toast(err.message||String(err),true);}}
@@ -1007,6 +1008,9 @@ function clearMapAtlas(message='Declared atlas invalidated; inspect again.') {
  $('map-script-atlas-audit').disabled=true;
  $('map-script-atlas-list').replaceChildren();
  $('map-script-atlas-status').textContent='No full-atlas script target review run.';
+ $('map-script-operand-atlas-audit').disabled=true;
+ $('map-script-operand-atlas-list').replaceChildren();
+ $('map-script-operand-atlas-status').textContent='No script operand alias review run.';
  $('map-event-ownership-list').replaceChildren();
  $('map-event-ownership-status').textContent='No event ownership review run.';
  $('map-atlas-alias-list').replaceChildren();
@@ -1125,6 +1129,7 @@ $('map-atlas-inspect').addEventListener('click',()=>safeRun(()=>{
  atlasScriptAliasStart=0;
  $('map-script-crosspage-audit').disabled=false;
  $('map-script-atlas-audit').disabled=false;
+ $('map-script-operand-atlas-audit').disabled=false;
  atlasScriptCrossPageStart=0;
  $('map-coordinate-batch-audit').disabled=false;
  $('map-atlas-status').textContent='Inspected '+atlas.mapCount+' explicitly declared maps across '+
@@ -1696,6 +1701,72 @@ $('map-script-atlas-audit').addEventListener('click',()=>safeRun(()=>{
  if(!result.groups.length){
   const empty=document.createElement('div');empty.className='empty-state';
   empty.textContent='No shared script targets in the declared atlas; this is not proof of script ownership.';
+  root.append(empty);
+ }
+}));
+
+$('map-script-operand-atlas-audit').addEventListener('click',()=>safeRun(()=>{
+ requireVanillaMapFormat();
+ if(!inspectedMapAtlas||inspectedMapAtlas.rom!==model)
+  throw Error('Reinspect the declared atlas before the operand alias review');
+ const atlas=inspectedMapAtlas.atlas;
+ function inputsUnchanged(){
+  const counts=parseVanillaBankMapCounts($('map-atlas-counts').value);
+  return inspectedMapAtlas?.rom===model&&
+   parseOffset($('map-bank-offset').value)===atlas.address&&
+   $('map-layout-family').value===atlas.family&&
+   counts.length===atlas.bankCount&&
+   counts.every((n,i)=>n===atlas.bankMapCounts[i]);
+ }
+ if(!inputsUnchanged())
+  throw Error('Atlas inputs changed; reinspect before the operand alias review');
+ // Keep synchronous mobile inspection bounded; larger declared atlases
+ // must use the explicit local SHA-256 smoke CLI, not a partial UI scan.
+ const opts={maxMaps:512,maxPointerFields:8192,maxScripts:1024,
+  maxOperandFields:8192,maxGroups:24,maxReferences:8,
+  maxBytes:64,maxCommands:16};
+ const result=auditVanillaAtlasScriptOperandAliases(model,atlas,opts);
+ const root=$('map-script-operand-atlas-list');root.replaceChildren();
+ $('map-script-operand-atlas-status').textContent='Reviewed all '+
+  result.mapsInspected+' declared maps: '+result.distinctEventScripts+
+  ' distinct script roots, '+result.operandFields+' decoded pointer fields, '+
+  result.totalGroups+' shared operand targets'+
+  (result.truncated?' (first 24 groups shown)':'')+
+  '. Source aliases only; not CUBE grammar, target ownership or permission to write.';
+ function navigate(label,offset,group,reference){
+  const button=document.createElement('button');button.type='button';
+  button.className='secondary-button';button.style.display='block';
+  button.style.margin='8px 0';button.style.textAlign='left';
+  button.textContent=label;
+  button.addEventListener('click',()=>safeRun(()=>{
+   requireVanillaMapFormat();
+   if(!inputsUnchanged())
+    throw Error('Atlas inputs changed; reinspect before navigation');
+   const fresh=auditVanillaAtlasScriptOperandAliases(model,atlas,opts);
+   const match=fresh.groups.find(g=>g.targetOffset===group.targetOffset&&
+    g.sourceCount===group.sourceCount);
+   if(!match||reference&&!match.references.some(ref=>
+     ref.pointerSourceOffset===reference.pointerSourceOffset&&
+     ref.scriptOffset===reference.scriptOffset&&ref.role===reference.role))
+    throw Error('Script operand aliases changed; rescan before navigation');
+   setPageForOffset(offset);gotoTab('hex');
+  }));
+  root.append(button);
+ }
+ for(const group of result.groups){
+  navigate('Shared operand target ROM 0x'+hex(group.targetOffset)+
+   ' · '+group.sourceCount+' distinct pointer sources'+
+   (group.referencesTruncated?' · first 8 shown':'')+
+   ' · inspect target',group.targetOffset,group,null);
+  for(const ref of group.references)
+   navigate(ref.role+' · source ROM 0x'+hex(ref.pointerSourceOffset)+
+    ' · script ROM 0x'+hex(ref.scriptOffset)+
+    ' · '+ref.eventRootReferences+' event root(s)',
+    ref.pointerSourceOffset,group,ref);
+ }
+ if(!result.groups.length){
+  const empty=document.createElement('div');empty.className='empty-state';
+  empty.textContent='No shared decoded operand targets in this declared atlas. Unknown commands and untraversed branches remain uninspected.';
   root.append(empty);
  }
 }));
