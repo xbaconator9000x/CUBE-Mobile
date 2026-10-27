@@ -12,7 +12,7 @@ import {inspectVanillaMapBankEntry,inspectVanillaMapWarps} from './map-discovery
 import {parseVanillaBankMapCounts,inspectVanillaMapAtlas,lookupVanillaMapAtlasTarget,probeVanillaMapBankTables,auditVanillaAtlasPointerAliases} from './map-atlas.js';
 import {auditVanillaMapLinks,auditVanillaAtlasLinkBatch,auditVanillaMapEventCoordinates,auditVanillaAtlasEventCoordinateBatch} from './map-link-audit.js';
 import {inspectVanillaMapConnections} from './map-connections.js';
-import {inspectVanillaMapEvents,inspectVanillaEventScriptPointers} from './map-events.js';
+import {inspectVanillaMapEvents,inspectVanillaEventScriptPointers,previewVanillaEventScriptBytes} from './map-events.js';
 import {inspectVanillaMapBlocksets} from './map-blocksets.js';
 import {panMapViewport,indexMapWarpMarkers,indexMapEventMarkers,inspectRenderedMapPixel,projectRenderedMapMarkers} from './map-viewport.js';
 import {renderVanillaMapViewport} from './map-render.js';
@@ -751,6 +751,8 @@ function clearEventInspection(message='Select a vanilla map header to inspect ob
   $('map-event-status').textContent=message;
   $('map-script-pointer-list').replaceChildren();
   $('map-script-pointer-status').textContent='No raw script pointer fields inspected.';
+  $('map-script-preview-list').replaceChildren();
+  $('map-script-preview-status').textContent='No raw script byte prefix inspected.';
 }
 function clearBlocksetInspection(message='Select a vanilla map header to inspect tileset pointers.'){
   $('map-blockset-list').replaceChildren();
@@ -1292,6 +1294,9 @@ $('map-script-pointer-inspect').addEventListener('click',()=>safeRun(()=>{
  const address=parseOffset($('map-layout-offset').value);
  const family=$('map-layout-family').value;
  const result=inspectVanillaEventScriptPointers(model,{address,family});
+ const original=model;
+ $('map-script-preview-list').replaceChildren();
+ $('map-script-preview-status').textContent='No raw script byte prefix inspected.';
  const root=$('map-script-pointer-list');root.replaceChildren();
  $('map-script-pointer-status').textContent=result.records.length+
   ' raw object/trigger script fields: '+result.counts.inRom+
@@ -1317,6 +1322,29 @@ $('map-script-pointer-inspect').addEventListener('click',()=>safeRun(()=>{
     setPageForOffset(record.targetOffset);gotoTab('hex');
    }));
    root.append(target);
+   const preview=document.createElement('button');preview.type='button';
+   preview.className='secondary-button';preview.style.margin='0 0 8px 8px';
+   preview.textContent='Preview 32 raw bytes (not decoded)';
+   preview.addEventListener('click',()=>safeRun(()=>{
+    requireVanillaMapFormat();
+    if(model!==original||$('map-layout-source').value!=='header'||
+       parseOffset($('map-layout-offset').value)!==address||
+       $('map-layout-family').value!==family)
+      throw Error('Map/ROM selection changed; reinspect raw script pointers');
+    const bytes=previewVanillaEventScriptBytes(model,{
+      address,family,kind:record.kind,index:record.index,byteCount:32
+    });
+    const root=$('map-script-preview-list');root.replaceChildren();
+    const raw=document.createElement('div');raw.className='palette-note';
+    raw.textContent=bytes.bytes.map(value=>hex(value,2)).join(' ');
+    root.append(raw);
+    $('map-script-preview-status').textContent=bytes.kind+' '+bytes.index+
+      ' · pointer field ROM 0x'+hex(bytes.pointerSourceOffset)+
+      ' · raw target ROM 0x'+hex(bytes.targetOffset)+
+      ' · '+bytes.readBytes+' bytes'+(bytes.truncated?' (ROM end reached)':'')+
+      '. Raw prefix only; command boundaries, script length, ownership and CUBE grammar unverified.';
+   }));
+   root.append(preview);
   }
  }
  if(!result.records.length){
