@@ -48,3 +48,35 @@ test('supports staged readers, rejects bad accessor bytes and preserves source',
  assert.throws(()=>reviewVanillaChangeSet({length:64,read:()=>-1},
   [cell(4,[0,0],[1,0])]),/Invalid staged/);
 });
+
+test('field-aware review decodes raw blockmap, warp and event changes',()=>{
+ const rom=new Uint8Array(96);
+ const cellReview=reviewVanillaChangeSet(rom,[cell(4,[0,0],[1,4])]);
+ assert.deepEqual(cellReview.entries[0].fieldChanges,[
+  {field:'tileId',before:0,after:1},
+  {field:'rawCollision',before:0,after:1}]);
+ const w=Array(8).fill(0),next=[2,0,3,0,1,5,7,9];
+ const warpReview=reviewVanillaChangeSet(rom,[warp(24,w,next)]);
+ assert.deepEqual(warpReview.entries[0].fieldChanges.map(f=>f.field),
+  ['x','y','elevation','warpId','targetMap','targetBank']);
+ const before=Array(24).fill(0),after=before.slice();
+ after[4]=6;after[8]=3;
+ const e=reviewVanillaChangeSet(rom,[event(48,'objects',before,after)]);
+ assert.deepEqual(e.entries[0].fieldChanges,[
+  {field:'x',before:0,after:6},{field:'elevation',before:0,after:3}]);
+ assert.ok(Object.isFrozen(e.entries[0].fieldChanges));
+});
+test('forged event previews cannot modify script pointers, flags or reserved bytes',()=>{
+ const rom=new Uint8Array(96);
+ for(const [kind,size,illegal] of [['objects',24,16],['objects',24,20],
+  ['scripts',16,12],['signposts',12,8]]){
+  const before=Array(size).fill(0),after=before.slice();after[illegal]=9;
+  assert.throws(()=>reviewVanillaChangeSet(rom,[event(32,kind,before,after)]),
+   /non-editable pointer, flag or reserved/);
+ }
+ const original=Array(16).fill(0),legal=original.slice();
+ legal[4]=2;legal[5]=1;
+ const ok=reviewVanillaChangeSet(rom,[event(32,'scripts',original,legal)]);
+ assert.deepEqual(ok.entries[0].fieldChanges,
+  [{field:'elevation',before:0,after:258}]);
+});

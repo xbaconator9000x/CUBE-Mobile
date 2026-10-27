@@ -3866,6 +3866,39 @@ function previewShape(preview){
  }
  throw new TypeError('Unsupported vanilla preview shape');
 }
+// Only the fields actually exposed by the vanilla preview editors may differ.
+// A fabricated preview must never smuggle changes to scripts, flags or pointers.
+const reviewFields=Object.freeze({
+ warp:Object.freeze({x:[0,2],y:[2,2],elevation:[4,1],
+  warpId:[5,1],targetMap:[6,1],targetBank:[7,1]}),
+ objects:Object.freeze({x:[4,2],y:[6,2],elevation:[8,1]}),
+ scripts:Object.freeze({x:[0,2],y:[2,2],elevation:[4,2]}),
+ signposts:Object.freeze({x:[0,2],y:[2,2],elevation:[4,1]})
+});
+function reviewFieldChanges(p){
+ if(p.kind==='blockmap'){
+  const before=p.before[0]|(p.before[1]<<8),after=p.after[0]|(p.after[1]<<8);
+  const changes=[];
+  if((before&1023)!==(after&1023))changes.push(Object.freeze({
+   field:'tileId',before:before&1023,after:after&1023}));
+  if((before>>>10)!==(after>>>10))changes.push(Object.freeze({
+   field:'rawCollision',before:before>>>10,after:after>>>10}));
+  return Object.freeze(changes);
+ }
+ const fields=reviewFields[p.kind],allowed=new Set(),changes=[];
+ for(const [field,[start,size]] of Object.entries(fields)){
+  for(let i=start;i<start+size;i++)allowed.add(i);
+  const original=p.before[start]|(size===2?p.before[start+1]<<8:0);
+  const proposed=p.after[start]|(size===2?p.after[start+1]<<8:0);
+  if(original!==proposed)changes.push(Object.freeze({
+   field,before:original,after:proposed}));
+ }
+ for(let i=0;i<p.length;i++)
+  if(p.before[i]!==p.after[i]&&!allowed.has(i))
+   throw new RangeError('Proposed '+p.kind+' record changes a non-editable pointer, flag or reserved field');
+ return Object.freeze(changes);
+}
+
 /**
  * Re-check every expected original byte and reject overlapping proposals.
  * No ROM mutation, save/export or semantic write permission is possible here.
@@ -3898,7 +3931,7 @@ function reviewVanillaChangeSet(source,previews,{
     throw new RangeError('Original ROM bytes changed; rebuild the previews');
    if(p.after[i]!==p.before[i])changedBytes++;
   }
-  spans.push({index,...p});
+  spans.push({index,...p,fieldChanges:reviewFieldChanges(p)});
  }
  spans.sort((a,b)=>a.offset-b.offset||a.index-b.index);
  for(let i=1;i<spans.length;i++)
@@ -3907,7 +3940,8 @@ function reviewVanillaChangeSet(source,previews,{
  const entries=spans.map(p=>Object.freeze({
   sourceIndex:p.index,kind:p.kind,offset:p.offset,length:p.length,
   changed:p.after.some((n,i)=>n!==p.before[i]),
-  before:Object.freeze([...p.before]),after:Object.freeze([...p.after])
+  before:Object.freeze([...p.before]),after:Object.freeze([...p.after]),
+  fieldChanges:p.fieldChanges
  }));
  return Object.freeze({
   count:entries.length,totalBytes,changedBytes,
@@ -4841,6 +4875,8 @@ $('map-review-run').addEventListener('click',()=>safeRun(()=>{
   button.style.margin='8px 0';button.style.textAlign='left';
   button.textContent=entry.kind+' ROM 0x'+hex(entry.offset)+
    ' · '+entry.length+' bytes · '+(entry.changed?'change':'unchanged')+
+   (entry.fieldChanges.length?' · '+entry.fieldChanges.map(f=>
+    f.field+': '+f.before+' → '+f.after).join('; '):'')+
    ' · inspect original hex';
   button.addEventListener('click',()=>safeRun(()=>{
    if(mapReviewRom!==model)throw Error('Review belongs to another ROM');
