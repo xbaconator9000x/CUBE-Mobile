@@ -7,3 +7,7 @@ The bounded reverse-reference scan examines at most 32 declared maps per call (d
 Every source map and destination is rechecked against its stored map-pointer source, map header, layout, dimensions and blockmap offset before interpretation. The caller must still provide explicit bank counts and vanilla family. This neither authenticates a CUBE layout nor verifies a real runtime teleport, collision or connection behavior. ROM bytes are never written.
 
 Synthetic tests cover exact source offsets, pagination, truncation, raw special/invalid warp indexes, stale pointers/layouts, staged accessors and immutability. Authentic ROM and emulator acceptance, Android device testing and semantic editing remain outstanding.
+
+## Mobile usage
+
+In the Blockmaps atlas section, inspect an explicitly declared vanilla atlas, select a destination map, and choose **Find incoming links**. Each press scans the next 16 declared source maps, showing incoming warp and connection records with their exact ROM offsets. Tap a record to inspect its bytes or open its source map. Changing the destination or replacing the ROM resets the scan. Reinspect after changing bank counts, bank-table offset or family. The scan does not establish that a teleport or connection functions in an emulator.

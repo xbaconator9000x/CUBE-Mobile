@@ -1,0 +1,30 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {Script} from 'node:vm';
+const read=p=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
+test('incoming-link explorer is available on mobile and resets on map selection/ROM replacement',()=>{
+ const app=read('src/app.js'),html=read('index.html');
+ assert.match(html,/id="map-atlas-incoming"/);
+ assert.match(html,/id="map-atlas-incoming-status"/);
+ assert.match(html,/id="map-atlas-incoming-list"/);
+ assert.match(app,/auditVanillaAtlasIncomingLinks\(model,atlas,/);
+ assert.match(app,/atlasIncomingStart=0;atlasIncomingTarget=null/);
+ assert.match(app,/\$\('map-atlas-select'\)\.addEventListener\('change'/);
+ assert.match(app,/counts\.some\(\(n,i\)=>n!==atlas\.bankMapCounts\[i\]\)/);
+ assert.match(app,/result\.nextStart\?\?0/);
+ assert.match(app,/openDeclaredAtlasMap\(source\)/);
+ assert.match(app,/setPageForOffset\(record\.recordOffset\);gotoTab\('hex'\)/);
+ assert.match(app,/page, not a complete inbound index/);
+ assert.doesNotMatch(app,/auditVanillaAtlasIncomingLinks[\s\S]{0,500}model\.write/);
+});
+test('standalone incoming-link explorer parses with no module imports',()=>{
+ const offline=read('app/CUBHMA_Mobile_Lab_Offline.html');
+ assert.match(offline,/function auditVanillaAtlasIncomingLinks\(/);
+ assert.match(offline,/id="map-atlas-incoming"/);
+ assert.match(offline,/incoming raw links found on this page/);
+ const match=offline.match(/<script>\n'use strict';\n([\s\S]*?)\n<\/script>/);
+ assert.ok(match);
+ assert.doesNotThrow(()=>new Script("'use strict';\n"+match[1]));
+ assert.doesNotMatch(match[1],/^import \{/m);
+});
