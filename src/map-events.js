@@ -142,3 +142,36 @@ export function inspectVanillaEventScriptPointers(source,{address,family}={}){
   records:Object.freeze(records),readOnly:true,layoutAuthenticated:false,
   scriptsDecoded:false});
 }
+
+/**
+ * Preview a bounded prefix of raw bytes at one explicitly selected vanilla
+ * object/trigger script pointer. This is NOT a script parser or length finder.
+ * Upstream CUBHMA ScriptParser uses game-dependent command definitions; bytes
+ * must never be treated as executable instructions without that grammar.
+ */
+export function previewVanillaEventScriptBytes(source,{
+ address,family,kind,index,byteCount=32
+}={}){
+ const rom=eventAccessor(source);
+ if(kind!=='objects'&&kind!=='scripts')
+  throw new RangeError('Choose a vanilla object or trigger script record');
+ if(!Number.isSafeInteger(index)||index<0||index>254)
+  throw new RangeError('Script record index must be 0–254');
+ if(!Number.isSafeInteger(byteCount)||byteCount<1||byteCount>64)
+  throw new RangeError('Raw preview is limited to 1–64 bytes');
+ const pointers=inspectVanillaEventScriptPointers(rom,{address,family});
+ const record=pointers.records.find(x=>x.kind===kind&&x.index===index);
+ if(!record)throw new RangeError('Script record not found in selected map');
+ if(record.status!=='in-rom'||record.targetOffset===null)
+  throw new RangeError('Selected script pointer has no in-ROM target');
+ const available=Math.min(byteCount,rom.length-record.targetOffset);
+ const bytes=[];
+ for(let i=0;i<available;i++)bytes.push(eventU8(rom,record.targetOffset+i));
+ return Object.freeze({
+  kind,index,pointerSourceOffset:record.sourceOffset,
+  rawPointer:record.rawPointer,targetOffset:record.targetOffset,
+  requestedBytes:byteCount,readBytes:available,
+  truncated:available<byteCount,bytes:Object.freeze(bytes),
+  readOnly:true,scriptsDecoded:false,layoutAuthenticated:false
+ });
+}

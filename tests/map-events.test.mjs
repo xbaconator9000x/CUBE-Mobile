@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {inspectVanillaMapEvents,inspectVanillaEventScriptPointers} from '../src/map-events.js';
+import {inspectVanillaMapEvents,inspectVanillaEventScriptPointers,previewVanillaEventScriptBytes} from '../src/map-events.js';
 const ptr=n=>0x08000000+n;
 function u32(rom,at,n){for(let i=0;i<4;i++)rom[at+i]=(n>>>(8*i))&255;}
 function u16(rom,at,n){rom[at]=n&255;rom[at+1]=(n>>>8)&255;}
@@ -81,4 +81,49 @@ test('script pointer inspection retains zero, non-ROM and out-of-ROM values',()=
  assert.equal(result.records[1].targetOffset,null);
  const staged={length:rom.length,read:i=>i>=0x2b0&&i<0x2b4?0:rom[i]};
  assert.equal(inspectVanillaEventScriptPointers(staged,{address:0x100,family:'RSE'}).records[0].status,'null');
+});
+
+test('bounded raw script preview preserves source pointer and exact target bytes',()=>{
+ const rom=fixture(),before=rom.slice();
+ const a=previewVanillaEventScriptBytes(rom,{address:0x100,family:'RSE',
+  kind:'objects',index:0,byteCount:4});
+ assert.equal(a.pointerSourceOffset,0x2b0);
+ assert.equal(a.targetOffset,0x350);
+ assert.equal(a.rawPointer,ptr(0x350));
+ assert.deepEqual(a.bytes,[255,255,255,255]);
+ assert.equal(a.readBytes,4);
+ assert.equal(a.truncated,false);
+ assert.equal(a.scriptsDecoded,false);
+ assert.equal(a.layoutAuthenticated,false);
+ assert.ok(Object.isFrozen(a)&&Object.isFrozen(a.bytes));
+ assert.deepEqual(rom,before);
+ const b=previewVanillaEventScriptBytes(rom,{address:0x100,family:'RSE',
+  kind:'scripts',index:0,byteCount:1});
+ assert.equal(b.targetOffset,0x380);
+ assert.deepEqual(b.bytes,[255]);
+});
+test('raw script preview respects ROM end and staged bytes without writes',()=>{
+ const rom=fixture();u32(rom,0x2b0,ptr(0x4fe));rom[0x4fe]=0x12;rom[0x4ff]=0x34;
+ const staged={length:rom.length,read:i=>i===0x4fe?0x56:rom[i]};
+ const a=previewVanillaEventScriptBytes(staged,{address:0x100,family:'RSE',
+  kind:'objects',index:0,byteCount:8});
+ assert.deepEqual(a.bytes,[0x56,0x34]);
+ assert.equal(a.readBytes,2);assert.equal(a.truncated,true);
+ assert.equal(rom[0x4fe],0x12);
+ assert.throws(()=>previewVanillaEventScriptBytes(
+  {length:rom.length,read:i=>i===0x4fe?300:rom[i]},
+  {address:0x100,family:'RSE',kind:'objects',index:0,byteCount:8}),/Invalid ROM accessor byte/);
+});
+test('raw script preview rejects absent, unsafe and malformed pointers',()=>{
+ const rom=fixture();
+ for(const extra of [{kind:'warps',index:0},{kind:'objects',index:-1},
+  {kind:'objects',index:1},{kind:'objects',index:0,byteCount:0},
+  {kind:'objects',index:0,byteCount:65},{kind:'objects',index:0,byteCount:1.5}])
+  assert.throws(()=>previewVanillaEventScriptBytes(rom,{address:0x100,family:'RSE',...extra}));
+ u32(rom,0x2b0,0);
+ assert.throws(()=>previewVanillaEventScriptBytes(rom,{address:0x100,family:'RSE',
+  kind:'objects',index:0}),/no in-ROM target/);
+ u32(rom,0x2b0,ptr(0x600));
+ assert.throws(()=>previewVanillaEventScriptBytes(rom,{address:0x100,family:'RSE',
+  kind:'objects',index:0}),/no in-ROM target/);
 });
