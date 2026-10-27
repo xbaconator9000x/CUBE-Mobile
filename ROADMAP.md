@@ -1,3 +1,8 @@
+## Checkpoint — shortest raw vanilla map-link route (28 October 2026)
+- [x] Add bounded, deterministic shortest directed route inspection across explicitly declared RSE/FRLG maps, with exact raw warp/connection source offsets and invalid/special link exclusion.
+- [x] Revalidate canonical atlas provenance and raw link counts; add synthetic regression tests for shortest/zero-hop/unreachable paths, stale pointers and fail-closed budgets.
+- [ ] Wire touchscreen/offline route navigation; authenticate CUBE-specific structures and perform genuine ROM/emulator/Android acceptance. Strict parity unchanged. See [raw route explorer](docs/VANILLA_RAW_ROUTE_EXPLORER.md).
+
 ## Checkpoint — opt-in local ROM raw warp graph smoke (28 October 2026)
 - [x] Add SHA-256-matched opt-in whole-atlas raw link graph aggregates with no exported edges, event bytes or map pointer sources.
 - [x] Strictly validate the manifest flag and test two-map directed synthetic roundtrips without writing ROM bytes.
