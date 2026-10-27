@@ -2650,8 +2650,16 @@ $('metadata-picker').addEventListener('change',async e=>{
   const files=[...(e.target.files||[])];e.target.value='';if(!files.length)return;
   try{
     const snapshot=metadataImportSnapshot(),serial=++metadataImportSerial,sources=[];
+    // Refuse oversized selections before allocating any file buffers.
+    if(files.length>16)throw Error('Too many metadata files (maximum 16)');
+    let total=0;
     for(const file of files){
-      if(file.size<1||file.size>4*1024*1024)throw Error('Metadata file must contain 1 byte to 4 MiB');
+      if(!Number.isSafeInteger(file.size)||file.size<1||file.size>4*1024*1024)
+        throw Error('Metadata file must contain 1 byte to 4 MiB');
+      total+=file.size;
+      if(total>16*1024*1024)throw Error('Metadata files exceed 16 MiB total');
+    }
+    for(const file of files){
       const bytes=new Uint8Array(await file.arrayBuffer());
       assertMetadataImportCurrent(snapshot,serial);
       sources.push(decodeMetadataSource(file.name,bytes));
