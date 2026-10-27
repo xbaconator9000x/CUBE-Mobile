@@ -1,5 +1,10 @@
 # Roadmap
 
+## Checkpoint — mobile shared event-script targets (28 October 2026)
+- [x] Page through 16 explicitly declared vanilla maps for exact shared object/trigger script targets and source pointer offsets.
+- [x] Revalidate atlas inputs and each finding before raw hex navigation; support modular/offline mobile UI and synthetic regressions.
+- [ ] Cross-page alias coverage, authenticated CUBE script ownership, safe repointing, genuine ROM/emulator/Android acceptance remain outstanding. See [mobile alias explorer](docs/MOBILE_SCRIPT_ALIASES.md).
+
 ## Checkpoint — mobile vanilla script operand role review (28 October 2026)
 - [x] Display bounded pointer-role hints from selected vanilla object/trigger scripts, with exact source and in-ROM target navigation.
 - [x] Revalidate selected event pointer and decoded operand bytes before navigation; include standalone offline build and regression tests.
