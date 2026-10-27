@@ -36,3 +36,29 @@ export function indexMapWarpMarkers(warps,{width,height}={}){
   for(const key of Object.keys(markers))Object.freeze(markers[key]);
   return Object.freeze(markers);
 }
+
+/**
+ * Spatial hints for raw vanilla object/script/signpost records.
+ * Labels are identifiers only, not verified passability or script semantics.
+ * Out-of-map records are omitted; the caller must match source layout identity.
+ */
+export function indexMapEventMarkers(arrays,{width,height}={}){
+  viewportDimension(width,'Map width');viewportDimension(height,'Map height');
+  if(!arrays||typeof arrays!=='object')throw new TypeError('Expected event arrays');
+  const markers=Object.create(null);
+  for(const [name,prefix] of [['objects','O'],['scripts','S'],['signposts','P']]){
+    const records=arrays[name];
+    if(!Array.isArray(records)||records.length>255)
+      throw new RangeError('Invalid '+name+' event array');
+    for(const record of records){
+      if(!record||!Number.isSafeInteger(record.x)||!Number.isSafeInteger(record.y)||
+         !Number.isSafeInteger(record.index)||record.index<0||record.index>254)
+        throw new RangeError('Invalid '+name+' event coordinates/index');
+      if(record.x<0||record.y<0||record.x>=width||record.y>=height)continue;
+      const key=record.x+','+record.y;
+      (markers[key]??=[]).push(prefix+record.index);
+    }
+  }
+  for(const key of Object.keys(markers))Object.freeze(markers[key]);
+  return Object.freeze(markers);
+}
