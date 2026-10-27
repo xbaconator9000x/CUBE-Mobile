@@ -6,6 +6,7 @@ import {parseHmaPcsReference,decodeHmaPcsReference} from './pcs-reference.js';
 import {fingerprintRomSha256,fingerprintMatchesRom} from './rom-fingerprint.js';
 import {compareRomIdentity} from './rom-compatibility.js';
 import {fingerprintMetadataFiles,compareRomMetadataFingerprintRecords} from './metadata-fingerprint.js';
+import {inspectBlockMap} from './map-blocks.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
@@ -16,8 +17,8 @@ let model=null, currentTab='home', page=0, selected=null, patchFile=null, palett
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
 ctx.imageSmoothingEnabled=false;
-const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','save-rom','save-project','export-ips','discard-button','edit-unlock'];
-const tabs={home:['YOUR WORKSPACE','ROM Workbench'],hex:['BINARY INSPECTOR','Hex editor'],anchors:['ROM SEMANTICS','Named data'],graphics:['GBA GRAPHICS','Graphics explorer'],patches:['PATCH WORKFLOW','Patch tools'],changes:['REVIEW & EXPORT','Changes']};
+const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','save-rom','save-project','export-ips','discard-button','edit-unlock'];
+const tabs={home:['YOUR WORKSPACE','ROM Workbench'],hex:['BINARY INSPECTOR','Hex editor'],anchors:['ROM SEMANTICS','Named data'],maps:['RAW MAP CELLS','Blockmap inspector'],graphics:['GBA GRAPHICS','Graphics explorer'],patches:['PATCH WORKFLOW','Patch tools'],changes:['REVIEW & EXPORT','Changes']};
 function toast(message,bad=false){const t=$('toast');t.textContent=message;t.classList.toggle('error',bad);t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),4300);}
 function safeRun(fn){try{const result=fn();if(result?.catch) result.catch(err=>toast(err.message||String(err),true));}catch(err){toast(err.message||String(err),true);}}
 function confirmAction(title,description){return new Promise(resolve=>{const d=$('confirm-dialog');$('confirm-title').textContent=title;$('confirm-text').textContent=description;d.showModal();d.addEventListener('close',()=>resolve(d.returnValue==='yes'),{once:true});});}
@@ -26,7 +27,7 @@ function ensureModel(){if(!model)throw Error('Open a GBA ROM first');return mode
 // file:// standalone HTML app. Each tab change creates a real history entry,
 // allowing Android's system Back gesture/button to return to the previous tab.
 const routeFromHash=()=>{
-  const match=/^#\/(home|hex|anchors|graphics|patches|changes)$/.exec(location.hash);
+  const match=/^#\/(home|hex|anchors|maps|graphics|patches|changes)$/.exec(location.hash);
   return match ? match[1] : 'home';
 };
 function renderTab(name){
@@ -96,7 +97,7 @@ function updateIndicators(){
   if(active)showRomInfo();
   drawMetadataFingerprintStatus();
 }
-function installModel(name,bytes){metadataImportSerial++;metadataFingerprints=[];pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
+function installModel(name,bytes){$('map-grid').innerHTML='<div class="empty-state">No blockmap inspected.</div>';$('map-status').textContent='ROM replaced. Enter a verified offset and inspect again.';metadataImportSerial++;metadataFingerprints=[];pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
 $('rom-picker').addEventListener('change',async e=>{
   const file=e.target.files?.[0];e.target.value='';if(!file)return;
   if(file.size<0xC0 || file.size>MAX_BYTES)return toast('ROM must be 192 bytes to 128 MiB',true);
@@ -698,5 +699,31 @@ $('metadata-stock').addEventListener('click',async()=>{
     metadataCommit(sources);
   }catch(err){toast('Stock metadata: '+err.message,true);}finally{$('metadata-stock').disabled=false;}
 });
+
+
+// A manually supplied blockmap address is NOT a verified map layout. This
+// view deliberately never interprets the high six bits as walkability.
+$('map-inspect').addEventListener('click',()=>safeRun(()=>{
+  ensureModel();
+  const address=parseOffset($('map-offset').value);
+  const width=Number($('map-width').value),height=Number($('map-height').value);
+  const x=Number($('map-x').value),y=Number($('map-y').value);
+  const preview=inspectBlockMap(model,{address,width,height,x,y,viewportWidth:12,viewportHeight:10});
+  const grid=$('map-grid');grid.replaceChildren();
+  const board=document.createElement('div');board.className='blockmap-grid';
+  board.style.gridTemplateColumns='repeat('+preview.columns+', minmax(64px,1fr))';
+  for(const row of preview.cells)for(const cell of row){
+    const button=document.createElement('button');button.type='button';button.className='blockmap-cell';
+    button.textContent=cell.tileId+' / '+cell.collision;
+    button.title='('+cell.x+','+cell.y+') tile '+cell.tileId+', raw collision/elevation '+cell.collision+', ROM 0x'+hex(cell.byteOffset);
+    button.setAttribute('aria-label',button.title);
+    button.addEventListener('click',()=>safeRun(()=>{setPageForOffset(cell.byteOffset);gotoTab('hex');}));
+    board.append(button);
+  }
+  grid.append(board);
+  $('map-status').textContent=preview.columns+' × '+preview.rows+' cells from 0x'+hex(address)+
+    (preview.truncated?' (partial viewport)':'')+
+    '. Each cell: tile ID / raw collision-elevation (0–63). Re-inspect after edits.';
+}));
 
 updateIndicators();drawGraphics();drawAnchors();renderTab(routeFromHash());
