@@ -171,6 +171,17 @@
     <button type="button" id="map-event-inspect" class="subtle-button" disabled>Inspect vanilla objects, scripts and signposts</button>
     <output id="map-event-status" class="palette-note" aria-live="polite">Select a known vanilla map header to inspect raw object, script trigger and signpost records. Read only.</output>
     <div id="map-event-list" class="anchor-list" aria-label="Read-only object, script and signpost records"><div class="empty-state">No additional event records inspected.</div></div>
+    <div class="toolbar-card" aria-label="Read-only proposed event coordinate change">
+      <h3>Preview object / trigger / signpost coordinates (no writes)</h3>
+      <p class="palette-note">Choose “Plan coordinate changes” beside an inspected event. Script pointers, flags and all other bytes are preserved. Shared arrays and CUBE layouts are not authenticated.</p>
+      <div class="input-row">
+        <div class="input-wrap"><label for="map-event-preview-x">Proposed X</label><input id="map-event-preview-x" type="number" min="0" max="65535" step="1"></div>
+        <div class="input-wrap"><label for="map-event-preview-y">Proposed Y</label><input id="map-event-preview-y" type="number" min="0" max="65535" step="1"></div>
+        <div class="input-wrap"><label for="map-event-preview-elevation">Proposed elevation</label><input id="map-event-preview-elevation" type="number" min="0" max="65535" step="1"></div>
+      </div>
+      <button type="button" id="map-event-preview" class="subtle-button" disabled>Preview exact event record bytes</button>
+      <output id="map-event-preview-status" class="palette-note" aria-live="polite">Select a raw event record to preview proposed bytes. No writes.</output>
+    </div>
     <button type="button" id="map-script-pointer-inspect" class="subtle-button" disabled>Inspect raw object/trigger script pointer fields (read only)</button>
     <output id="map-script-pointer-status" class="palette-note" aria-live="polite">No raw script pointer fields inspected.</output>
     <div id="map-script-pointer-list" class="anchor-list" aria-label="Unverified raw script pointer fields"></div>
