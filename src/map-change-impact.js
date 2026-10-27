@@ -102,7 +102,7 @@ export function auditVanillaChangeImpact(source,atlas,previews,{
       const ev=eventsByHeader.get(c.map.headerOffset);
       const index=(entry.offset-c.offset)/c.unit;
       if(preview.eventsOffset===ev.eventsOffset&&
-         (entry.kind==='warps'?preview.warpIndex===index:
+         (entry.kind==='warp'?preview.warpIndex===index:
           preview.index===index&&preview.arrayOffset===c.offset))
        sourceProvenance=true;
      }
