@@ -1,3 +1,8 @@
+## Checkpoint — local CUBHMA map-bank metadata inspection (28 October 2026)
+- [x] Add opt-in local-only CLI for multiple TOML sources with bounded UTF-8 reads, declaration conflict checks, and aggregate map-format section reporting.
+- [x] Test CLI output, contradictory metadata, missing anchors, malformed UTF-8, file-size limits and zero ROM write authority.
+- [ ] Integrate into mobile Named Data; independently verify authentic CUBE metadata and ROM identity before any semantic decoding, editing or strict parity credit. See [local report](docs/LOCAL_HMA_MAP_METADATA_REPORT.md).
+
 ## Checkpoint — exact CUBHMA map-bank TOML provenance (28 October 2026)
 - [x] Resolve the upstream `data.maps.banks` named anchor from actual imported TOML source texts, rather than trusting an arbitrary format string.
 - [x] Preserve source/line/address evidence, reject conflicting overlay declarations and malformed/out-of-ROM metadata, then extract only bounded read-only custom map-format hints.
