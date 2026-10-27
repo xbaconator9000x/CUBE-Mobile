@@ -1,3 +1,8 @@
+## Checkpoint — opt-in local full-atlas script alias smoke (28 October 2026)
+- [x] Add SHA-256-matched, opt-in aggregate alias counts for every explicitly declared vanilla map, with no pointer addresses or ROM bytes in the report.
+- [x] Reject malformed flags and oversized scans; add synthetic multi-map and no-export regressions.
+- [ ] Independently verify authentic CUBE layouts, save/reopen, emulator and Android acceptance. No strict parity credit.
+
 ## Checkpoint — atlas-wide shared vanilla script targets (28 October 2026)
 - [x] Audit all explicitly declared vanilla maps in a single capped, fail-closed pass, including aliases separated by arbitrary 64-map scan windows.
 - [x] Preserve exact event pointer-field provenance, count all references while capping displayed groups, and reject stale map pointers/layouts and oversized audits.
