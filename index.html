@@ -149,6 +149,22 @@
     <button type="button" id="map-warp-inspect" class="subtle-button" disabled>Inspect vanilla warps for selected header</button>
     <output id="map-warp-status" class="palette-note" aria-live="polite">Select a known vanilla map header to inspect event counts and warp destinations. Read only.</output>
     <div id="map-warp-list" class="anchor-list" aria-label="Read-only warp events"><div class="empty-state">No warp events inspected.</div></div>
+    <div class="toolbar-card" aria-label="Read-only proposed warp record change">
+      <h3>Preview warp byte changes (no writes)</h3>
+      <p class="palette-note">Choose “Plan byte changes” beside a raw vanilla warp. These are exact record bytes, not authenticated CUBE teleport rules.</p>
+      <div class="input-row">
+        <div class="input-wrap"><label for="map-warp-preview-x">X</label><input id="map-warp-preview-x" type="number" min="0" max="65535" step="1"></div>
+        <div class="input-wrap"><label for="map-warp-preview-y">Y</label><input id="map-warp-preview-y" type="number" min="0" max="65535" step="1"></div>
+        <div class="input-wrap"><label for="map-warp-preview-elevation">Elevation</label><input id="map-warp-preview-elevation" type="number" min="0" max="255" step="1"></div>
+      </div>
+      <div class="input-row">
+        <div class="input-wrap"><label for="map-warp-preview-warp-id">Target warp ID</label><input id="map-warp-preview-warp-id" type="number" min="0" max="255" step="1"></div>
+        <div class="input-wrap"><label for="map-warp-preview-target-map">Target map</label><input id="map-warp-preview-target-map" type="number" min="0" max="255" step="1"></div>
+        <div class="input-wrap"><label for="map-warp-preview-target-bank">Target bank</label><input id="map-warp-preview-target-bank" type="number" min="0" max="255" step="1"></div>
+      </div>
+      <button type="button" id="map-warp-preview" class="subtle-button" disabled>Preview exact eight-byte record</button>
+      <output id="map-warp-preview-status" class="palette-note" aria-live="polite">Select a raw warp record to preview proposed bytes. No writes.</output>
+    </div>
     <button type="button" id="map-event-inspect" class="subtle-button" disabled>Inspect vanilla objects, scripts and signposts</button>
     <output id="map-event-status" class="palette-note" aria-live="polite">Select a known vanilla map header to inspect raw object, script trigger and signpost records. Read only.</output>
     <div id="map-event-list" class="anchor-list" aria-label="Read-only object, script and signpost records"><div class="empty-state">No additional event records inspected.</div></div>

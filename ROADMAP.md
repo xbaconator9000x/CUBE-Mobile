@@ -1,5 +1,10 @@
 # Roadmap
 
+## Checkpoint — touch-friendly proposed warp record byte preview (27 October 2026)
+- [x] Select any inspected vanilla warp and preview proposed x/y/elevation/target IDs as an exact eight-byte before/after record, with expected-original-byte stale checks.
+- [x] No ROM writes, pointer repointing or semantic permissions; standalone offline UI and regression tests included.
+- [ ] Authenticate CUBE warp grammar and shared event-array ownership before permitting transactional edits. No strict parity score change.
+
 ## Checkpoint — mobile raw warp arrival tracing (27 October 2026)
 - [x] Follow selected declared vanilla warp IDs to recorded destination warp coordinates, center mobile blockmap on that cell and report exact source/target ROM offsets.
 - [x] Reject ambiguous aliased source headers, stale atlas snapshots, special IDs, out-of-range destination indexes and out-of-bounds arrival records; no script execution or ROM writes.
