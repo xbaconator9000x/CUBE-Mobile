@@ -4,7 +4,7 @@
  * Equal destinations are only structural aliases, never allocation ownership.
  */
 import {inspectVanillaEventScriptPointers} from './map-events.js';
-import {inspectVanillaMapHeader} from './map-layouts.js';
+import {inspectVanillaMapBankEntry} from './map-discovery.js';
 
 function atlasAliasReader(source) {
  if(source instanceof Uint8Array)return {length:source.length,read:i=>source[i]};
@@ -45,8 +45,15 @@ export function auditVanillaAtlasWideScriptAliases(source,atlas,{
   throw new RangeError('Invalid atlas-wide alias audit limits');
  if(atlas.maps.length>maxMaps)
   throw new RangeError('Declared atlas exceeds scan map budget; no partial result');
+ const counts=atlas.bankMapCounts;
+ if(!Number.isSafeInteger(atlas.address)||atlas.address<0||
+    atlas.address%4!==0||!Array.isArray(counts)||
+    counts.length<1||counts.length>256||
+    counts.some(n=>!Number.isSafeInteger(n)||n<1||n>1024)||
+    counts.reduce((a,b)=>a+b,0)!==atlas.maps.length)
+  throw new RangeError('Declared atlas has inconsistent bank-table provenance');
  const targets=new Map();
- let pointerFields=0,inRomPointers=0;
+ let pointerFields=0,inRomPointers=0,expectedBank=0,expectedMap=0;
  for(let ordinal=0;ordinal<atlas.maps.length;ordinal++){
   const map=atlas.maps[ordinal];
   if(!map||![map.mapHeaderOffset,map.mapPointerSource,map.bankIndex,
@@ -54,11 +61,23 @@ export function auditVanillaAtlasWideScriptAliases(source,atlas,{
       .every(n=>Number.isSafeInteger(n)&&n>=0)||
      map.mapHeaderOffset>=0x02000000)
    throw new RangeError('Invalid declared map provenance');
+  if(map.bankIndex!==expectedBank||map.mapIndex!==expectedMap)
+   throw new RangeError('Declared atlas map order or bank identity changed');
+  expectedMap++;
+  if(expectedMap===counts[expectedBank]){expectedBank++;expectedMap=0;}
+  // Re-derive the canonical bank/map source from the ROM's bank table.
+  // A matching pointer value at a forged offset is not map provenance.
+  const canonical=inspectVanillaMapBankEntry(rom,{
+   address:atlas.address,bankCount:counts.length,
+   bankIndex:map.bankIndex,mapCount:counts[map.bankIndex],
+   mapIndex:map.mapIndex,family:atlas.family
+  });
+  if(map.mapPointerSource!==canonical.mapPointerSource||
+     map.mapHeaderOffset!==canonical.mapHeaderOffset)
+   throw new RangeError('Declared map pointer source or header changed');
   if(atlasAliasPointer(rom,map.mapPointerSource)!==0x08000000+map.mapHeaderOffset)
    throw new RangeError('Declared map pointer changed');
-  const header=inspectVanillaMapHeader(rom,{
-   address:map.mapHeaderOffset,family:atlas.family
-  });
+  const header=canonical.header;
   if(header.layoutOffset!==map.layoutOffset||
      header.layout.blockmapOffset!==map.blockmapOffset||
      header.layout.width!==map.width||header.layout.height!==map.height)
