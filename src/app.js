@@ -17,6 +17,7 @@ import {inspectVanillaMapBlocksets} from './map-blocksets.js';
 import {panMapViewport,indexMapWarpMarkers,indexMapEventMarkers,inspectRenderedMapPixel,projectRenderedMapMarkers} from './map-viewport.js';
 import {renderVanillaMapViewport} from './map-render.js';
 import {previewVanillaBlockmapCellChange} from './map-edit-preview.js';
+import {traceVanillaWarpArrival} from './map-warp-trace.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
@@ -1188,6 +1189,45 @@ $('map-warp-inspect').addEventListener('click',()=>safeRun(()=>{
       open.textContent='Open declared warp destination '+target.bankIndex+'/'+target.mapIndex;
       open.addEventListener('click',()=>safeRun(()=>openDeclaredAtlasMap(target)));
       root.append(open);
+    }
+    if(atlas&&atlas.family===family){
+      const traceButton=document.createElement('button');traceButton.type='button';
+      traceButton.className='secondary-button';traceButton.style.margin='0 0 8px 8px';
+      traceButton.textContent='Trace recorded arrival for warp '+warp.index;
+      traceButton.addEventListener('click',()=>safeRun(()=>{
+        requireVanillaMapFormat();
+        if(inspectedMapAtlas?.rom!==model||inspectedMapAtlas.atlas!==atlas)
+          throw Error('Declared atlas expired; inspect again');
+        const sources=atlas.maps.filter(m=>m.mapHeaderOffset===address);
+        if(sources.length!==1)
+          throw Error('Source map header is absent or aliased; choose an unambiguous atlas entry');
+        const source=sources[0];
+        const result=traceVanillaWarpArrival(model,atlas,{
+          bankIndex:source.bankIndex,mapIndex:source.mapIndex,warpIndex:warp.index
+        });
+        if(result.status!=='raw-arrival'){
+          $('map-warp-status').textContent='Raw warp '+warp.index+': '+result.status+
+            '. Cannot navigate to a recorded arrival cell. CUBE behavior unverified.';
+          return;
+        }
+        const destination=result.destination;
+        const entry=lookupVanillaMapAtlasTarget(atlas,destination.bankIndex,destination.mapIndex);
+        if(!entry||entry.mapHeaderOffset!==destination.headerOffset)
+          throw Error('Destination changed; inspect atlas again');
+        openDeclaredAtlasMap(entry);
+        const next=panMapViewport({width:destination.width,height:destination.height,
+          x:0,y:0,dx:destination.x-6,dy:destination.y-5});
+        $('map-x').value=String(next.x);$('map-y').value=String(next.y);
+        $('map-inspect').click();
+        $('map-warp-status').textContent='Raw arrival '+destination.bankIndex+'/'+
+          destination.mapIndex+' warp '+destination.warpIndex+' at ('+
+          destination.x+', '+destination.y+'), warp record ROM 0x'+
+          hex(destination.warpRecordOffset)+', blockmap ROM 0x'+
+          hex(destination.blockmapByteOffset)+', tile '+destination.tileId+
+          ', raw high bits '+destination.rawCollision+
+          '. This is a recorded coordinate, NOT verified runtime teleport behavior.';
+      }));
+      root.append(traceButton);
     }
   }
   // Only annotate the blockmap when its exact selected offset/dimensions
