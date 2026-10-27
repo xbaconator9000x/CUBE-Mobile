@@ -104,6 +104,9 @@
     <button type="button" id="map-atlas-alias-audit" class="subtle-button" disabled>Review shared map header/layout/blockmap pointers (read only)</button>
     <output id="map-atlas-alias-status" class="palette-note" aria-live="polite">No shared pointer aliases reviewed.</output>
     <div id="map-atlas-alias-list" class="anchor-list" aria-label="Shared vanilla map pointer references"></div>
+    <button type="button" id="map-event-ownership-audit" class="subtle-button" disabled>Review shared event arrays and overlapping ROM spans (read only)</button>
+    <output id="map-event-ownership-status" class="palette-note" aria-live="polite">No event ownership review run.</output>
+    <div id="map-event-ownership-list" class="anchor-list" aria-label="Shared event arrays and overlapping ROM spans"></div>
     <button type="button" id="map-bank-inspect" class="subtle-button" disabled>Follow vanilla bank → map (read only)</button>
     <output id="map-bank-status" class="palette-note" aria-live="polite">Requires independently verified vanilla bank table and explicit counts; no automatic CUBE map-bank discovery.</output>
     <div class="input-wrap"><label for="map-layout-offset">Optional known VANILLA map header/layout ROM offset (hex)</label><input id="map-layout-offset" inputmode="text" spellcheck="false" placeholder="e.g. 1A2B3C"></div>

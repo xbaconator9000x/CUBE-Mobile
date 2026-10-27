@@ -1,5 +1,11 @@
 # Roadmap
 
+## Checkpoint — mobile vanilla event ownership review (27 October 2026)
+- [x] Show shared event-group/object/warp/trigger/signpost arrays and partial/cross-kind ROM-span overlaps across the explicitly declared vanilla atlas, with exact pointer-source navigation.
+- [x] Revalidate bank pointers and event layouts on review and before navigation; bound output and preserve full counts; include modular/offline UI and synthetic tests.
+- [ ] Independently authenticate CUBE event layouts, shared allocation ownership, safe write transactions and emulator/Android roundtrips. No strict parity score change.
+
+
 ## Checkpoint — touch-friendly proposed warp record byte preview (27 October 2026)
 - [x] Select any inspected vanilla warp and preview proposed x/y/elevation/target IDs as an exact eight-byte before/after record, with expected-original-byte stale checks.
 - [x] No ROM writes, pointer repointing or semantic permissions; standalone offline UI and regression tests included.

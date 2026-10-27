@@ -12,6 +12,7 @@ import {inspectVanillaMapBankEntry,inspectVanillaMapWarps} from './map-discovery
 import {parseVanillaBankMapCounts,inspectVanillaMapAtlas,lookupVanillaMapAtlasTarget,probeVanillaMapBankTables,auditVanillaAtlasPointerAliases} from './map-atlas.js';
 import {auditVanillaMapLinks,auditVanillaAtlasLinkBatch,auditVanillaMapEventCoordinates,auditVanillaAtlasEventCoordinateBatch} from './map-link-audit.js';
 import {inspectVanillaMapConnections} from './map-connections.js';
+import {auditVanillaAtlasEventOwnership} from './map-event-ownership.js';
 import {inspectVanillaMapEvents,inspectVanillaEventScriptPointers,previewVanillaEventScriptBytes} from './map-events.js';
 import {inspectVanillaMapBlocksets} from './map-blocksets.js';
 import {panMapViewport,indexMapWarpMarkers,indexMapEventMarkers,inspectRenderedMapPixel,projectRenderedMapMarkers} from './map-viewport.js';
@@ -777,6 +778,9 @@ function clearMapAtlas(message='Declared atlas invalidated; inspect again.') {
  inspectedMapAtlas=null;atlasBatchStart=0;atlasCoordinateBatchStart=0;
  $('map-atlas-batch-audit').disabled=true;
  $('map-atlas-alias-audit').disabled=true;
+ $('map-event-ownership-audit').disabled=true;
+ $('map-event-ownership-list').replaceChildren();
+ $('map-event-ownership-status').textContent='No event ownership review run.';
  $('map-atlas-alias-list').replaceChildren();
  $('map-atlas-alias-status').textContent='No shared pointer aliases reviewed.';
  $('map-coordinate-batch-audit').disabled=true;
@@ -878,6 +882,7 @@ $('map-atlas-inspect').addEventListener('click',()=>safeRun(()=>{
  $('map-event-coordinate-audit').disabled=false;
  $('map-atlas-batch-audit').disabled=false;
  $('map-atlas-alias-audit').disabled=false;
+ $('map-event-ownership-audit').disabled=false;
  $('map-coordinate-batch-audit').disabled=false;
  $('map-atlas-status').textContent='Inspected '+atlas.mapCount+' explicitly declared maps across '+
   atlas.bankCount+' vanilla-format banks. Pointer/layout bounds checked; no ROM identity, CUBE layout or warp topology authenticated.';
@@ -1115,6 +1120,65 @@ $('map-atlas-alias-audit').addEventListener('click',()=>safeRun(()=>{
  if(!result.groups.length){
   const empty=document.createElement('div');empty.className='empty-state';
   empty.textContent='No exact shared header, layout or blockmap pointers in the declared atlas.';
+  root.append(empty);
+ }
+}));
+
+$('map-event-ownership-audit').addEventListener('click',()=>safeRun(()=>{
+ requireVanillaMapFormat();
+ if(!inspectedMapAtlas||inspectedMapAtlas.rom!==model)
+  throw Error('Reinspect the declared atlas before reviewing event ownership');
+ const atlas=inspectedMapAtlas.atlas;
+ const counts=parseVanillaBankMapCounts($('map-atlas-counts').value);
+ if(parseOffset($('map-bank-offset').value)!==atlas.address||
+    $('map-layout-family').value!==atlas.family||
+    counts.length!==atlas.bankCount||
+    counts.some((n,i)=>n!==atlas.bankMapCounts[i]))
+  throw Error('Atlas inputs changed; reinspect before event ownership review');
+ const result=auditVanillaAtlasEventOwnership(model,atlas,{
+  maxGroups:64,maxReferences:8,maxConflicts:64});
+ const root=$('map-event-ownership-list');root.replaceChildren();
+ $('map-event-ownership-status').textContent='Reviewed '+result.mapsWithEvents+
+  ' maps with events across '+result.totalMaps+' declared maps: '+
+  result.totalGroups+' exact shared event-group/array spans, '+
+  result.overlapCount+' potentially overlapping distinct spans. '+
+  (result.groupsTruncated||result.overlapsTruncated?'Showing first 64 per category. ':'')+
+  'Pointer ownership and CUBE layout remain unauthenticated; no writes.';
+ function addRow(label,sourceOffset,stillValid){
+  const button=document.createElement('button');button.type='button';
+  button.className='secondary-button';button.style.display='block';
+  button.style.margin='8px 0';button.style.textAlign='left';
+  button.textContent=label+' · inspect pointer at 0x'+hex(sourceOffset);
+  button.addEventListener('click',()=>safeRun(()=>{
+   if(inspectedMapAtlas?.rom!==model)throw Error('Atlas expired; reinspect');
+   const fresh=auditVanillaAtlasEventOwnership(model,atlas,{
+    maxGroups:64,maxReferences:8,maxConflicts:64});
+   if(!stillValid(fresh))throw Error('Event ownership findings changed; review again');
+   setPageForOffset(sourceOffset);gotoTab('hex');
+  }));
+  root.append(button);
+ }
+ for(const group of result.groups){
+  const ref=group.references[0];
+  addRow('Shared '+group.kind+' ROM 0x'+hex(group.offset)+
+   ' ('+group.size+' bytes) · '+group.referenceCount+' map references: '+
+   group.references.map(x=>x.bankIndex+'/'+x.mapIndex).join(', ')+
+   (group.referencesTruncated?' (truncated)':''),
+   ref.sourceOffset,
+   fresh=>fresh.groups.some(g=>g.kind===group.kind&&g.offset===group.offset&&
+    g.size===group.size&&g.references.some(x=>x.sourceOffset===ref.sourceOffset)));
+ }
+ for(const overlap of result.overlaps){
+  addRow('Overlap: '+overlap.kind+' 0x'+hex(overlap.offset)+
+   ' intersects '+overlap.intersectsKind+' 0x'+hex(overlap.intersectsOffset),
+   overlap.reference.sourceOffset,
+   fresh=>fresh.overlaps.some(o=>o.kind===overlap.kind&&
+    o.offset===overlap.offset&&o.intersectsKind===overlap.intersectsKind&&
+    o.intersectsOffset===overlap.intersectsOffset));
+ }
+ if(!result.groups.length&&!result.overlaps.length){
+  const empty=document.createElement('div');empty.className='empty-state';
+  empty.textContent='No exact event-array aliases or partial overlaps detected in the declared atlas.';
   root.append(empty);
  }
 }));
