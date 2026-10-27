@@ -82,9 +82,10 @@ test('stale bank pointers, invalid structures and malformed caps fail closed',()
 });
 test('staged reader is respected without mutating underlying ROM',()=>{
  const rom=fixture(),before=rom.slice(),original=atlas(rom);
- const reader={length:rom.length,read:i=>i===0x244?0x00:rom[i]};
+ const reader={length:rom.length,read:i=>i===0x848?0x04:rom[i]};
  const result=auditVanillaAtlasEventOwnership(reader,original);
  assert.equal(result.mapsWithEvents,3);
+ assert.equal(result.overlapCount,1);
  assert.equal(result.totalGroups,0);
  assert.deepEqual(rom,before);
 });
