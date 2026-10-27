@@ -15,3 +15,10 @@ test('mobile and standalone expose gated rendered map canvas',()=>{
  assert.match(app,/clearRenderedMap\('ROM replaced/);
  assert.match(read('app/CUBHMA_Mobile_Lab_Offline.html'),/function renderVanillaMapViewport/);
 });
+
+test('mobile displays raw metatile behavior/layer without calling it walkability',()=>{
+ const app=read('src/app.js');
+ assert.match(app,/rendered\.attributes/);
+ assert.match(app,/attr\.behavior/);
+ assert.match(app,/not verified walkability/);
+});

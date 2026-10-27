@@ -1,5 +1,10 @@
 # Roadmap
 
+## Checkpoint — raw metatile attributes (27 October 2026)
+- [x] Preserve RSE/FRLG metatile behavior, layer, terrain and encounter bytes with exact ROM source offsets.
+- [x] Display behavior/layer hints beside raw collision/elevation in the rendered map grid; no inferred walkability.
+- [ ] Interpret collision and permissions only after verified CUBE layouts and emulator acceptance.
+
 ## Checkpoint — rendered vanilla map canvas (27 October 2026)
 - [x] Read-only 16×16 RSE/FRLG metatile composition with primary/secondary tilesets, palette banks, flips and layers.
 - [x] Opt-in canvas with explicit matching vanilla map header and standalone offline integration.
