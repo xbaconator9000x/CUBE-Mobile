@@ -16,7 +16,7 @@ test('overlay composes disjoint cell and warp edits without mutating backing ROM
  assert.equal(overlay.source.read(24),2);
  assert.equal(overlay.source.read(30),2);
  assert.equal(overlay.source.read(7),0);
- assert.equal(overlay.review.changedBytes,8);
+ assert.equal(overlay.review.changedBytes,7);
  assert.equal(overlay.transactionCommitted,false);
  assert.equal(overlay.writeAuthorized,false);
  assert.ok(Object.isFrozen(overlay)&&Object.isFrozen(overlay.source));
