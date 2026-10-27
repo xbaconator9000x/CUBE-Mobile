@@ -1,5 +1,9 @@
 # CUBE Mobile
 
+## Development checkpoint — shared map pointer ownership hints
+
+The declared vanilla atlas can now identify maps sharing exact header, layout or blockmap pointers, with bank/map references and source pointer offsets for touch-to-hex inspection. Aliases may be intentional and are not proof of safe ownership or CUBE layout compatibility. See [alias checkpoint](docs/VANILLA_ATLAS_POINTER_ALIASES.md).
+
 ## Development checkpoint — atlas-wide coordinate review
 
 The read-only vanilla atlas can now review up to 16 declared maps per tap for out-of-map event coordinates and shared cells, retaining up to 128 findings with exact ROM provenance. Counts cover all inspected records even when findings truncate. This is not CUBE-authenticated or a collision/walkability editor. See [coordinate audit](docs/VANILLA_EVENT_COORDINATE_AUDIT.md).
