@@ -10,7 +10,7 @@ import {inspectBlockMap} from './map-blocks.js';
 import {inspectVanillaMapLayout,inspectVanillaMapHeader} from './map-layouts.js';
 import {inspectVanillaMapBankEntry,inspectVanillaMapWarps} from './map-discovery.js';
 import {parseVanillaBankMapCounts,inspectVanillaMapAtlas,lookupVanillaMapAtlasTarget} from './map-atlas.js';
-import {auditVanillaMapLinks} from './map-link-audit.js';
+import {auditVanillaMapLinks,auditVanillaAtlasLinkBatch} from './map-link-audit.js';
 import {inspectVanillaMapConnections} from './map-connections.js';
 import {inspectVanillaMapEvents} from './map-events.js';
 import {inspectVanillaMapBlocksets} from './map-blocksets.js';
@@ -22,7 +22,7 @@ let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffs
 let pcsReference=null,pcsReferenceName='';
 let fingerprintResult=null,fingerprintAbort=null;
 let metadataFingerprints=[],metadataImportSerial=0;
-let inspectedWarpMap=null,inspectedEventMap=null,inspectedMapAtlas=null;
+let inspectedWarpMap=null,inspectedEventMap=null,inspectedMapAtlas=null,atlasBatchStart=0;
 let activeRenderedMap=null,selectedRenderedHit=null;
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
 const PER_PAGE=128;
@@ -192,7 +192,7 @@ $('edit-unlock').addEventListener('change',()=>{if(!$('edit-unlock').checked)toa
 $('write-byte').addEventListener('click',()=>safeRun(()=>{
   ensureModel();if(!$('edit-unlock').checked)throw Error('Unlock raw editing first');if(selected===null)throw Error('Tap a byte first');
   const val=$('selected-value').value.trim();if(!/^[0-9a-f]{1,2}$/i.test(val))throw Error('Enter a 1–2 digit hexadecimal byte');
-  if(model.write(selected,parseInt(val,16))){invalidateDecodedGraphic();clearWarpInspection('ROM bytes changed; inspect warps again.');clearConnectionInspection('ROM bytes changed; inspect connections again.');clearMapGrid('ROM bytes changed; inspect map cells again.');clearConnectionInspection('ROM bytes changed; inspect connections again.');clearMapGrid('ROM bytes changed; inspect map cells again.');toast(`Staged edit at 0x${hex(selected)}`);}drawHex();updateIndicators();
+  if(model.write(selected,parseInt(val,16))){invalidateDecodedGraphic();clearWarpInspection('ROM bytes changed; inspect warps again.');clearConnectionInspection('ROM bytes changed; inspect connections again.');clearMapGrid('ROM bytes changed; inspect map cells again.');toast(`Staged edit at 0x${hex(selected)}`);}drawHex();updateIndicators();
 }));
 $('undo-button').addEventListener('click',()=>safeRun(()=>{if(model.undo()){invalidateDecodedGraphic();clearWarpInspection('ROM bytes changed; inspect warps again.');clearConnectionInspection('ROM bytes changed; inspect connections again.');clearMapGrid('ROM bytes changed; inspect map cells again.');drawHex();drawGraphics();updateIndicators();}}));
 $('redo-button').addEventListener('click',()=>safeRun(()=>{if(model.redo()){invalidateDecodedGraphic();clearWarpInspection('ROM bytes changed; inspect warps again.');clearConnectionInspection('ROM bytes changed; inspect connections again.');clearMapGrid('ROM bytes changed; inspect map cells again.');drawHex();drawGraphics();updateIndicators();}}));
@@ -758,7 +758,10 @@ function requireVanillaMapFormat(){
     throw Error('Imported metadata declares a non-vanilla layout; vanilla map interpretation refused.');
 }
 function clearMapAtlas(message='Declared atlas invalidated; inspect again.') {
- inspectedMapAtlas=null;
+ inspectedMapAtlas=null;atlasBatchStart=0;
+ $('map-atlas-batch-audit').disabled=true;
+ $('map-atlas-batch-list').replaceChildren();
+ $('map-atlas-batch-status').textContent='No atlas-wide link batch inspected.';
  const select=$('map-atlas-select');
  select.replaceChildren(new Option('Inspect an atlas first',''));
  select.disabled=true;
@@ -806,6 +809,7 @@ $('map-atlas-inspect').addEventListener('click',()=>safeRun(()=>{
  select.replaceChildren(options);select.disabled=false;
  $('map-atlas-open').disabled=false;
  $('map-atlas-audit').disabled=false;
+ $('map-atlas-batch-audit').disabled=false;
  $('map-atlas-status').textContent='Inspected '+atlas.mapCount+' explicitly declared maps across '+
   atlas.bankCount+' vanilla-format banks. Pointer/layout bounds checked; no ROM identity, CUBE layout or warp topology authenticated.';
 }));
@@ -864,6 +868,50 @@ $('map-atlas-audit').addEventListener('click',()=>safeRun(()=>{
    root.append(open);
   }
  }
+}));
+
+$('map-atlas-batch-audit').addEventListener('click',()=>safeRun(()=>{
+ requireVanillaMapFormat();
+ if(!inspectedMapAtlas||inspectedMapAtlas.rom!==model)
+  throw Error('Reinspect the declared atlas before batch auditing');
+ const atlas=inspectedMapAtlas.atlas;
+ const counts=parseVanillaBankMapCounts($('map-atlas-counts').value);
+ if(parseOffset($('map-bank-offset').value)!==atlas.address||
+    $('map-layout-family').value!==atlas.family||
+    counts.length!==atlas.bankCount||
+    counts.some((n,i)=>n!==atlas.bankMapCounts[i]))
+  throw Error('Atlas inputs changed; reinspect before batch auditing');
+ const result=auditVanillaAtlasLinkBatch(model,atlas,{
+  start:atlasBatchStart,limit:16,maxFindings:128
+ });
+ const root=$('map-atlas-batch-list');root.replaceChildren();
+ $('map-atlas-batch-status').textContent='Scanned maps '+result.start+'–'+(result.end-1)+
+  ' of '+result.totalMaps+': '+result.counts.declared+' declared, '+
+  result.counts.undeclared+' undeclared, '+result.counts.special+
+  ' special, '+result.counts.needsReview+' index warnings. '+
+  result.totalFindings+' findings'+(result.truncated?' (first 128 shown)':'')+
+  '. Read-only, vanilla format unverified.'+
+  (result.nextStart===null?' Catalog scan finished.':' Continue for next 16.');
+ for(const finding of result.findings){
+  const button=document.createElement('button');button.type='button';
+  button.className='secondary-button';button.style.display='block';
+  button.style.margin='8px 0';button.style.textAlign='left';
+  button.textContent='Map '+finding.bankIndex+'/'+finding.mapIndex+
+   ' · '+finding.kind+' '+finding.index+' → '+finding.targetBank+'/'+
+   finding.targetMap+' · '+finding.status+' · ROM 0x'+hex(finding.offset);
+  button.addEventListener('click',()=>safeRun(()=>{
+   if(inspectedMapAtlas?.rom!==model)throw Error('Atlas expired; reinspect');
+   setPageForOffset(finding.offset);gotoTab('hex');
+  }));
+  root.append(button);
+ }
+ if(!result.findings.length){
+  const empty=document.createElement('div');empty.className='empty-state';
+  empty.textContent='No non-declared link statuses in this batch.';
+  root.append(empty);
+ }
+ atlasBatchStart=result.nextStart??0;
+ $('map-atlas-batch-audit').disabled=result.nextStart===null;
 }));
 $('map-atlas-select').addEventListener('change',()=>{
  $('map-atlas-audit-list').replaceChildren();

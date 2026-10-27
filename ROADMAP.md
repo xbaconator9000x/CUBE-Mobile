@@ -1,5 +1,10 @@
 # Roadmap
 
+## Checkpoint — bounded atlas-wide link review (27 October 2026)
+- [x] Inspect 16 declared vanilla maps per tap, count all raw warp/connection link statuses and display at most 128 flagged links per batch.
+- [x] Preserve source offsets, staged reads, strict bounds, pagination and fail-closed malformed-pointer behavior with synthetic regression tests.
+- [ ] Authenticated CUBE map-bank discovery, runtime warp resolution, Android performance and safe semantic editing remain unverified.
+
 ## Checkpoint — declared vanilla map-link audit (27 October 2026)
 - [x] Read-only structural cross-reference for warp and connection targets within explicitly declared map-bank counts.
 - [x] Preserve raw source offsets, distinguish missing declarations and special 0xFF fields, and flag out-of-range destination warp indexes without assuming runtime behavior.

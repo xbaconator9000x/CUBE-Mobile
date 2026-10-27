@@ -13,3 +13,7 @@ Select a map from a successfully inspected atlas and press **Audit selected map 
 Every result includes its exact source byte offset for hex inspection, and declared destinations can be opened in the existing map viewer. The audit reads staged ROM bytes through bounded accessors, does not mutate source bytes, rejects malformed event pointers, and is invalidated on ROM/metadata/atlas changes. The standalone offline HTML bundles the same function.
 
 **Not verified:** CUBE ROM identity, custom bank layouts, special warp behavior, reciprocal connections, emulator results, Android hardware, semantic writes, or 20% desktop feature parity. Tests use only synthetic ROM buffers.
+
+## Bounded atlas-wide review
+
+The **Audit next 16 declared maps** button scans at most 16 catalog entries per tap. Each batch counts every raw warp and connection link, retains up to 128 non-declared findings with exact source offsets, and explicitly reports truncation. Tap a finding to inspect the original ROM bytes. A new atlas inspection resets the batch cursor; changing ROM bytes or declared counts invalidates the atlas and findings. Invalid pointer structures reject the batch rather than reporting partial success. This is not a whole-ROM scan, automatic discovery, or proof of invalid game topology. The next batch is requested explicitly to keep mobile work bounded.
