@@ -18,3 +18,13 @@ test('modular and offline apps expose declared atlas browsing and navigation',()
  assert.match(offline,/function lookupVanillaMapAtlasTarget/);
  assert.doesNotMatch(offline,/^import \{.*?\} from '\.\//m);
 });
+
+test('bounded bank-table candidate probe appears in modular and offline map UI',()=>{
+ for(const path of ['index.html','app/CUBHMA_Mobile_Lab_Offline.html']){
+  const html=read(path);
+  for(const id of ['map-atlas-probe','map-atlas-probe-start','map-atlas-probe-bytes','map-atlas-probe-status','map-atlas-probe-list'])
+   assert.match(html,new RegExp('id="'+id+'"'));
+ }
+ assert.match(read('src/app.js'),/probeVanillaMapBankTables\(model/);
+ assert.match(read('app/CUBHMA_Mobile_Lab_Offline.html'),/function probeVanillaMapBankTables/);
+});

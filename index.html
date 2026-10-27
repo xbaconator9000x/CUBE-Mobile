@@ -78,6 +78,13 @@
       <div class="input-wrap"><label for="map-bank-map-index">Map index (0-based)</label><input id="map-bank-map-index" type="number" min="0" value="0"></div>
     </div>
     <div class="input-wrap"><label for="map-atlas-counts">Optional declared map counts for every bank (decimal, comma-separated)</label><input id="map-atlas-counts" inputmode="text" placeholder="e.g. 2, 4, 1" spellcheck="false"></div>
+    <div class="input-row">
+      <div class="input-wrap"><label for="map-atlas-probe-start">Optional approximate bank-table search start (hex)</label><input id="map-atlas-probe-start" inputmode="text" value="000000" spellcheck="false"></div>
+      <div class="input-wrap"><label for="map-atlas-probe-bytes">Probe window (bytes, max 4096)</label><input id="map-atlas-probe-bytes" type="number" min="4" max="4096" step="4" value="1024"></div>
+    </div>
+    <button type="button" id="map-atlas-probe" class="subtle-button" disabled>Find vanilla-format bank-table candidates nearby (read only)</button>
+    <output id="map-atlas-probe-status" class="palette-note" aria-live="polite">No vanilla bank-table candidates inspected.</output>
+    <div id="map-atlas-probe-list" class="anchor-list" aria-label="Unverified vanilla bank-table candidates"></div>
     <button type="button" id="map-atlas-inspect" class="subtle-button" disabled>Catalog explicitly declared vanilla maps (read only)</button>
     <output id="map-atlas-status" class="palette-note" aria-live="polite">No atlas loaded. Supply all bank counts explicitly; these values are not discovered or authenticated.</output>
     <div class="input-wrap"><label for="map-atlas-select">Declared maps</label><select id="map-atlas-select" disabled><option value="">Inspect an atlas first</option></select></div>
