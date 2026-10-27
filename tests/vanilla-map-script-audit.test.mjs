@@ -57,3 +57,13 @@ test('rejects malformed record budgets, grammar and event structure',()=>{
  d(r,0x504,0);
  assert.throws(()=>audit(r,{address:0x200,family:'RSE'}),RangeError);
 });
+
+test('map script audit aggregates pointer operand hints without exporting targets',()=>{
+ const result=audit(fixture(),{address:0x200,family:'FRLG'});
+ assert.equal(result.operandPointerStatuses.inRom,1);
+ assert.equal(result.operandPointerRoles.scriptBranch,1);
+ assert.equal(result.records[1].preview.operandPointerCount,1);
+ assert.equal(result.records[1].preview.operandPointerRoles.scriptBranch,1);
+ assert.equal(result.ownershipVerified,false);
+ assert.ok(Object.isFrozen(result.operandPointerStatuses));
+});
