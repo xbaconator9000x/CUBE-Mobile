@@ -12,7 +12,7 @@ import {inspectVanillaMapHeader} from './map-layouts.js';
 function eventAccessor(source){
   if(source instanceof Uint8Array)return {length:source.length,read:i=>source[i]};
   if(source&&Number.isSafeInteger(source.length)&&source.length>=0&&typeof source.read==='function')return source;
-  throw new TypeError('Expected ROM bytes or a read-only ROM eventAccessor');
+  throw new TypeError('Expected ROM bytes or a read-only ROM accessor');
 }
 function eventSpan(rom,offset,size,label,align=4){
   if(!Number.isSafeInteger(offset)||offset<0||offset%align!==0||
@@ -21,7 +21,7 @@ function eventSpan(rom,offset,size,label,align=4){
 }
 function eventU8(rom,offset){
   const value=rom.read(offset);
-  if(!Number.isInteger(value)||value<0||value>255)throw new RangeError('Invalid ROM eventAccessor byte');
+  if(!Number.isInteger(value)||value<0||value>255)throw new RangeError('Invalid ROM accessor byte');
   return value;
 }
 function eventU16(rom,offset){return eventU8(rom,offset)|(eventU8(rom,offset+1)<<8);}
