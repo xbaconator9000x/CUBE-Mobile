@@ -95,6 +95,10 @@
     <button type="button" id="map-atlas-graph" class="subtle-button" disabled>Explore directed warp/connection references across declared maps (read only)</button>
     <output id="map-atlas-graph-status" class="palette-note" aria-live="polite">No declared raw map network reviewed.</output>
     <div id="map-atlas-graph-list" class="anchor-list" aria-label="Raw directed map network review"></div>
+    <div class="input-wrap"><label for="map-atlas-route-target">Raw route destination (origin is the selected declared map)</label><select id="map-atlas-route-target" disabled><option value="">Inspect an atlas first</option></select></div>
+    <button type="button" id="map-atlas-route" class="subtle-button" disabled>Find shortest directed raw map-link route (read only)</button>
+    <output id="map-atlas-route-status" class="palette-note" aria-live="polite">No raw map route inspected.</output>
+    <div id="map-atlas-route-list" class="anchor-list" aria-label="Read-only shortest raw map-link route"></div>
     <button type="button" id="map-atlas-incoming" class="subtle-button" disabled>Find incoming links to selected map (next 16 declared maps, read only)</button>
     <output id="map-atlas-incoming-status" class="palette-note" aria-live="polite">No incoming link page inspected.</output>
     <div id="map-atlas-incoming-list" class="anchor-list" aria-label="Raw incoming vanilla warp and connection references"></div>
