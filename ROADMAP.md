@@ -1,5 +1,10 @@
 # Roadmap
 
+## Checkpoint — mobile cross-page vanilla script aliases (28 October 2026)
+- [x] Show bounded 64-map shared script-target scans across 16-map UI page boundaries, with exact source/target hex navigation.
+- [x] Revalidate declared atlas inputs and raw pointer findings before navigation; include offline HTML and tests.
+- [ ] Cross-64-map-window aliases, CUBE ownership, safe writes and genuine ROM/emulator/Android acceptance remain unverified. See [mobile cross-page aliases](docs/MOBILE_SCRIPT_ALIAS_CROSSPAGE.md).
+
 ## Checkpoint — mobile shared event-script targets (28 October 2026)
 - [x] Page through 16 explicitly declared vanilla maps for exact shared object/trigger script targets and source pointer offsets.
 - [x] Revalidate atlas inputs and each finding before raw hex navigation; support modular/offline mobile UI and synthetic regressions.
