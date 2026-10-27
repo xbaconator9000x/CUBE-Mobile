@@ -77,6 +77,11 @@
       <div class="input-wrap"><label for="map-bank-map-count">Maps in bank (declared)</label><input id="map-bank-map-count" type="number" min="1" max="1024" value="1"></div>
       <div class="input-wrap"><label for="map-bank-map-index">Map index (0-based)</label><input id="map-bank-map-index" type="number" min="0" value="0"></div>
     </div>
+    <div class="input-wrap"><label for="map-atlas-counts">Optional declared map counts for every bank (decimal, comma-separated)</label><input id="map-atlas-counts" inputmode="text" placeholder="e.g. 2, 4, 1" spellcheck="false"></div>
+    <button type="button" id="map-atlas-inspect" class="subtle-button" disabled>Catalog explicitly declared vanilla maps (read only)</button>
+    <output id="map-atlas-status" class="palette-note" aria-live="polite">No atlas loaded. Supply all bank counts explicitly; these values are not discovered or authenticated.</output>
+    <div class="input-wrap"><label for="map-atlas-select">Declared maps</label><select id="map-atlas-select" disabled><option value="">Inspect an atlas first</option></select></div>
+    <button type="button" id="map-atlas-open" class="subtle-button" disabled>Open selected declared map</button>
     <button type="button" id="map-bank-inspect" class="subtle-button" disabled>Follow vanilla bank → map (read only)</button>
     <output id="map-bank-status" class="palette-note" aria-live="polite">Requires independently verified vanilla bank table and explicit counts; no automatic CUBE map-bank discovery.</output>
     <div class="input-wrap"><label for="map-layout-offset">Optional known VANILLA map header/layout ROM offset (hex)</label><input id="map-layout-offset" inputmode="text" spellcheck="false" placeholder="e.g. 1A2B3C"></div>

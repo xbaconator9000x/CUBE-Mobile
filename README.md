@@ -4,6 +4,10 @@
 
 > **Status: v0.5.9 — early foundation, NOT a complete port.** The working code today is an offline ROM inspection / patching workbench and a limited read-only CUBHMA TOML named-anchor inspector. The desktop editor's semantic engine, map/collision/event editors, scripts, sprites, trainers, Pokémon, sound and CUBE upgrades are **not yet ported**.
 
+## Development checkpoint — explicit vanilla map atlas
+
+The Blockmaps screen can now inspect a bounded catalog of vanilla map headers using a known bank-table offset and **explicit per-bank map counts**. A selector opens declared maps; warp and connection records can navigate to declared targets. Counts and layouts are not automatically discovered or CUBE-authenticated, and the workflow remains read-only. See [atlas checkpoint](docs/VANILLA_MAP_ATLAS_CHECKPOINT.md).
+
 ## Development checkpoint — rendered vanilla map canvas
 
 An opt-in read-only canvas now composes 16×16 RSE/FRLG metatiles with palette banks, flips and layers from explicitly selected vanilla headers. Each rendered cell also displays its raw metatile behavior and layer bytes, without claiming walkability. The raw collision/elevation grid remains separate. This is not CUBE-authenticated map editing. See [rendering checkpoint](docs/VANILLA_METATILE_RENDER_CHECKPOINT.md).

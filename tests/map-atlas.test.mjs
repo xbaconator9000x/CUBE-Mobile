@@ -1,0 +1,51 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {parseVanillaBankMapCounts,inspectVanillaMapAtlas,lookupVanillaMapAtlasTarget} from '../src/map-atlas.js';
+const ptr=n=>0x08000000+n;
+function d(r,o,n){for(let i=0;i<4;i++)r[o+i]=n>>>(i*8)&255;}
+function fixture(){
+ const r=new Uint8Array(0x1000).fill(0xff);
+ d(r,0x100,ptr(0x140));d(r,0x104,ptr(0x160));
+ d(r,0x140,ptr(0x200));d(r,0x144,ptr(0x240));
+ d(r,0x160,ptr(0x280));
+ for(const [header,layout,blockmap] of [[0x200,0x300,0x400],[0x240,0x320,0x420],[0x280,0x340,0x440]]){
+  d(r,header,ptr(layout));d(r,header+4,0);d(r,header+8,0);d(r,header+12,0);
+  d(r,layout,2);d(r,layout+4,2);
+  for(const [off,target] of [[8,0x500],[12,blockmap],[16,0x600],[20,0x620]])
+   d(r,layout+off,ptr(target));
+ }
+ return r;
+}
+test('strict decimal bank counts and invalid input',()=>{
+ assert.deepEqual(parseVanillaBankMapCounts('2, 1'),[2,1]);
+ for(const s of ['','0','1,0','1,,2','0x10','1;2','1.5','-1','1025','1,'.repeat(260)+'1'])
+  assert.throws(()=>parseVanillaBankMapCounts(s));
+});
+test('catalog resolves explicitly declared vanilla banks, offsets and targets',()=>{
+ const rom=fixture(),original=rom.slice();
+ const atlas=inspectVanillaMapAtlas(rom,{address:0x100,bankMapCounts:[2,1],family:'RSE'});
+ assert.equal(atlas.mapCount,3);assert.equal(atlas.bankCount,2);
+ assert.deepEqual(atlas.maps.map(x=>x.mapHeaderOffset),[0x200,0x240,0x280]);
+ assert.equal(lookupVanillaMapAtlasTarget(atlas,0,1).blockmapOffset,0x420);
+ assert.equal(lookupVanillaMapAtlasTarget(atlas,1,0).width,2);
+ assert.equal(lookupVanillaMapAtlasTarget(atlas,1,1),null);
+ assert.equal(lookupVanillaMapAtlasTarget(atlas,2,0),null);
+ assert.equal(atlas.layoutAuthenticated,false);
+ assert.ok(Object.isFrozen(atlas.maps)&&Object.isFrozen(atlas.maps[0]));
+ assert.deepEqual(rom,original);
+});
+test('staged bytes change atlas readout without modifying source ROM',()=>{
+ const r=fixture(),reader={length:r.length,read:i=>i===0x144?0xff:r[i]};
+ assert.throws(()=>inspectVanillaMapAtlas(reader,{address:0x100,bankMapCounts:[2,1],family:'RSE'}));
+ assert.equal(r[0x144],0x40);
+});
+test('invalid map counts, overlapping arrays and malformed pointers fail closed',()=>{
+ const r=fixture();
+ for(const counts of [[0,1],[1025],[1.5],[1,1,1,1],[],Array(257).fill(1)])
+  assert.throws(()=>inspectVanillaMapAtlas(r,{address:0x100,bankMapCounts:counts,family:'RSE'}));
+ assert.throws(()=>inspectVanillaMapAtlas(r,{address:0x100,bankMapCounts:[2,1],family:'RSE',maxMaps:2}),/limit/);
+ const a=fixture();d(a,0x104,ptr(0x140));
+ assert.throws(()=>inspectVanillaMapAtlas(a,{address:0x100,bankMapCounts:[2,1],family:'RSE'}),/overlap/);
+ const b=fixture();d(b,0x160,ptr(0x100));
+ assert.throws(()=>inspectVanillaMapAtlas(b,{address:0x100,bankMapCounts:[2,1],family:'RSE'}));
+});
