@@ -19,6 +19,7 @@ import {auditVanillaScriptBranchTargets} from './vanilla-script-branches.js';
 import {auditVanillaScriptOperandPointers} from './vanilla-script-operand-pointers.js';
 import {auditVanillaAtlasScriptAliases} from './vanilla-script-aliases.js';
 import {auditVanillaScriptAliasesAcrossPages} from './vanilla-script-alias-crosspage.js';
+import {auditVanillaMapEventScripts} from './vanilla-map-script-audit.js';
 import {inspectVanillaMapBlocksets} from './map-blocksets.js';
 import {panMapViewport,indexMapWarpMarkers,indexMapEventMarkers,inspectRenderedMapPixel,projectRenderedMapMarkers} from './map-viewport.js';
 import {renderVanillaMapViewport} from './map-render.js';
@@ -44,7 +45,7 @@ let model=null, currentTab='home', page=0, selected=null, patchFile=null, palett
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
 ctx.imageSmoothingEnabled=false;
-const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-summary-scan','map-preview-cell','map-visual-compare','map-visual-compare-queue','map-layout-inspect','map-bank-inspect','map-atlas-inspect','map-atlas-probe','map-warp-inspect','map-connection-inspect','map-event-inspect','map-script-pointer-inspect','map-blockset-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','discard-button','edit-unlock'];
+const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-summary-scan','map-preview-cell','map-visual-compare','map-visual-compare-queue','map-layout-inspect','map-bank-inspect','map-atlas-inspect','map-atlas-probe','map-warp-inspect','map-connection-inspect','map-event-inspect','map-script-pointer-inspect','map-script-map-audit','map-blockset-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','discard-button','edit-unlock'];
 const tabs={home:['YOUR WORKSPACE','ROM Workbench'],hex:['BINARY INSPECTOR','Hex editor'],anchors:['ROM SEMANTICS','Named data'],maps:['RAW MAP CELLS','Blockmap inspector'],graphics:['GBA GRAPHICS','Graphics explorer'],patches:['PATCH WORKFLOW','Patch tools'],changes:['REVIEW & EXPORT','Changes']};
 function toast(message,bad=false){const t=$('toast');t.textContent=message;t.classList.toggle('error',bad);t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),4300);}
 function safeRun(fn){try{const result=fn();if(result?.catch) result.catch(err=>toast(err.message||String(err),true));}catch(err){toast(err.message||String(err),true);}}
@@ -1995,6 +1996,68 @@ $('map-event-preview').addEventListener('click',()=>safeRun(()=>{
   format(result.before)+' → '+format(result.after)+
   (result.changed?' (proposed change).':' (no difference).')+
   ' NOT applied. Script/flag bytes preserved; CUBE layout and array ownership unverified.';
+}));
+
+$('map-script-map-audit').addEventListener('click',()=>safeRun(()=>{
+ requireVanillaMapFormat();
+ if($('map-layout-source').value!=='header')
+  throw Error('Select a vanilla map header for script audit');
+ const original=model,address=parseOffset($('map-layout-offset').value);
+ const family=$('map-layout-family').value;
+ const opts={address,family,maxRecords:32,maxBytes:64,maxCommands:16};
+ const audit=auditVanillaMapEventScripts(model,opts);
+ const root=$('map-script-map-audit-list');root.replaceChildren();
+ $('map-script-map-audit-status').textContent=
+  'Vanilla map script audit: '+audit.inspectedRecords+' of '+
+  audit.totalRecords+' object/trigger pointer fields · '+
+  audit.counts.inRom+' conventional in-ROM, '+audit.counts.null+
+  ' null, '+audit.counts.outsideRom+' outside ROM, '+
+  audit.counts.nonRom+' non-ROM · '+audit.counts.decoded+
+  ' with decoded prefix commands · '+audit.operandPointerStatuses.inRom+
+  ' conventional in-ROM operand pointers'+
+  (audit.truncated?' · records truncated':'')+
+  '. No CUBE grammar, script ownership, execution or writes.';
+ function unchanged(){
+  return model===original&&$('map-layout-source').value==='header'&&
+   parseOffset($('map-layout-offset').value)===address&&
+   $('map-layout-family').value===family;
+ }
+ for(const record of audit.records){
+  const description=record.kind+' '+record.index+
+   ' · pointer source ROM 0x'+hex(record.pointerSourceOffset)+
+   ' · '+record.pointerStatus+
+   (record.preview?' · '+record.preview.decodedCommands+
+    ' commands · stop: '+record.preview.stopReason+
+    ' · '+record.preview.branchCount+' branch hints · '+
+    record.preview.operandPointerCount+' operand pointers':'');
+  function addNavigation(label,offset){
+   const button=document.createElement('button');button.type='button';
+   button.className='secondary-button';button.style.display='block';
+   button.style.margin='8px 0';button.style.textAlign='left';
+   button.textContent=description+' · '+label;
+   button.addEventListener('click',()=>safeRun(()=>{
+    requireVanillaMapFormat();
+    if(!unchanged())throw Error('Map/ROM selection changed; audit scripts again');
+    const fresh=auditVanillaMapEventScripts(model,opts);
+    if(!fresh.records.some(item=>
+      item.kind===record.kind&&item.index===record.index&&
+      item.pointerSourceOffset===record.pointerSourceOffset&&
+      item.pointerStatus===record.pointerStatus&&
+      item.targetOffset===record.targetOffset))
+     throw Error('Script audit pointer changed; audit again');
+    setPageForOffset(offset);gotoTab('hex');
+   }));
+   root.append(button);
+  }
+  addNavigation('Inspect pointer bytes',record.pointerSourceOffset);
+  if(record.targetOffset!==null)
+   addNavigation('Inspect raw script target',record.targetOffset);
+ }
+ if(!audit.records.length){
+  const empty=document.createElement('div');empty.className='empty-state';
+  empty.textContent='No object or trigger script pointers in this map.';
+  root.append(empty);
+ }
 }));
 
 $('map-script-pointer-inspect').addEventListener('click',()=>safeRun(()=>{
