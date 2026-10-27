@@ -10,6 +10,7 @@ import {inspectBlockMap} from './map-blocks.js';
 import {inspectVanillaMapLayout,inspectVanillaMapHeader} from './map-layouts.js';
 import {inspectVanillaMapBankEntry,inspectVanillaMapWarps} from './map-discovery.js';
 import {parseVanillaBankMapCounts,inspectVanillaMapAtlas,lookupVanillaMapAtlasTarget} from './map-atlas.js';
+import {auditVanillaMapLinks} from './map-link-audit.js';
 import {inspectVanillaMapConnections} from './map-connections.js';
 import {inspectVanillaMapEvents} from './map-events.js';
 import {inspectVanillaMapBlocksets} from './map-blocksets.js';
@@ -27,7 +28,7 @@ let model=null, currentTab='home', page=0, selected=null, patchFile=null, palett
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
 ctx.imageSmoothingEnabled=false;
-const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-layout-inspect','map-bank-inspect','map-atlas-inspect','map-warp-inspect','map-connection-inspect','map-event-inspect','map-blockset-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','discard-button','edit-unlock'];
+const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-layout-inspect','map-bank-inspect','map-atlas-inspect','map-atlas-audit','map-warp-inspect','map-connection-inspect','map-event-inspect','map-blockset-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','discard-button','edit-unlock'];
 const tabs={home:['YOUR WORKSPACE','ROM Workbench'],hex:['BINARY INSPECTOR','Hex editor'],anchors:['ROM SEMANTICS','Named data'],maps:['RAW MAP CELLS','Blockmap inspector'],graphics:['GBA GRAPHICS','Graphics explorer'],patches:['PATCH WORKFLOW','Patch tools'],changes:['REVIEW & EXPORT','Changes']};
 function toast(message,bad=false){const t=$('toast');t.textContent=message;t.classList.toggle('error',bad);t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),4300);}
 function safeRun(fn){try{const result=fn();if(result?.catch) result.catch(err=>toast(err.message||String(err),true));}catch(err){toast(err.message||String(err),true);}}
@@ -762,6 +763,9 @@ function clearMapAtlas(message='Declared atlas invalidated; inspect again.') {
  select.replaceChildren(new Option('Inspect an atlas first',''));
  select.disabled=true;
  $('map-atlas-open').disabled=true;
+ $('map-atlas-audit').disabled=true;
+ $('map-atlas-audit-list').replaceChildren();
+ $('map-atlas-audit-status').textContent='No declared map links audited.';
  $('map-atlas-status').textContent=message;
 }
 function openDeclaredAtlasMap(target) {
@@ -801,6 +805,7 @@ $('map-atlas-inspect').addEventListener('click',()=>safeRun(()=>{
  }
  select.replaceChildren(options);select.disabled=false;
  $('map-atlas-open').disabled=false;
+ $('map-atlas-audit').disabled=false;
  $('map-atlas-status').textContent='Inspected '+atlas.mapCount+' explicitly declared maps across '+
   atlas.bankCount+' vanilla-format banks. Pointer/layout bounds checked; no ROM identity, CUBE layout or warp topology authenticated.';
 }));
@@ -811,6 +816,59 @@ $('map-atlas-open').addEventListener('click',()=>safeRun(()=>{
   throw Error('Select a declared map');
  openDeclaredAtlasMap(inspectedMapAtlas.atlas.maps[i]);
 }));
+$('map-atlas-audit').addEventListener('click',()=>safeRun(()=>{
+ requireVanillaMapFormat();
+ if(!inspectedMapAtlas||inspectedMapAtlas.rom!==model)
+  throw Error('Reinspect the declared atlas before auditing links');
+ const atlas=inspectedMapAtlas.atlas;
+ const counts=parseVanillaBankMapCounts($('map-atlas-counts').value);
+ if(parseOffset($('map-bank-offset').value)!==atlas.address||
+    $('map-layout-family').value!==atlas.family||
+    counts.length!==atlas.bankCount||
+    counts.some((n,i)=>n!==atlas.bankMapCounts[i]))
+  throw Error('Atlas inputs changed; reinspect before auditing');
+ const i=Number($('map-atlas-select').value);
+ if(!Number.isSafeInteger(i)||i<0||i>=atlas.maps.length)
+  throw Error('Select a declared map first');
+ const entry=atlas.maps[i];
+ $('map-atlas-audit-list').replaceChildren();
+ $('map-atlas-audit-status').textContent='Auditing raw vanilla links…';
+ const result=auditVanillaMapLinks(model,atlas,{bankIndex:entry.bankIndex,mapIndex:entry.mapIndex});
+ const root=$('map-atlas-audit-list');
+ $('map-atlas-audit-status').textContent='Bank '+entry.bankIndex+' / map '+entry.mapIndex+
+  ': '+result.counts.declared+' declared, '+result.counts.undeclared+
+  ' outside supplied counts, '+result.counts.special+' special, '+
+  result.counts.needsReview+' raw index warnings. Read-only; topology and CUBE compatibility unverified.';
+ if(!result.records.length){
+  const empty=document.createElement('div');empty.className='empty-state';
+  empty.textContent='No raw warp or connection records.';root.append(empty);
+ }
+ for(const record of result.records){
+  const button=document.createElement('button');button.type='button';
+  button.className='secondary-button';button.style.display='block';
+  button.style.margin='8px 0';button.style.textAlign='left';
+  button.textContent=record.kind+' '+record.index+' → '+record.targetBank+'/'+
+   record.targetMap+(record.targetWarpId===null?'':' warp '+record.targetWarpId)+
+   ' · '+record.status+' · '+record.detail+' · ROM 0x'+hex(record.offset);
+  button.addEventListener('click',()=>safeRun(()=>{
+   if(inspectedMapAtlas?.rom!==model)throw Error('Atlas expired; reinspect');
+   setPageForOffset(record.offset);gotoTab('hex');
+  }));
+  root.append(button);
+  if(record.targetHeaderOffset!==null){
+   const target=lookupVanillaMapAtlasTarget(atlas,record.targetBank,record.targetMap);
+   const open=document.createElement('button');open.type='button';
+   open.className='secondary-button';open.style.margin='0 0 8px 8px';
+   open.textContent='Open declared destination '+record.targetBank+'/'+record.targetMap;
+   open.addEventListener('click',()=>safeRun(()=>openDeclaredAtlasMap(target)));
+   root.append(open);
+  }
+ }
+}));
+$('map-atlas-select').addEventListener('change',()=>{
+ $('map-atlas-audit-list').replaceChildren();
+ $('map-atlas-audit-status').textContent='Map selection changed; audit again.';
+});
 for(const id of ['map-atlas-counts','map-bank-offset','map-layout-family'])
  $(id).addEventListener('change',()=>clearMapAtlas('Declared atlas inputs changed; inspect again.'));
 $('map-bank-inspect').addEventListener('click',()=>safeRun(()=>{
