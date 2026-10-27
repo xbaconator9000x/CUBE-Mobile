@@ -9,7 +9,7 @@ import {fingerprintMetadataFiles,compareRomMetadataFingerprintRecords} from './m
 import {inspectBlockMap} from './map-blocks.js';
 import {inspectVanillaMapLayout,inspectVanillaMapHeader} from './map-layouts.js';
 import {inspectVanillaMapBankEntry,inspectVanillaMapWarps} from './map-discovery.js';
-import {parseVanillaBankMapCounts,inspectVanillaMapAtlas,lookupVanillaMapAtlasTarget,probeVanillaMapBankTables} from './map-atlas.js';
+import {parseVanillaBankMapCounts,inspectVanillaMapAtlas,lookupVanillaMapAtlasTarget,probeVanillaMapBankTables,auditVanillaAtlasPointerAliases} from './map-atlas.js';
 import {auditVanillaMapLinks,auditVanillaAtlasLinkBatch,auditVanillaMapEventCoordinates,auditVanillaAtlasEventCoordinateBatch} from './map-link-audit.js';
 import {inspectVanillaMapConnections} from './map-connections.js';
 import {inspectVanillaMapEvents,inspectVanillaEventScriptPointers} from './map-events.js';
@@ -762,6 +762,9 @@ function requireVanillaMapFormat(){
 function clearMapAtlas(message='Declared atlas invalidated; inspect again.') {
  inspectedMapAtlas=null;atlasBatchStart=0;atlasCoordinateBatchStart=0;
  $('map-atlas-batch-audit').disabled=true;
+ $('map-atlas-alias-audit').disabled=true;
+ $('map-atlas-alias-list').replaceChildren();
+ $('map-atlas-alias-status').textContent='No shared pointer aliases reviewed.';
  $('map-coordinate-batch-audit').disabled=true;
  $('map-coordinate-batch-list').replaceChildren();
  $('map-coordinate-batch-status').textContent='No atlas-wide coordinate batch inspected.';
@@ -860,6 +863,7 @@ $('map-atlas-inspect').addEventListener('click',()=>safeRun(()=>{
  $('map-atlas-audit').disabled=false;
  $('map-event-coordinate-audit').disabled=false;
  $('map-atlas-batch-audit').disabled=false;
+ $('map-atlas-alias-audit').disabled=false;
  $('map-coordinate-batch-audit').disabled=false;
  $('map-atlas-status').textContent='Inspected '+atlas.mapCount+' explicitly declared maps across '+
   atlas.bankCount+' vanilla-format banks. Pointer/layout bounds checked; no ROM identity, CUBE layout or warp topology authenticated.';
@@ -1054,6 +1058,51 @@ $('map-coordinate-batch-audit').addEventListener('click',()=>safeRun(()=>{
  }
  atlasCoordinateBatchStart=result.nextStart??0;
  $('map-coordinate-batch-audit').disabled=result.nextStart===null;
+}));
+
+
+$('map-atlas-alias-audit').addEventListener('click',()=>safeRun(()=>{
+ requireVanillaMapFormat();
+ if(!inspectedMapAtlas||inspectedMapAtlas.rom!==model)
+  throw Error('Reinspect the declared atlas before reviewing shared pointers');
+ const atlas=inspectedMapAtlas.atlas;
+ const counts=parseVanillaBankMapCounts($('map-atlas-counts').value);
+ if(parseOffset($('map-bank-offset').value)!==atlas.address||
+    $('map-layout-family').value!==atlas.family||
+    counts.length!==atlas.bankCount||
+    counts.some((n,i)=>n!==atlas.bankMapCounts[i]))
+  throw Error('Atlas inputs changed; reinspect before shared pointer review');
+ const result=auditVanillaAtlasPointerAliases(atlas,{
+  maxGroups:64,maxReferences:8
+ });
+ const root=$('map-atlas-alias-list');root.replaceChildren();
+ $('map-atlas-alias-status').textContent='Across '+result.totalMaps+
+  ' declared maps: '+result.counts.header+' shared header groups, '+
+  result.counts.layout+' shared layout groups, '+result.counts.blockmap+
+  ' shared blockmap groups. '+result.totalGroups+' total groups'+
+  (result.truncated?' (first 64 shown)':'')+
+  '. Shared pointers may be intentional; ownership and CUBE layout unverified.';
+ for(const group of result.groups){
+  const button=document.createElement('button');button.type='button';
+  button.className='secondary-button';button.style.display='block';
+  button.style.margin='8px 0';button.style.textAlign='left';
+  button.textContent='Shared '+group.kind+' at 0x'+hex(group.offset)+
+   ' · '+group.referenceCount+' map references: '+
+   group.references.map(x=>x.bankIndex+'/'+x.mapIndex+
+    ' pointer 0x'+hex(x.sourceOffset)).join(', ')+
+   (group.referencesTruncated?' (first 8 shown)':'')+
+   ' · tap to inspect first pointer source';
+  button.addEventListener('click',()=>safeRun(()=>{
+   if(inspectedMapAtlas?.rom!==model)throw Error('Atlas expired; reinspect');
+   setPageForOffset(group.references[0].sourceOffset);gotoTab('hex');
+  }));
+  root.append(button);
+ }
+ if(!result.groups.length){
+  const empty=document.createElement('div');empty.className='empty-state';
+  empty.textContent='No exact shared header, layout or blockmap pointers in the declared atlas.';
+  root.append(empty);
+ }
 }));
 
 $('map-atlas-select').addEventListener('change',()=>{
