@@ -1,5 +1,10 @@
 # Roadmap
 
+## Watchdog checkpoint — source-matched raw event spatial hints (27 October 2026)
+- [x] Overlay raw object, script-trigger and signpost indexes only on an exact matching blockmap offset and dimensions.
+- [x] Validate coordinate/index bounds, suppress out-of-map hints, preserve immutable event arrays, and invalidate overlays on ROM/metadata changes.
+- [ ] Real tileset rendering, collision/movement, authenticated CUBE layouts and safe map/event editing remain outstanding.
+
 ## Watchdog checkpoint — read-only vanilla object/script/signpost inspection (27 October 2026)
 - [x] Decode all four vanilla event arrays with raw source offsets, pointers, coordinates and flags, preserving the source ROM and staged edits.
 - [x] Reject malformed pointers, truncated arrays and cross-array/map-structure overlaps; expose touch-to-hex inspection in modular and offline builds.
