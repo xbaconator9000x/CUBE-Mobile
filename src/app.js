@@ -34,6 +34,7 @@ import {auditVanillaChangeImpact} from './map-change-impact.js';
 import {auditVanillaQueuedChangeRoundtrip} from './map-change-roundtrip.js';
 import {compareVanillaBlockmapVisualChange,compareVanillaBlockmapVisualChangeSet} from './map-visual-diff.js';
 import {buildVanillaRawMapOverlay,buildRawBlockmapGridOverlay} from './map-raw-overlay.js';
+import {auditVanillaAtlasRawCells} from './map-cell-census.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
@@ -998,6 +999,9 @@ function clearMapAtlas(message='Declared atlas invalidated; inspect again.') {
  $('map-review-impact-status').textContent='Declared atlas invalidated; inspect again.';
  $('map-atlas-batch-audit').disabled=true;
  $('map-atlas-alias-audit').disabled=true;
+ $('map-atlas-raw-census').disabled=true;
+ $('map-atlas-raw-census-list').replaceChildren();
+ $('map-atlas-raw-census-status').textContent='No raw-cell census run.';
  $('map-event-ownership-audit').disabled=true;
  $('map-script-alias-audit').disabled=true;
  $('map-script-alias-list').replaceChildren();
@@ -1124,6 +1128,7 @@ $('map-atlas-inspect').addEventListener('click',()=>safeRun(()=>{
  $('map-event-coordinate-audit').disabled=false;
  $('map-atlas-batch-audit').disabled=false;
  $('map-atlas-alias-audit').disabled=false;
+ $('map-atlas-raw-census').disabled=false;
  $('map-event-ownership-audit').disabled=false;
  $('map-script-alias-audit').disabled=false;
  atlasScriptAliasStart=0;
@@ -1457,6 +1462,58 @@ $('map-coordinate-batch-audit').addEventListener('click',()=>safeRun(()=>{
  $('map-coordinate-batch-audit').disabled=result.nextStart===null;
 }));
 
+
+
+$('map-atlas-raw-census').addEventListener('click',()=>safeRun(()=>{
+ requireVanillaMapFormat();
+ if(!inspectedMapAtlas||inspectedMapAtlas.rom!==model)
+  throw Error('Inspect a declared vanilla atlas before raw-cell census');
+ const atlas=inspectedMapAtlas.atlas;
+ function inputsUnchanged(){
+  const counts=parseVanillaBankMapCounts($('map-atlas-counts').value);
+  return inspectedMapAtlas?.rom===model&&
+   parseOffset($('map-bank-offset').value)===atlas.address&&
+   $('map-layout-family').value===atlas.family&&
+   counts.length===atlas.bankCount&&
+   counts.every((n,i)=>n===atlas.bankMapCounts[i]);
+ }
+ if(!inputsUnchanged())throw Error('Atlas inputs changed; reinspect before census');
+ const opts={maxMaps:128,maxUniqueCells:65536,maxRows:32,chunkSize:4096};
+ const result=auditVanillaAtlasRawCells(model,atlas,opts);
+ const root=$('map-atlas-raw-census-list');root.replaceChildren();
+ const common=result.rawHighBitCounts.map((count,value)=>({count,value}))
+  .filter(x=>x.count).sort((a,b)=>b.count-a.count||a.value-b.value)
+  .slice(0,6).map(x=>x.value+': '+x.count).join(', ');
+ $('map-atlas-raw-census-status').textContent=
+  'Inspected '+result.mapsInspected+' declared maps, '+
+  result.uniqueBlockmaps+' unique blockmaps, '+result.uniqueCells+
+  ' physical cells ('+result.logicalCells+' logical map cells; '+
+  result.sharedMapReferences+' shared map references). '+
+  result.nonzeroRawHighBitCells+' cells have nonzero raw high bits. '+
+  'Most common raw values: '+common+'. '+
+  (result.rowsTruncated?'First 32 maps shown. ':'')+
+  'These values are NOT verified walkability or CUBE collision semantics.';
+ for(const row of result.rows){
+  const button=document.createElement('button');button.type='button';
+  button.className='secondary-button';button.style.display='block';
+  button.style.margin='8px 0';button.style.textAlign='left';
+  button.textContent='Bank '+row.bankIndex+' / map '+row.mapIndex+
+   ' · '+row.width+'×'+row.height+' · '+row.nonzeroRawHighBitCells+
+   ' nonzero raw high-bit cells · '+row.sharedBlockmapReferences+
+   ' map reference(s) · inspect raw bytes';
+  button.addEventListener('click',()=>safeRun(()=>{
+   requireVanillaMapFormat();
+   if(!inputsUnchanged())throw Error('Atlas inputs changed; rescan first');
+   const fresh=auditVanillaAtlasRawCells(model,atlas,opts);
+   const found=fresh.rows.find(m=>m.bankIndex===row.bankIndex&&
+    m.mapIndex===row.mapIndex&&m.blockmapOffset===row.blockmapOffset&&
+    m.nonzeroRawHighBitCells===row.nonzeroRawHighBitCells);
+   if(!found)throw Error('Raw blockmap census changed; rescan first');
+   setPageForOffset(found.blockmapOffset);gotoTab('hex');
+  }));
+  root.append(button);
+ }
+}));
 
 $('map-atlas-alias-audit').addEventListener('click',()=>safeRun(()=>{
  requireVanillaMapFormat();
