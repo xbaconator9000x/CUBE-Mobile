@@ -60,6 +60,12 @@
 .semantic-table th,.semantic-table td{border-bottom:1px solid #293852;padding:10px 12px;max-width:250px;overflow-wrap:anywhere;vertical-align:top}
 .semantic-table th{color:#b9a9f5;background:#192741}
 .semantic-row-jump{background:#273658;border:1px solid #51658b;color:#e6e9ff;border-radius:7px;min-height:40px;padding:8px 10px;font:inherit;cursor:pointer}
+
+/* Bounded, horizontally scrollable raw blockmap viewport. No walkability colours. */
+.blockmap-scroller{overflow:auto;max-width:100%;padding:12px;-webkit-overflow-scrolling:touch}
+.blockmap-grid{display:grid;gap:4px;min-width:max-content}
+.blockmap-cell{min-width:64px;min-height:48px;padding:8px 4px;border:1px solid #435079;border-radius:6px;background:#18243a;color:#e5ebf7;font:600 12px/1.2 ui-monospace,monospace;touch-action:manipulation}
+.blockmap-cell:focus-visible{outline:3px solid #b4a7ff;outline-offset:2px}
 </style>
 </head><body>
 <div class="shell" id="app">
@@ -69,6 +75,7 @@
     <button class="tab active" data-tab="home"><span class="nav-icon">▦</span><span>Workspace</span></button>
     <button class="tab" data-tab="hex"><span class="nav-icon">⌗</span><span>Hex editor</span></button>
     <button class="tab" data-tab="anchors"><span class="nav-icon">⌕</span><span>Named data</span></button>
+    <button class="tab" data-tab="maps"><span class="nav-icon">▤</span><span>Blockmaps</span></button>
     <button class="tab" data-tab="graphics"><span class="nav-icon">◈</span><span>Graphics</span></button>
     <button class="tab" data-tab="patches"><span class="nav-icon">⇄</span><span>Patches</span></button>
     <button class="tab" data-tab="changes"><span class="nav-icon">≡</span><span>Changes</span><span class="nav-counter" id="changes-tab-count" hidden>0</span></button>
@@ -96,6 +103,7 @@
   <div class="dashboard-grid">
     <button class="feature-card" data-go="hex"><div class="feature-icon violet">⌗</div><strong>Hex editor</strong><p>Browse bytes, search patterns, use pointers and stage edits.</p><span>Open tool ↗</span></button>
     <button class="feature-card" data-go="anchors"><div class="feature-icon green">⌕</div><strong>Named ROM data</strong><p>Import CUBHMA TOML metadata and inspect verified-offset anchors, pointers and formats.</p><span>Open tool ↗</span></button>
+    <button class="feature-card" data-go="maps"><div class="feature-icon blue">▤</div><strong>Blockmap inspector</strong><p>Inspect raw map tiles and collision/elevation bits at a supplied ROM offset. Read-only.</p><span>Open tool ↗</span></button>
     <button class="feature-card" data-go="graphics"><div class="feature-icon blue">◈</div><strong>Graphics inspector</strong><p>Find LZ77-compressed tile candidates and inspect palettes.</p><span>Open tool ↗</span></button>
     <button class="feature-card" data-go="patches"><div class="feature-icon green">⇄</div><strong>Patch tools</strong><p>Apply validated BPS/IPS patches or export an IPS diff.</p><span>Open tool ↗</span></button>
     <button class="feature-card" data-go="changes"><div class="feature-icon amber">≡</div><strong>Change history</strong><p>Review every staged edit and save a safe copy.</p><span>Open tool ↗</span></button>
@@ -114,6 +122,22 @@
  <div class="toolbar-card"><div class="input-wrap"><label for="anchor-find">Search named anchors</label><input id="anchor-find" placeholder="e.g. pokemon.stats, maps, trainers, sound…" spellcheck="false"></div><div class="input-wrap"><label for="anchor-group">Category</label><select id="anchor-group"><option value="all">All categories</option></select></div></div>
  <div class="semantic-grid"><div class="semantic-card"><div class="card-caption"><b>ANCHOR DIRECTORY</b><span id="anchor-count">0 loaded</span></div><div id="anchor-list" class="anchor-list"><div class="empty-state">Load ROM metadata to browse named data.</div></div></div><div class="semantic-card"><div class="card-caption"><b>DATA INSPECTION</b><span>Never writes ROM data</span></div><div id="anchor-detail" class="anchor-detail"><div class="empty-state">Choose an anchor to inspect its address, format and bytes.</div></div><div class="input-row"><button id="anchor-to-hex" class="secondary-button" disabled>Open in hex</button><button id="anchor-follow-pointer" class="secondary-button" disabled>Follow pointer</button><button id="anchor-to-graphics" class="secondary-button" disabled>View LZ graphic</button></div></div></div>
  <div class="safety-strip"><span class="safety-icon">!</span><div><strong>Metadata ≠ verified ROM compatibility.</strong><p>HMA named anchors can describe tables, text, graphics and scripts, but reading their addresses does not establish that an expanded CUBE ROM uses those locations. Full writable format decoding, repointing and map/collision editing are not implemented here.</p></div></div>
+</section>
+<section class="view" id="view-maps">
+  <div class="tool-heading"><div><div class="eyebrow">RAW MAP CELLS · UNVERIFIED LAYOUT</div><h2>Blockmap inspector</h2><p>Read-only 10-bit tile IDs and 6-bit collision/elevation values. This does not infer walkability, discover map pointers, or edit maps.</p></div><span class="pill">Read only</span></div>
+  <div class="toolbar-card">
+    <div class="input-wrap"><label for="map-offset">Blockmap ROM offset (hex; GBA pointer accepted)</label><input id="map-offset" inputmode="text" placeholder="e.g. 1A2B3C" spellcheck="false"></div>
+    <div class="input-row">
+      <div class="input-wrap"><label for="map-width">Width (decimal)</label><input id="map-width" type="number" min="1" max="1024" value="16"></div>
+      <div class="input-wrap"><label for="map-height">Height (decimal)</label><input id="map-height" type="number" min="1" max="1024" value="16"></div>
+      <div class="input-wrap"><label for="map-x">Start X</label><input id="map-x" type="number" min="0" value="0"></div>
+      <div class="input-wrap"><label for="map-y">Start Y</label><input id="map-y" type="number" min="0" value="0"></div>
+    </div>
+    <button type="button" id="map-inspect" class="subtle-button" disabled>Inspect 12 × 10 cells</button>
+    <p class="palette-note">You must independently verify the map's blockmap offset and dimensions. Header identity alone cannot verify CUBE layouts. No bytes are changed. Collision values are raw metadata, not passability colours.</p>
+    <output id="map-status" class="palette-note" aria-live="polite">Open a ROM and enter a known blockmap offset.</output>
+  </div>
+  <div class="editor-card"><div id="map-grid" class="blockmap-scroller" aria-label="Read-only map block cells"><div class="empty-state">No blockmap inspected.</div></div></div>
 </section>
 <section class="view" id="view-graphics">
  <div class="tool-heading"><div><div class="eyebrow">GBA GRAPHICS EXPLORER</div><h2>Graphics explorer</h2><p>Search for LZ77-compressed tile data, or inspect a known raw offset. Read-only, with no guessed colours.</p></div><span class="pill">Inspect only</span></div>
@@ -2002,6 +2026,83 @@ function compareRomMetadataIdentity(model,romFingerprint,metadataFiles,
     fingerprintMetadataFiles(metadataFiles),{profiles});
 }
 
+/**
+ * Read-only, source-grounded GBA blockmap inspection.
+ *
+ * Upstream CUBHMA: HexManiac.Core/Models/Map/MapModel.cs,
+ * BlockCells[x,y] reads a little-endian 16-bit cell and returns
+ * BlockCell(data & 0x3FF, data >> 10).
+ *
+ * IMPORTANT: the high six bits are raw collision/elevation metadata.
+ * They are NOT a portable walkability boolean, and must not be flattened.
+ * Callers must supply a separately verified blockmap ROM offset and dimensions.
+ * No pointer discovery, semantic ownership, or ROM writing is performed here.
+ */
+
+function positiveInt(value, name, maximum) {
+  if (!Number.isSafeInteger(value) || value < 1 || value > maximum)
+    throw new RangeError(name + ' must be an integer from 1 to ' + maximum);
+}
+
+function decodeBlockCell(word) {
+  if (!Number.isInteger(word) || word < 0 || word > 0xFFFF)
+    throw new RangeError('Blockmap cell must be an unsigned 16-bit value');
+  return Object.freeze({
+    raw: word,
+    tileId: word & 0x3FF,
+    collision: word >>> 10,
+  });
+}
+
+/**
+ * Inspect a bounded viewport of a validated blockmap. Address is a ROM
+ * file offset, not a GBA 0x08xxxxxx pointer. Even-aligned cells are required.
+ * The full declared map must fit inside the ROM even for a tiny viewport.\n * A read-only {length, read(offset)} ROM model can expose staged edits\n * without allocating a complete copy of a large ROM.
+ */
+function inspectBlockMap(bytes, {
+  address, width, height,
+  x = 0, y = 0, viewportWidth = 16, viewportHeight = 16,
+} = {}) {
+  if (!(bytes instanceof Uint8Array) && !(bytes && Number.isSafeInteger(bytes.length) && bytes.length >= 0 && typeof bytes.read === 'function'))
+    throw new TypeError('ROM must be Uint8Array or a read-only ROM accessor');
+  const read = bytes instanceof Uint8Array ? offset => bytes[offset] : offset => bytes.read(offset);
+  if (!Number.isSafeInteger(address) || address < 0 || address % 2 !== 0)
+    throw new RangeError('Blockmap ROM offset must be a non-negative even integer');
+  positiveInt(width, 'Map width', 1024);
+  positiveInt(height, 'Map height', 1024);
+  if (!Number.isSafeInteger(x) || x < 0 || x >= width ||
+      !Number.isSafeInteger(y) || y < 0 || y >= height)
+    throw new RangeError('Viewport origin is outside the map');
+  positiveInt(viewportWidth, 'Viewport width', 64);
+  positiveInt(viewportHeight, 'Viewport height', 64);
+  if (width * height > Math.floor((bytes.length - address) / 2))
+    throw new RangeError('Complete blockmap extends beyond ROM bounds');
+  const columns = Math.min(viewportWidth, width - x);
+  const rows = Math.min(viewportHeight, height - y);
+  const cells = [];
+  for (let dy = 0; dy < rows; dy++) {
+    const row = [];
+    for (let dx = 0; dx < columns; dx++) {
+      const offset = address + ((y + dy) * width + x + dx) * 2;
+      const low = read(offset), high = read(offset + 1);
+      if (!Number.isInteger(low) || low < 0 || low > 255 || !Number.isInteger(high) || high < 0 || high > 255)
+        throw new RangeError('ROM accessor returned invalid byte');
+      const raw = low | (high << 8);
+      row.push(Object.freeze({
+        x: x + dx, y: y + dy, byteOffset: offset, ...decodeBlockCell(raw),
+      }));
+    }
+    cells.push(Object.freeze(row));
+  }
+  return Object.freeze({
+    address, width, height, x, y, columns, rows,
+    truncated: x + columns < width || y + rows < height,
+    cells: Object.freeze(cells),
+    readOnly: true,
+    walkabilityVerified: false,
+  });
+}
+
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let pcsReference=null,pcsReferenceName='';
@@ -2011,8 +2112,8 @@ let model=null, currentTab='home', page=0, selected=null, patchFile=null, palett
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
 ctx.imageSmoothingEnabled=false;
-const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','save-rom','save-project','export-ips','discard-button','edit-unlock'];
-const tabs={home:['YOUR WORKSPACE','ROM Workbench'],hex:['BINARY INSPECTOR','Hex editor'],anchors:['ROM SEMANTICS','Named data'],graphics:['GBA GRAPHICS','Graphics explorer'],patches:['PATCH WORKFLOW','Patch tools'],changes:['REVIEW & EXPORT','Changes']};
+const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','save-rom','save-project','export-ips','discard-button','edit-unlock'];
+const tabs={home:['YOUR WORKSPACE','ROM Workbench'],hex:['BINARY INSPECTOR','Hex editor'],anchors:['ROM SEMANTICS','Named data'],maps:['RAW MAP CELLS','Blockmap inspector'],graphics:['GBA GRAPHICS','Graphics explorer'],patches:['PATCH WORKFLOW','Patch tools'],changes:['REVIEW & EXPORT','Changes']};
 function toast(message,bad=false){const t=$('toast');t.textContent=message;t.classList.toggle('error',bad);t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),4300);}
 function safeRun(fn){try{const result=fn();if(result?.catch) result.catch(err=>toast(err.message||String(err),true));}catch(err){toast(err.message||String(err),true);}}
 function confirmAction(title,description){return new Promise(resolve=>{const d=$('confirm-dialog');$('confirm-title').textContent=title;$('confirm-text').textContent=description;d.showModal();d.addEventListener('close',()=>resolve(d.returnValue==='yes'),{once:true});});}
@@ -2021,7 +2122,7 @@ function ensureModel(){if(!model)throw Error('Open a GBA ROM first');return mode
 // file:// standalone HTML app. Each tab change creates a real history entry,
 // allowing Android's system Back gesture/button to return to the previous tab.
 const routeFromHash=()=>{
-  const match=/^#\/(home|hex|anchors|graphics|patches|changes)$/.exec(location.hash);
+  const match=/^#\/(home|hex|anchors|maps|graphics|patches|changes)$/.exec(location.hash);
   return match ? match[1] : 'home';
 };
 function renderTab(name){
@@ -2091,7 +2192,7 @@ function updateIndicators(){
   if(active)showRomInfo();
   drawMetadataFingerprintStatus();
 }
-function installModel(name,bytes){metadataImportSerial++;metadataFingerprints=[];pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
+function installModel(name,bytes){$('map-grid').innerHTML='<div class="empty-state">No blockmap inspected.</div>';$('map-status').textContent='ROM replaced. Enter a verified offset and inspect again.';metadataImportSerial++;metadataFingerprints=[];pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
 $('rom-picker').addEventListener('change',async e=>{
   const file=e.target.files?.[0];e.target.value='';if(!file)return;
   if(file.size<0xC0 || file.size>MAX_BYTES)return toast('ROM must be 192 bytes to 128 MiB',true);
@@ -2693,6 +2794,32 @@ $('metadata-stock').addEventListener('click',async()=>{
     metadataCommit(sources);
   }catch(err){toast('Stock metadata: '+err.message,true);}finally{$('metadata-stock').disabled=false;}
 });
+
+
+// A manually supplied blockmap address is NOT a verified map layout. This
+// view deliberately never interprets the high six bits as walkability.
+$('map-inspect').addEventListener('click',()=>safeRun(()=>{
+  ensureModel();
+  const address=parseOffset($('map-offset').value);
+  const width=Number($('map-width').value),height=Number($('map-height').value);
+  const x=Number($('map-x').value),y=Number($('map-y').value);
+  const preview=inspectBlockMap(model,{address,width,height,x,y,viewportWidth:12,viewportHeight:10});
+  const grid=$('map-grid');grid.replaceChildren();
+  const board=document.createElement('div');board.className='blockmap-grid';
+  board.style.gridTemplateColumns='repeat('+preview.columns+', minmax(64px,1fr))';
+  for(const row of preview.cells)for(const cell of row){
+    const button=document.createElement('button');button.type='button';button.className='blockmap-cell';
+    button.textContent=cell.tileId+' / '+cell.collision;
+    button.title='('+cell.x+','+cell.y+') tile '+cell.tileId+', raw collision/elevation '+cell.collision+', ROM 0x'+hex(cell.byteOffset);
+    button.setAttribute('aria-label',button.title);
+    button.addEventListener('click',()=>safeRun(()=>{setPageForOffset(cell.byteOffset);gotoTab('hex');}));
+    board.append(button);
+  }
+  grid.append(board);
+  $('map-status').textContent=preview.columns+' × '+preview.rows+' cells from 0x'+hex(address)+
+    (preview.truncated?' (partial viewport)':'')+
+    '. Each cell: tile ID / raw collision-elevation (0–63). Re-inspect after edits.';
+}));
 
 updateIndicators();drawGraphics();drawAnchors();renderTab(routeFromHash());
 
