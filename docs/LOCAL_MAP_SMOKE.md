@@ -13,7 +13,8 @@ Create a private, local JSON manifest (do not commit it):
   "family": "RSE",
   "bankTableOffset": 256,
   "bankMapCounts": [2, 1],
-  "scanAllScriptAliases": true
+  "scanAllScriptAliases": true,
+  "scanAllOperandAliases": true
 }
 ```
 
@@ -29,6 +30,13 @@ npm run smoke:local -- --rom /local/path/to/your.gba --manifest /local/path/to/y
 ```
 
 Set `scanAllScriptAliases` to `true` to additionally scan all declared vanilla maps for shared object/trigger script targets. The report includes aggregate counts only, never script target offsets, pointer-source bytes or local paths. The opt-in scan fails closed if the 32768-pointer budget is exceeded; omit the flag to keep the existing smaller smoke test.
+
+Set `scanAllOperandAliases` to `true` to inspect bounded fixed-width
+vanilla command prefixes from all declared object/trigger scripts and count
+shared pointer-operand targets across distinct script source fields.
+Repeated events sharing one script are deduplicated. Only aggregate counts
+are exported; the scanner does not follow control flow or verify CUBE
+target formats. See [operand alias audit](VANILLA_SCRIPT_OPERAND_ALIAS_ATLAS.md).
 
 On success, the command prints JSON with the matched SHA-256, declared
 map counts, up to 16 event-map summaries, shared pointer alias counts,

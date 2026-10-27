@@ -126,3 +126,39 @@ test('opt-in alias smoke rejects non-boolean flag without inspecting ROM',()=>{
  assert.notEqual(result.status,0);
  assert.equal(result.stdout,'');
 });
+
+test('opt-in whole-atlas script operand aliases report aggregate counts only',()=>{
+ const rom=fixture();
+ d(rom,0x144,ptr(0x240));
+ d(rom,0x240,ptr(0x340));
+ for(const o of [8,12])d(rom,0x240+o,0);
+ d(rom,0x340,2);d(rom,0x344,2);
+ for(const [o,target] of [[8,0x500],[12,0x400],[16,0x600],[20,0x620]])
+  d(rom,0x340+o,ptr(target));
+ for(const [header,event,object,script] of [
+  [0x200,0x700,0x740,0x900],[0x240,0x720,0x760,0x920]
+ ]){
+  d(rom,header+4,ptr(event));
+  rom[event]=1;rom[event+1]=0;rom[event+2]=0;rom[event+3]=0;
+  d(rom,event+4,ptr(object));
+  for(const o of [8,12,16])d(rom,event+o,0);
+  d(rom,object+16,ptr(script));
+  rom[script]=0x67;d(rom,script+1,ptr(0xa00));rom[script+5]=0x02;
+ }
+ const result=run(rom,{bankMapCounts:[2],scanAllOperandAliases:true});
+ assert.equal(result.status,0,result.stderr);
+ const report=JSON.parse(result.stdout);
+ assert.equal(report.operandAliasAtlas.mapsInspected,2);
+ assert.equal(report.operandAliasAtlas.eventScriptReferences,2);
+ assert.equal(report.operandAliasAtlas.distinctEventScripts,2);
+ assert.equal(report.operandAliasAtlas.operandFields,2);
+ assert.equal(report.operandAliasAtlas.sharedTargets,1);
+ assert.equal(report.operandAliasAtlas.ownershipAuthenticated,false);
+ assert.equal(report.independentParityEvidence,false);
+ assert.doesNotMatch(result.stdout,/pointerSourceOffset|targetOffset|message-text|fixture.gba/);
+});
+test('opt-in operand scan requires a boolean manifest flag',()=>{
+ const result=run(fixture(),{scanAllOperandAliases:'yes'});
+ assert.notEqual(result.status,0);
+ assert.equal(result.stdout,'');
+});

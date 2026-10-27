@@ -1,3 +1,8 @@
+## Checkpoint — whole-atlas vanilla script operand aliases (28 October 2026)
+- [x] Revalidate canonical declared bank/map pointers, deduplicate event script roots and group shared fixed-width command pointer operands by distinct ROM source field.
+- [x] Add bounded, fail-closed scanner, synthetic tests and opt-in SHA-256-matched local-ROM aggregate report with no exported script bytes or pointer offsets.
+- [ ] Mobile UI, CUBE-specific script grammar, complete control flow, authenticated ownership, genuine save/reopen, emulator and Android acceptance remain outstanding. No strict parity credit. See [operand aliases](docs/VANILLA_SCRIPT_OPERAND_ALIAS_ATLAS.md).
+
 ## Checkpoint — canonical full-atlas script provenance (28 October 2026)
 - [x] Re-derive every declared map pointer source from the ROM bank table and explicit bank/map counts, rather than accepting a matching pointer value at an arbitrary supplied offset.
 - [x] Reject forged map indexes, shuffled atlas order, missing bank-count provenance and stale map headers before emitting whole-atlas script aliases; add synthetic forgery regressions.
