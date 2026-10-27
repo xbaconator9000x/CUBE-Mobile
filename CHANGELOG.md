@@ -1,3 +1,7 @@
+## Unreleased — opt-in local ROM raw warp graph smoke (28 October 2026)
+- Extend the SHA-256-matched local-only smoke tool with optional aggregate raw directed warp/connection counts and structural reachability, without exporting raw edge offsets or ROM bytes.
+- Add synthetic two-map and malformed manifest regressions. No gameplay/CUBE compatibility claims or parity credit.
+
 ## Unreleased — mobile/offline directed warp graph explorer (28 October 2026)
 - Add touch-first inspection of raw directed map links, bounded map summaries, unresolved warp findings and stale-checked navigation to maps and hex bytes.
 - Bundle the graph inspector into the standalone offline application with UI wiring regressions. Raw reachability is not verified gameplay travel.
