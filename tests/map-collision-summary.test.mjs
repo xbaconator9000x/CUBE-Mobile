@@ -20,6 +20,10 @@ test('raw six-bit distribution, tile frequency, and source offsets are exact',()
  assert.equal(a.rawHighBitCounts[0],1);
  assert.equal(a.rawHighBitCounts[1],1);
  assert.equal(a.rawHighBitCounts[63],2);
+ assert.equal(a.firstRawHighBitOffsets[0],0x80);
+ assert.equal(a.firstRawHighBitOffsets[1],0x82);
+ assert.equal(a.firstRawHighBitOffsets[63],0x84);
+ assert.equal(a.firstRawHighBitOffsets[2],null);
  assert.equal(a.rawHighBitCounts.reduce((x,y)=>x+y,0),4);
  assert.deepEqual(a.commonTiles,[{tileId:2,count:2},{tileId:3,count:2}]);
  assert.equal(a.distinctTiles,2);
