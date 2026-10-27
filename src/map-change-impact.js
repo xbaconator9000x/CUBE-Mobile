@@ -96,14 +96,28 @@ export function auditVanillaChangeImpact(source,atlas,previews,{
     if(owners.length<maxOwners)owners.push(c.map);
     if(c.map.headerOffset===preview.headerOffset){
      if(entry.kind==='blockmap'){
-      if(preview.blockmapOffset===c.offset&&preview.byteOffset===entry.offset)
+      // The selected cell coordinates and layout must identify exactly the
+      // reviewed word. A forged preview with a valid byte offset but a
+      // different visible cell must not pass the ownership preflight.
+      if(preview.family===fresh.family&&
+         preview.layoutOffset===fresh.maps.find(m=>m.mapHeaderOffset===c.map.headerOffset)?.layoutOffset&&
+         preview.blockmapOffset===c.offset&&preview.byteOffset===entry.offset&&
+         preview.width===fresh.maps.find(m=>m.mapHeaderOffset===c.map.headerOffset)?.width&&
+         preview.height===fresh.maps.find(m=>m.mapHeaderOffset===c.map.headerOffset)?.height&&
+         Number.isSafeInteger(preview.x)&&Number.isSafeInteger(preview.y)&&
+         preview.x>=0&&preview.x<preview.width&&
+         preview.y>=0&&preview.y<preview.height&&
+         c.offset+(preview.y*preview.width+preview.x)*2===entry.offset)
        sourceProvenance=true;
      }else{
       const ev=eventsByHeader.get(c.map.headerOffset);
       const index=(entry.offset-c.offset)/c.unit;
       if(preview.eventsOffset===ev.eventsOffset&&
          (entry.kind==='warp'?preview.warpIndex===index:
-          preview.index===index&&preview.arrayOffset===c.offset))
+          preview.index===index&&preview.arrayOffset===c.offset&&
+          preview.recordLength===entry.length&&
+          preview.arrayPointerSource===ev.eventsOffset+
+           ({objects:4,warps:8,scripts:12,signposts:16})[entry.kind]))
        sourceProvenance=true;
      }
     }
