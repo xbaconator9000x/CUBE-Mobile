@@ -1,3 +1,8 @@
+## Checkpoint — upstream CUBHMA custom map-format hierarchy (28 October 2026)
+- [x] Port bounded read-only nested pointer-format extraction from pinned CUBHMA MapModel.cs, including custom layout/events/warp/connection metadata structure hints.
+- [x] Add synthetic malformed, vanilla-marker and nested-format tests without reading or writing ROM bytes.
+- [ ] Resolve actual CUBE metadata declarations and versioned ROM fingerprints, then authenticate custom map structures, safe editing and genuine ROM/emulator/Android acceptance. No strict parity credit. See [custom format hierarchy](docs/HMA_CUSTOM_MAP_FORMAT_HIERARCHY.md).
+
 ## Checkpoint — mobile reviewed-warp raw route comparison (28 October 2026)
 - [x] Compare original and proposed shortest raw routes for 1–16 typed reviewed warp changes, with per-hop original-byte inspection.
 - [x] Revalidate queue identity, atlas, endpoint selection and both decoded routes before navigation; regenerate offline HTML and add UI regressions.
