@@ -65,7 +65,7 @@ export function auditVanillaChangeImpact(source,atlas,previews,{
  // Events are parsed once per unique header, not once per alias. Reusing the
  // resulting spans for every map preserves alias ownership without re-reading.
  const eventsByHeader=new Map();
- if(review.entries.some(e=>e.kind!=='blockmap')){
+ {
   for(const map of fresh.maps){
    let events=eventsByHeader.get(map.mapHeaderOffset);
    if(!events){
