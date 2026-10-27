@@ -19,7 +19,7 @@ export function auditVanillaMapEventScripts(source,{
   decoded:0,unknownOpcode:0,truncatedCommand:0,terminal:0};
  const operandPointerStatuses={inRom:0,outsideRom:0,nonRom:0,null:0};
  const operandPointerRoles={scriptBranch:0,genericData:0,asm:0,code:0,
-  movementData:0,messageText:0};
+  movementData:0,messageText:0,trainerBattleData:0};
  for(const record of pointers.records.slice(0,maxRecords)){
   counts[record.status==='in-rom'?'inRom':record.status==='outside-rom'?
    'outsideRom':record.status==='non-rom'?'nonRom':'null']++;

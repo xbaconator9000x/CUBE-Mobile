@@ -1,5 +1,10 @@
 # Roadmap
 
+## Checkpoint — conservative vanilla trainerbattle subtype parsing (28 October 2026)
+- [x] Decode upstream-defined trainerbattle subtypes 00–08 with exact operand widths, byte budgets and bounded raw pointer inspection.
+- [x] Stop on subtype 09+ or incomplete commands without guessing game-specific extensions; cover FRLG/RSE and pointer role summaries with synthetic tests.
+- [ ] Authenticate CUBE-specific battle script grammar and genuine ROM/emulator/Android acceptance before semantic edits or parity credit. See [trainerbattle checkpoint](docs/VANILLA_TRAINERBATTLE_SUBTYPES.md).
+
 ## Checkpoint — vanilla script operand pointer hints (28 October 2026)
 - [x] Classify fixed-width command pointer operands as branch, generic data, ASM/code, movement or message hints with exact ROM provenance and capped output.
 - [x] Aggregate statuses in map event-script audits and expose counts only in SHA-256-checked local-ROM smoke reports; add synthetic tests.

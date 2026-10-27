@@ -10,7 +10,8 @@ const ROLES=Object.freeze({
   0x04:'script-branch',0x05:'script-branch',
   0x06:'script-branch',0x07:'script-branch',
   0x0f:'generic-data',0x23:'asm',0x24:'code',
-  0x4f:'movement-data',0x50:'movement-data',0x67:'message-text'
+  0x4f:'movement-data',0x50:'movement-data',0x5c:'trainer-battle-data',
+  0x67:'message-text'
 });
 
 export function auditVanillaScriptOperandPointers(source,{
@@ -23,7 +24,7 @@ export function auditVanillaScriptOperandPointers(source,{
  });
  const findings=[],statuses={inRom:0,outsideRom:0,nonRom:0,null:0};
  const roles={scriptBranch:0,genericData:0,asm:0,code:0,
-  movementData:0,messageText:0};
+  movementData:0,messageText:0,trainerBattleData:0};
  let total=0;
  for(const command of prefix.commands){
   for(const arg of command.args){
@@ -35,7 +36,8 @@ export function auditVanillaScriptOperandPointers(source,{
     'non-rom':'nonRom',null:'null'}[status];
    const roleKey={'script-branch':'scriptBranch',
     'generic-data':'genericData',asm:'asm',code:'code',
-    'movement-data':'movementData','message-text':'messageText'}[role];
+    'movement-data':'movementData','message-text':'messageText',
+    'trainer-battle-data':'trainerBattleData'}[role];
    if(!statusKey||!roleKey)throw new RangeError('Invalid pointer classification');
    statuses[statusKey]++;roles[roleKey]++;total++;
    if(findings.length<maxFindings)findings.push(Object.freeze({
