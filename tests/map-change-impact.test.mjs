@@ -78,3 +78,12 @@ test('staged reader preserves underlying ROM and honors staged record bytes',()=
  assert.equal(result.entries[0].ownerCount,1);
  assert.deepEqual(r,before);
 });
+
+test('forged blockmap coordinates and event pointer provenance are rejected',()=>{
+ const r=fixture(),a=atlas(r),p=cell(r,0x200);
+ for(const forged of [{...p,x:1},{...p,y:1},{...p,width:3},
+  {...p,height:3},{...p,layoutOffset:0x320},{...p,family:'FRLG'}])
+  assert.throws(()=>auditVanillaChangeImpact(r,a,[forged]),/provenance/);
+ const w=warp(r,0x200);
+ assert.throws(()=>auditVanillaChangeImpact(r,a,[{...w,warpIndex:1}]),/provenance/);
+});
