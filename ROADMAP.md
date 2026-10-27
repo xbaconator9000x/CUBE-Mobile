@@ -1,5 +1,10 @@
 # Roadmap
 
+## Checkpoint — vanilla atlas pointer alias provenance (27 October 2026)
+- [x] Detect shared header/layout/blockmap pointers across the explicitly declared vanilla map atlas, retaining source pointer offsets and bounded reference lists.
+- [x] Surface ownership hints in mobile/offline UI with synthetic tests and no ROM writes.
+- [ ] Authenticate engine-specific layout ownership, metadata overlays, allocation/repointing and save/emulator/Android roundtrips before semantic editing.
+
 ## Checkpoint — atlas-wide event coordinate batches (27 October 2026)
 - [x] Review 16 declared vanilla maps per tap for raw event coordinate bounds and shared cells; aggregate every event and retain at most 128 findings.
 - [x] Revalidate current ROM layouts per map, support staged reads, exact source offsets, offline/mobile parity and pagination regressions.
