@@ -778,6 +778,9 @@ function clearMapAtlas(message='Declared atlas invalidated; inspect again.') {
  inspectedMapAtlas=null;atlasBatchStart=0;atlasCoordinateBatchStart=0;
  $('map-atlas-batch-audit').disabled=true;
  $('map-atlas-alias-audit').disabled=true;
+ $('map-event-ownership-audit').disabled=true;
+ $('map-event-ownership-list').replaceChildren();
+ $('map-event-ownership-status').textContent='No event ownership review run.';
  $('map-atlas-alias-list').replaceChildren();
  $('map-atlas-alias-status').textContent='No shared pointer aliases reviewed.';
  $('map-coordinate-batch-audit').disabled=true;
@@ -879,6 +882,7 @@ $('map-atlas-inspect').addEventListener('click',()=>safeRun(()=>{
  $('map-event-coordinate-audit').disabled=false;
  $('map-atlas-batch-audit').disabled=false;
  $('map-atlas-alias-audit').disabled=false;
+ $('map-event-ownership-audit').disabled=false;
  $('map-coordinate-batch-audit').disabled=false;
  $('map-atlas-status').textContent='Inspected '+atlas.mapCount+' explicitly declared maps across '+
   atlas.bankCount+' vanilla-format banks. Pointer/layout bounds checked; no ROM identity, CUBE layout or warp topology authenticated.';
