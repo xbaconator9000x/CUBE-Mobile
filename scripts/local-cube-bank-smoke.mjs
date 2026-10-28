@@ -13,15 +13,16 @@ import {inspectHmaDeclaredBankPointerTable} from '../src/hma-map-bank-declared-t
 import {inspectHmaDeclaredBankTargetWindows} from '../src/hma-map-bank-target-windows.js';
 import {inspectHmaCubeMapEntry} from '../src/hma-cube-map-discovery.js';
 import {inspectHmaCubeMapEventWarps} from '../src/hma-cube-map-events.js';
+import {renderHmaCubeMapViewport} from '../src/hma-cube-map-render.js';
 
 const SHA=/^[0-9a-f]{64}$/i;
 export function parseLocalCubeBankSmokeArgs(argv){
- if(!Array.isArray(argv)||argv.length<6||argv.length>14||argv.length%2!==0)
+ if(!Array.isArray(argv)||argv.length<6||argv.length>16||argv.length%2!==0)
   throw new RangeError('Usage: --rom <local.gba> --metadata <local.toml> --expected-sha256 <64 hex>');
  const options={};
  for(let i=0;i<argv.length;i+=2){
   const key=argv[i],value=argv[i+1];
-  if(!['--rom','--metadata','--expected-sha256','--target-words','--bank-index','--map-index','--map-count'].includes(key)||
+  if(!['--rom','--metadata','--expected-sha256','--target-words','--bank-index','--map-index','--map-count','--render-map'].includes(key)||
      Object.hasOwn(options,key)||typeof value!=='string'||!value)
     throw new RangeError('Invalid local smoke arguments');
   options[key]=value;
@@ -31,8 +32,12 @@ export function parseLocalCubeBankSmokeArgs(argv){
     (options['--target-words']!==undefined&&
      !/^(?:[1-9]|1[0-6])$/.test(options['--target-words'])))
   throw new RangeError('ROM, metadata and separately supplied exact SHA-256 are required');
+ if(options['--render-map']!==undefined&&options['--render-map']!=='1')
+  throw new RangeError('Use --render-map 1 for a bounded local render check');
  const keys=['--bank-index','--map-index','--map-count'];
  const present=keys.filter(k=>options[k]!==undefined);
+ if(options['--render-map']!==undefined&&present.length!==3)
+  throw new RangeError('Render check requires a selected CUBE bank/map/count');
  if(present.length!==0&&present.length!==3)
   throw new RangeError('Custom map inspection requires bank index, map index and explicit map count together');
  if(present.length===3){
@@ -74,6 +79,9 @@ export async function inspectLocalCubeBankSmoke(argv){
    mapCount:Number(args['--map-count'])};
  const custom=customOptions?inspectHmaCubeMapEntry(reader,metadata,customOptions):null;
  const events=customOptions?inspectHmaCubeMapEventWarps(reader,metadata,customOptions):null;
+ const render=args['--render-map']===undefined?null:
+   renderHmaCubeMapViewport(reader,metadata,{...customOptions,
+     x:0,y:0,viewportWidth:10,viewportHeight:8});
  return Object.freeze({
   schema:custom?'cube-mobile-local-cube-bank-table-smoke/3':'cube-mobile-local-cube-bank-table-smoke/2',
   hashMatchedUserDeclaration:true,
@@ -103,6 +111,13 @@ export async function inspectLocalCubeBankSmoke(argv){
     customMapMetadataFormatRecognized:custom.metadataFormatRecognized,
     customEventCounts:events.counts,customWarpOutsideMapCount:events.warps.filter(w=>w.outsideDeclaredMap).length,
     customWarpSpecialTargetCount:events.warps.filter(w=>w.specialTarget).length
+  }:{}),
+  ...(render?{
+    customRenderMode:render.renderingMode,
+    customRenderedMetatiles:render.columns*render.rows,
+    customRenderedPixelCount:render.width*render.height,
+    customRenderSupportedSubsetOnly:true,
+    customRenderedOutputExported:false
   }:{}),
   readOnly:true,romModified:false,romExported:false,
   independentlyAuthenticated:false,cubeLayoutAuthenticated:false,
