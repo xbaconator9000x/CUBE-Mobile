@@ -19,3 +19,10 @@ To inspect a **specific** map using the pinned CUBE Emerald custom map layout, a
 The opt-in JSON report contains only the selected bank/map indexes, declared map count, dimensions, raw cell count, event counts and aggregate out-of-map/special warp counts. It does not print pointer addresses, source offsets, raw ROM bytes, hashes or local file paths. The command never writes the ROM and rejects malformed metadata or overlapping structures.
 
 A matching user-supplied hash is an **identity check**, not independent evidence that the ROM is a genuine CUBE build. No collision/passability, script or warp reachability semantics are authenticated. Strict parity remains unchanged pending genuine ROM, emulator and Android testing.
+
+
+## Opt-in local CUBE RSE render compatibility check
+
+Add \`--render-map 1\` alongside the explicit \`--bank-index\`, \`--map-index\` and \`--map-count\` selection. After exact local ROM SHA-256 matching, the command attempts the conservative CUBE Emerald RSE renderer on the first 10 × 8 cells. Unsupported CUBE light palettes, FRLG layouts, malformed blocksets and truncated graphics fail closed. The report adds **only** the rendering mode and aggregate metatile/pixel counts. It does not emit the rendered image, raw pixels, palette values, ROM bytes, offsets, paths or the supplied digest.
+
+This provides a reproducible local smoke check for a ROM you already possess, not independent provenance or a full renderer acceptance test. Do not commit the ROM or metadata containing proprietary assets. Strict parity remains unchanged until authentic source provenance, emulator, Android and save/reopen evidence is independently reviewed.
