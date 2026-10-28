@@ -7,6 +7,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: android-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   android:
     runs-on: ubuntu-latest
@@ -38,6 +41,17 @@ jobs:
       - name: Compile offline Android shell
         working-directory: android
         run: gradle --no-daemon --stacktrace :app:assembleDebug
+      - name: Inspect APK asset and ROM safety
+        run: |
+          APK=$(find android/app/build/outputs/apk/debug -name '*.apk' -print -quit)
+          test -n "$APK"
+          unzip -Z1 "$APK" | grep -Fx 'assets/index.html'
+          if unzip -Z1 "$APK" | grep -Ei '\\.(gba|gbc|rom|sav|srm)
+        with:
+          name: cube-mobile-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+; then exit 1; fi
       - uses: actions/upload-artifact@v4
         with:
           name: cube-mobile-debug-apk
