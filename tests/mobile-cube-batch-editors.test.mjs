@@ -12,7 +12,7 @@ test('CUBE warp/event batch controller is connected to current map lifecycle',as
  assert.match(app,/bindHmaCubeBatchEditors\(/);
  assert.match(app,/cubeBatchEditors\.ready\(false\)/);
  assert.match(app,/cubeBatchEditors\.ready\(Boolean\(snapshot\)\)/);
- assert.match(app,/getContext:\(\)=>\(\{rom:model,summary:mapBankCustomSummary,snapshot:cubeWarpEvidence\}\)/);
+ assert.match(app,/getContext:\(\)=>\(\{rom:model,summary:mapBankCustomSummary,snapshot:cubeWarpEvidence,/);
  for(const page of [html,offline]){
   for(const kind of ['warp','event']){
    for(const action of ['load','queue','preview','verify','clear']){
