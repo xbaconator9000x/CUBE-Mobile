@@ -50,7 +50,7 @@ import {inspectHmaCubeMapConnections} from './hma-cube-map-connections.js';
 import {renderHmaCubeMapViewport} from './hma-cube-map-render.js';
 import {previewHmaCubeBlockmapVisualChange} from './hma-cube-map-cell-preview.js';
 import {inspectHmaCubeBankCatalog} from './hma-cube-bank-catalog.js';
-import {traceHmaCubeWarpArrival} from './hma-cube-warp-arrival.js';
+import {traceHmaCubeWarpArrival,auditHmaCubeWarpTopology} from './hma-cube-warp-arrival.js';
 import {traceHmaCubeConnectionDestination} from './hma-cube-connection-trace.js';
 import {auditHmaCubeCrossBankOwnership} from './hma-cube-cross-bank-ownership.js';
 import {previewHmaCubeCellBatch,planHmaCubeViewportFloodFill,planHmaCubeViewportStamp,planHmaCubeViewportReplace} from './hma-cube-cell-batch.js';
@@ -62,7 +62,7 @@ let fingerprintResult=null,fingerprintAbort=null;
 let metadataFingerprints=[],metadataImportSerial=0,mapBankMetadataReport=null,mapBankRawPointerEvidence=null,mapBankRawWindowEvidence=null,mapBankDeclaredEvidence=null,mapBankTargetEvidence=null,mapBankCustomSummary=null,cubeMapEvidence=null,cubeWarpEvidence=null,cubeConnectionEvidence=null,cubeRenderEvidence=null,cubeRenderSelection=null,cubeCellPreview=null;
 let inspectedWarpMap=null,selectedWarpPreview=null,selectedEventPreview=null,inspectedEventMap=null,inspectedMapAtlas=null,atlasBatchStart=0,atlasCoordinateBatchStart=0,atlasScriptAliasStart=0,atlasScriptCrossPageStart=0,atlasIncomingStart=0,atlasIncomingTarget=null;
 let activeRenderedMap=null,selectedRenderedHit=null;
-let cubeCatalogEvidence=null,cubeWarpTraceEvidence=null,cubeConnectionTraceEvidence=null,cubeOwnershipEvidence=null;
+let cubeCatalogEvidence=null,cubeWarpTraceEvidence=null,cubeConnectionTraceEvidence=null,cubeOwnershipEvidence=null,cubeWarpAuditEvidence=null;
 let cubeCellBatchQueue=[],cubeCellBatchSnapshot=null;
 let mapReviewQueue=[],mapReviewRom=null,lastMapPreviews={cell:null,warp:null,event:null};
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
@@ -1506,7 +1506,13 @@ $('cube-map-render-jump').addEventListener('click',()=>safeRun(()=>{
   setPageForOffset(selection.cellOffset);gotoTab('hex');
 }));
 
+function clearCubeWarpAudit(){
+  cubeWarpAuditEvidence=null;
+  $('cube-warp-audit-list').replaceChildren();
+  $('cube-warp-audit-status').textContent='Declare destination bank counts to check raw reciprocal warp indices. No gameplay inference.';
+}
 function clearCubeWarpTrace(){
+  clearCubeWarpAudit();
   cubeWarpTraceEvidence=null;
   $('cube-warp-trace-open').disabled=true;
   $('cube-warp-trace-status').textContent='Inspect CUBE warps, then supply an explicit destination-bank map count.';
@@ -1516,6 +1522,7 @@ function drawCubeWarpEvidence(){
   list.replaceChildren();
   const snapshot=cubeWarpEvidence;
   $('cube-warp-trace').disabled=!snapshot;
+  $('cube-warp-audit').disabled=!snapshot;
   if(!snapshot){
     status.textContent='No CUBE custom event arrays inspected. Select a map and inspect raw warps.';
     return;
@@ -1585,6 +1592,52 @@ function drawCubeWarpEvidence(){
     }
   }
 }
+$('cube-warp-audit').addEventListener('click',()=>safeRun(()=>{
+  const snapshot=cubeWarpEvidence;
+  if(!snapshot||!cubeMapEvidence||snapshot.options!==cubeMapEvidence.options)
+    throw Error('Inspect current CUBE event records before auditing warps');
+  const fresh=inspectHmaCubeMapEventWarps(ensureModel(),mapBankCustomSummary,snapshot.options);
+  if(JSON.stringify(fresh)!==JSON.stringify(snapshot.report))
+    throw Error('CUBE event records changed; inspect again');
+  const text=$('cube-warp-audit-banks').value.trim();
+  const parts=text.split(',').map(x=>x.trim());
+  if(!text||parts.length>8||parts.some(x=>!/^\d+:\d+$/.test(x)))
+    throw new RangeError('Declare 1–8 banks as bank:map-count, e.g. 0:12,1:9');
+  const targetBanks=parts.map(part=>{
+    const [bankIndex,mapCount]=part.split(':').map(Number);
+    if(!Number.isSafeInteger(bankIndex)||bankIndex<0||
+       !Number.isSafeInteger(mapCount)||mapCount<1||mapCount>1024)
+      throw new RangeError('Destination counts must be 1–1024');
+    return {bankIndex,mapCount};
+  });
+  const report=auditHmaCubeWarpTopology(model,mapBankCustomSummary,{
+    ...snapshot.options,targetBanks,maxWarps:32});
+  const evidence={rom:model,summary:mapBankCustomSummary,options:snapshot.options,
+    sourceReport:snapshot.report,targetBanks,report};
+  cubeWarpAuditEvidence=evidence;
+  const list=$('cube-warp-audit-list');list.replaceChildren();
+  $('cube-warp-audit-status').textContent=report.inspectedWarps+
+    ' raw warp(s), '+report.findings+' structural finding(s). Missing destination declarations remain unresolved. This is NOT a walkability or emulator test.';
+  for(const record of report.records){
+    const button=document.createElement('button');button.type='button';
+    button.className='subtle-button';
+    button.textContent='Warp #'+record.index+' ('+record.x+','+record.y+
+      ') → '+record.targetBank+':'+record.targetMap+' #'+record.targetWarpIndex+
+      ' · '+record.status+' · '+(record.issues.join(', ')||'no raw issues');
+    button.addEventListener('click',()=>safeRun(()=>{
+      if(cubeWarpAuditEvidence!==evidence||evidence.rom!==model||
+         evidence.summary!==mapBankCustomSummary||
+         cubeWarpEvidence?.report!==evidence.sourceReport)
+        throw Error('CUBE warp audit expired; inspect again');
+      const now=auditHmaCubeWarpTopology(model,mapBankCustomSummary,{
+        ...evidence.options,targetBanks:evidence.targetBanks,maxWarps:32});
+      if(JSON.stringify(now)!==JSON.stringify(evidence.report))
+        throw Error('CUBE warp topology changed; audit again');
+      setPageForOffset(now.records[record.index].offset);gotoTab('hex');
+    }));
+    list.append(button);
+  }
+}));
 $('cube-warp-trace').addEventListener('click',()=>safeRun(()=>{
   const snapshot=cubeWarpEvidence;
   if(!snapshot||!cubeMapEvidence||snapshot.options!==cubeMapEvidence.options)
