@@ -86,7 +86,9 @@ export async function inspectLocalCubeCombinedTransaction(argv){
  const {changes,viewport,count}=parsePlan(await readStableLocalFile(args['--plan'],64*1024));
  const options={bankIndex,mapIndex,mapCount,banks,targetBanks:banks,...changes,...viewport};
  const rehearsal=verifyHmaCubeCombinedTransaction(rom,summary,options);
- const ownership=auditHmaCubeEditOwnershipImpact(rom,summary,options);
+ const ownership=auditHmaCubeEditOwnershipImpact(rom,summary,{
+  ...options,wholeRomPointerScan:true
+ });
  if(!rehearsal.combinedReDecodeVerified||!rehearsal.inMemoryRollbackVerified||
     !rehearsal.sourceBytesPreserved||!ownership.copyOnlyRehearsalVerified||
     rehearsal.changedBytes!==ownership.changedBytes||sha(rom)!==originalHash)
@@ -105,12 +107,13 @@ export async function inspectLocalCubeCombinedTransaction(argv){
   ownershipConflicts:ownership.conflicts.length,
   ownershipCensusIncomplete:ownership.censusIncomplete,
   mapScriptOwnershipIssues:ownership.mapScriptIssueCount,
+  globalPointerCensus:ownership.globalPointerCandidates,
   partialOwnershipCoverage:true,globalPointerOwnershipProven:false,
   romModified:false,romExported:false,patchExported:false,
   independentlyAuthenticated:false,exclusiveOwnershipProven:false,
   emulatorVerified:false,androidHardwareVerified:false,writeAuthorized:false,
   strictParityEvidence:false,
-  warning:'User-supplied ROM hash, metadata and map counts do not authenticate CUBE. This is a read-only transaction rehearsal with partial ownership inspection, not edited-ROM save/reopen or gameplay acceptance.'
+  warning:'User-supplied ROM hash, metadata and map counts do not authenticate CUBE. Whole-ROM aligned pointer candidates are heuristic, not an alias graph or ownership proof. This is a read-only rehearsal, not edited-ROM save/reopen or gameplay acceptance.'
  });
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
