@@ -10488,6 +10488,27 @@ function drawCubeWarpEvidence(){
         setPageForOffset(now.arrays[kind][record.index].offset);gotoTab('hex');
       }));
       list.append(button);
+      const edit=document.createElement('button');edit.type='button';
+      edit.className='subtle-button';
+      edit.textContent='Edit '+labels[kind].toLowerCase()+' #'+record.index+' position (copy-only)';
+      edit.setAttribute('aria-label','Load CUBE '+labels[kind]+' '+record.index+' in batch editor');
+      edit.addEventListener('click',()=>safeRun(()=>{
+        if(cubeWarpEvidence!==snapshot)throw Error('CUBE event inspection expired');
+        const now=inspectHmaCubeMapEventWarps(ensureModel(),mapBankCustomSummary,snapshot.options);
+        if(JSON.stringify(now)!==JSON.stringify(snapshot.report))
+          throw Error('CUBE event source changed; inspect again');
+        if(kind==='warps'){
+          $('cube-batch-warp-index').value=String(record.index);
+          $('cube-batch-warp-load').click();
+          $('cube-batch-warp-load').scrollIntoView?.({block:'center',behavior:'smooth'});
+        }else{
+          $('cube-batch-event-kind').value=kind;
+          $('cube-batch-event-index').value=String(record.index);
+          $('cube-batch-event-load').click();
+          $('cube-batch-event-load').scrollIntoView?.({block:'center',behavior:'smooth'});
+        }
+      }));
+      list.append(edit);
       if(record.scriptPointerSource!==undefined){
         const source=document.createElement('button');source.type='button';
         source.className='subtle-button';
