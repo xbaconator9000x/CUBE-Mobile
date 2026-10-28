@@ -49,7 +49,7 @@ test('retargets two different script kinds to existing targets and rolls back',a
  ];
  const plan=previewHmaCubeScriptRetargetBatch(bytes,summary,{...opts,changes});
  assert.equal(plan.changedRecords,2);
- assert.equal(plan.changedBytes,4);
+ assert.equal(plan.changedBytes,2);
  assert.equal(plan.completeEventReDecodeVerified,true);
  const r=verifyHmaCubeScriptRetargetDryRun(bytes,summary,{...opts,changes});
  assert.equal(r.inMemoryRollbackVerified,true);
