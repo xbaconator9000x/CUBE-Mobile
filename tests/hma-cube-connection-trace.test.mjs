@@ -49,9 +49,9 @@ test('does not invent destination counts or travel for malformed, missing or spe
   assert.throws(()=>run({connectionIndex:1}),RangeError);
   assert.throws(()=>run({targetMapCount:0}),RangeError);
   assert.equal(run({targetMapCount:1}).status,'resolved-raw');
-  bytes[0x708]=2;
+  bytes[0x709]=2;
   assert.equal(run({targetMapCount:1}).status,'outside-explicit-target-map-count');
-  bytes[0x708]=1;bytes[0x709]=255;
+  bytes[0x709]=255;
   assert.equal(run({targetMapCount:undefined}).status,'special-or-unresolved');
   bytes[0x709]=0;bytes[0x708]=1;
   ptr(bytes,0x120,0xFFF);
