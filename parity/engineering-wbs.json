@@ -58,14 +58,14 @@
       "effortUnits": 9,
       "completion": {
         "low": 0.09,
-        "mid": 0.16,
-        "high": 0.28
+        "mid": 0.17,
+        "high": 0.29
       },
       "upstreamPath": "src/HexManiac.Core/Models/Runs/PointerRun.cs",
       "localEvidence": [
         "tests/pointer-references.test.mjs"
       ],
-      "rationale": "Read-only pointer and alias probes; no complete ownership graph or relocation."
+      "rationale": "Read-only pointer and alias probes plus optional cross-bank CUBE event-group/record-array ownership census; still no complete ownership graph, relocation, or authenticated write permission."
     },
     {
       "id": "metadata",
@@ -205,29 +205,29 @@
       "id": "map-events",
       "effortUnits": 8,
       "completion": {
-        "low": 0.11,
-        "mid": 0.23,
-        "high": 0.35
+        "low": 0.12,
+        "mid": 0.27,
+        "high": 0.38
       },
       "upstreamPath": "src/HexManiac.Core/ViewModels/Map/EventTemplate.cs",
       "localEvidence": [
         "tests/map-events.test.mjs"
       ],
-      "rationale": "Source-grounded CUBE object/trigger/signpost position preflight, multi-event atomic overlay, co-location review, isolated apply/re-decode/rollback; mobile UI, persistent editing and authentic ROM/emulator/Android acceptance still missing."
+      "rationale": "CUBE object/trigger/signpost position preflight, atomic multi-event overlay and copy-only rollback now integrated into mobile/offline queues, with cross-kind rehearsal; persisted editing and genuine ROM/emulator/Android acceptance remain absent."
     },
     {
       "id": "warps",
       "effortUnits": 8,
       "completion": {
-        "low": 0.15,
-        "mid": 0.31,
-        "high": 0.44
+        "low": 0.16,
+        "mid": 0.34,
+        "high": 0.48
       },
       "upstreamPath": "src/HexManiac.Core/ViewModels/Map/SurfConnectionViewModel.cs",
       "localEvidence": [
         "tests/map-link-audit.test.mjs"
       ],
-      "rationale": "Mobile/offline single CUBE warp preview and rollback plus 1–32 warp atomic combined-topology and isolated rollback core; no multi-warp UI, persisted semantic edit, authenticated CUBE acceptance or gameplay validation."
+      "rationale": "Single and multi-warp mobile/offline queue, combined topology preview and copy-only rollback, plus cross-kind rehearsal; no persisted semantic edits, authenticated CUBE ROM, emulator travel or Android hardware acceptance."
     },
     {
       "id": "wild",
@@ -419,15 +419,16 @@
       "id": "transaction-platform",
       "effortUnits": 14,
       "completion": {
-        "low": 0.02,
-        "mid": 0.12,
-        "high": 0.22
+        "low": 0.03,
+        "mid": 0.14,
+        "high": 0.24
       },
       "sourceRefs": [
         "FULL_PORT_PLAN.md",
-        "docs/HMA_CUBE_CELL_DRYRUN.md"
+        "docs/HMA_CUBE_CELL_DRYRUN.md",
+        "tests/hma-cube-combined-transaction.test.mjs"
       ],
-      "rationale": "Shared journal, exclusive ownership, save/reopen, rollback and copy-on-write platform; current dry-run is copy-only."
+      "rationale": "Atomic copy-only cell/warp/event and cross-kind transaction rehearsal with full rollback now exists; no ownership-complete journal, persisted save/reopen or authenticated write authority."
     },
     {
       "id": "android-platform",
@@ -475,15 +476,16 @@
       "id": "mobile-ux-accessibility",
       "effortUnits": 8,
       "completion": {
-        "low": 0.08,
-        "mid": 0.18,
-        "high": 0.3
+        "low": 0.09,
+        "mid": 0.19,
+        "high": 0.32
       },
       "sourceRefs": [
         "src/app.js",
-        "src/styles.css"
+        "src/styles.css",
+        "tests/mobile-cube-combined-transaction.test.mjs"
       ],
-      "rationale": "Shared touch-first navigation exists; accessibility and device UX acceptance not established."
+      "rationale": "Touch-first navigation and atomic CUBE warp/event queues with combined rollback action; accessibility, Android packaging and device UX acceptance remain unverified."
     }
   ]
 }

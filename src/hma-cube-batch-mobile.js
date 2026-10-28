@@ -6,6 +6,7 @@
 import {inspectHmaCubeMapEventWarps} from './hma-cube-map-events.js';
 import {previewHmaCubeWarpBatch,verifyHmaCubeWarpBatchDryRun} from './hma-cube-warp-batch.js';
 import {previewHmaCubeEventPositionBatch,verifyHmaCubeEventPositionBatchDryRun} from './hma-cube-event-batch.js';
+import {verifyHmaCubeCombinedTransaction} from './hma-cube-combined-transaction.js';
 
 const warpFields=['x','y','elevation','warpId','targetMap','targetBank'];
 const positionFields=['x','y','elevation'];
@@ -36,6 +37,8 @@ export function bindHmaCubeBatchEditors({getContext,safeRun}){
  function reset(){
   warpQueue=[];eventQueue=[];warpSelection=null;eventSelection=null;
   warpSnapshot=null;eventSnapshot=null;warpBanks=null;
+  $('cube-batch-combined-verify').disabled=true;
+  $('cube-batch-combined-status').textContent='No cross-kind rehearsal performed.';
   for(const kind of names){
    $('cube-batch-'+kind+'-list').replaceChildren();
    for(const action of ['load','queue','preview','verify','clear'])
@@ -71,6 +74,8 @@ export function bindHmaCubeBatchEditors({getContext,safeRun}){
    ...(kind==='warp'?{targetBanks:warpBanks}:{})}};
  }
  function render(kind){
+  $('cube-batch-combined-verify').disabled=!(warpQueue.length||eventQueue.length);
+  $('cube-batch-combined-status').textContent='Queues changed; rerun cross-kind verification.';
   const queue=kind==='warp'?warpQueue:eventQueue;
   const list=$('cube-batch-'+kind+'-list');list.replaceChildren();
   for(const action of ['preview','verify','clear'])
@@ -180,6 +185,35 @@ export function bindHmaCubeBatchEditors({getContext,safeRun}){
    '; source preserved: '+r.sourceBytesPreserved+'. No ROM exported.');
  });
  on('cube-batch-event-clear',()=>{eventQueue=[];eventSnapshot=null;render('event');});
+ on('cube-batch-combined-verify',()=>{
+  const ctx=getContext();
+  const {fresh}=current(ctx?.snapshot);
+  if(!fresh||!(warpQueue.length||eventQueue.length))
+   throw Error('Queue a warp or event change before combined rehearsal');
+  if(warpQueue.length&&warpSnapshot!==ctx.snapshot)
+   throw Error('Warp queue belongs to a different map inspection');
+  if(eventQueue.length&&eventSnapshot!==ctx.snapshot)
+   throw Error('Event queue belongs to a different map inspection');
+  const cells=ctx.cellQueue??[];
+  if(cells.length&&(!ctx.cellSnapshot||ctx.cellSnapshot!==ctx.cellEvidence||
+     ctx.cellSnapshot.rom!==ctx.rom||
+     ctx.cellSnapshot.options.bankIndex!==ctx.snapshot.options.bankIndex||
+     ctx.cellSnapshot.options.mapIndex!==ctx.snapshot.options.mapIndex||
+     ctx.cellSnapshot.options.mapCount!==ctx.snapshot.options.mapCount))
+   throw Error('Map-cell queue expired or belongs to another CUBE map; render again');
+  const r=verifyHmaCubeCombinedTransaction(ctx.rom,ctx.summary,{
+   ...ctx.snapshot.options,cells,warps:warpQueue,events:eventQueue,
+   targetBanks:warpBanks??[{bankIndex:ctx.snapshot.options.bankIndex,
+    mapCount:ctx.snapshot.options.mapCount}],
+   x:ctx.cellSnapshot?.x??0,y:ctx.cellSnapshot?.y??0,
+   viewportWidth:10,viewportHeight:8
+  });
+  $('cube-batch-combined-status').textContent='Combined copy-only transaction: '+
+   r.cellChanges+' cells, '+r.warpChanges+' warps, '+r.eventChanges+
+   ' events; '+r.changedBytes+' changed bytes; re-decode: '+r.combinedReDecodeVerified+
+   '; rollback: '+r.inMemoryRollbackVerified+'; source preserved: '+
+   r.sourceBytesPreserved+'. No ROM file exported or write permission.';
+ });
  reset();
  return Object.freeze({reset,ready});
 }
