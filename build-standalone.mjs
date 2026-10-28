@@ -79,9 +79,9 @@ const stripHmaCubeMapCellPreview='const previewHmaCubeBlockmapVisualChange=(()=>
 const stripHmaCubeBankCatalog='const inspectHmaCubeBankCatalog=(()=>{\n'+
  hmaCubeBankCatalog.replace(/^import .*?;\s*/gm,'').replace(/\bexport (const|class|function)\b/g,'$1')+
  '\nreturn inspectHmaCubeBankCatalog;\n})();';
-const stripHmaCubeWarpArrival='const traceHmaCubeWarpArrival=(()=>{\n'+
+const stripHmaCubeWarpArrival='const {traceHmaCubeWarpArrival,auditHmaCubeWarpTopology}=(()=>{\n'+
  hmaCubeWarpArrival.replace(/^import .*?;\s*/gm,'').replace(/\bexport (const|class|function)\b/g,'$1')+
- '\nreturn traceHmaCubeWarpArrival;\n})();';
+ '\nreturn {traceHmaCubeWarpArrival,auditHmaCubeWarpTopology};\n})();';
 const stripHmaCubeConnectionTrace='const traceHmaCubeConnectionDestination=(()=>{\n'+
  hmaCubeConnectionTrace.replace(/^import .*?;\s*/gm,'').replace(/\bexport (const|class|function)\b/g,'$1')+
  '\nreturn traceHmaCubeConnectionDestination;\n})();';
