@@ -1,3 +1,9 @@
+## Checkpoint — raw CUBHMA map-bank anchor pointer evidence (28 October 2026)
+- [x] Read exactly four staged ROM bytes at an unambiguous imported `data.maps.banks` anchor, classify conventional GBA pointer range and in-ROM target without inferring a map-bank layout.
+- [x] Add touchscreen/offline raw word inspection and stale-byte-checked target navigation; invalidate on metadata/ROM changes.
+- [x] Add synthetic read-only, boundary, stale-byte and UI regressions; no semantic writes, ROM assets or strict parity credit.
+- [ ] Authenticate CUBE custom map-bank format and real ROM identity before interpreting any pointer as a bank layout. See [raw pointer checkpoint](docs/MOBILE_MAP_BANK_RAW_POINTER.md).
+
 ## Checkpoint — mobile CUBHMA map-bank metadata provenance (28 October 2026)
 - [x] Surface exact imported `data.maps.banks` TOML declaration provenance and conservative nested format section names on the Named Data touchscreen UI.
 - [x] Reject ambiguous/conflicting/out-of-bounds map-bank navigation, preserve atomic import and ROM-reset behavior, and provide source-offset-only hex navigation.
