@@ -10,7 +10,16 @@
   window.__cubeNativeExportInstalled = true;
   const MAX = 128 * 1024 * 1024, CHUNK = 48 * 1024;
   let blob = null, offset = 0, index = 0, waiting = false, chunkLength = 0;
-  let sequence = 0, session = null, preparing = false;
+  let session = null, preparing = false;
+  // A page reload resets JS state while an Android picker may still be open.
+  // Generate a fresh 16-digit cryptographic session ID for each export so
+  // delayed callbacks cannot collide with a new page's first export.
+  const newSessionId = () => {
+    const words = new Uint32Array(2);
+    window.crypto.getRandomValues(words); // Secure WebViewAssetLoader HTTPS origin.
+    return String(10000000 + (words[0] % 90000000)) +
+      String(words[1] % 100000000).padStart(8, '0');
+  };
   const post = data => window.CubeExport.postMessage(JSON.stringify(data));
   // Android-only 48px touch target, visible throughout picker/stream/readback.
   // It does not exist in the browser/PWA build.
@@ -95,7 +104,7 @@
       if (value.size > MAX) throw new Error('Export exceeds 128 MiB limit');
       blob = value;
       offset = 0; index = 0; waiting = false;
-      session = String(++sequence);
+      session = newSessionId();
       preparing = false;
       cancelButton.hidden = false;
       post({kind: 'start', session, name: target.download || 'cube-export.bin',
