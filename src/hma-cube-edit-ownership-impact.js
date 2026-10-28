@@ -9,6 +9,7 @@
 import {previewHmaCubeCellBatch} from './hma-cube-cell-batch.js';
 import {previewHmaCubeWarpBatch} from './hma-cube-warp-batch.js';
 import {previewHmaCubeEventPositionBatch} from './hma-cube-event-batch.js';
+import {previewHmaCubeConnectionBatch} from './hma-cube-connection-edit.js';
 import {auditHmaCubeCrossBankOwnership} from './hma-cube-cross-bank-ownership.js';
 import {verifyHmaCubeCombinedTransaction} from './hma-cube-combined-transaction.js';
 
@@ -24,6 +25,12 @@ function addChanged(changes, offset, before, after, kind) {
 }
 function warpBytes(w) {
  return [w.x&255,w.x>>>8,w.y&255,w.y>>>8,w.elevation,w.warpId,w.targetMap,w.targetBank];
+}
+function connectionBytes(r){
+ const d=r.direction>>>0,o=r.rawDisplacement>>>0;
+ return [d&255,(d>>>8)&255,(d>>>16)&255,(d>>>24)&255,
+  o&255,(o>>>8)&255,(o>>>16)&255,(o>>>24)&255,
+  r.targetBank,r.targetMap,r.unused&255,r.unused>>>8];
 }
 function intersectChanged(changes,start,length) {
  const offsets=[];
@@ -41,7 +48,7 @@ function intersectChanged(changes,start,length) {
  * remain unresolved even when the bounded census has no intersections.
  */
 export function auditHmaCubeEditOwnershipImpact(source,summary,options={}) {
- const {bankIndex,mapIndex,mapCount,banks,cells=[],warps=[],events=[],
+ const {bankIndex,mapIndex,mapCount,banks,cells=[],warps=[],events=[],connections=[],
   targetBanks,x=0,y=0,viewportWidth=10,viewportHeight=8}=options;
  if(!Array.isArray(banks)||!banks.some(b=>
     b?.bankIndex===bankIndex&&b?.mapCount===mapCount))
@@ -75,6 +82,16 @@ export function auditHmaCubeEditOwnershipImpact(source,summary,options={}) {
   });
   for(const r of plan.rawBytes)
    addChanged(changes,r.offset,r.expected,r.value,'event-position');
+ }
+ if(connections.length) {
+  const plan=previewHmaCubeConnectionBatch(source,summary,{
+   ...opts,changes:connections,targetBanks
+  });
+  for(const r of plan.changes) {
+   const before=connectionBytes(r.before),after=connectionBytes(r.after);
+   for(let i=0;i<12;i++)
+    addChanged(changes,r.sourceOffset+i,before[i],after[i],'connection-records');
+  }
  }
  if(changes.size!==rehearsal.changedBytes)
   throw new RangeError('Ownership edit bytes disagree with combined rollback');

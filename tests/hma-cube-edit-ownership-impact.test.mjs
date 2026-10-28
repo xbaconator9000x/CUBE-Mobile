@@ -25,6 +25,9 @@ async function fixture(){
   ptr(bytes,layout+16,0x500);ptr(bytes,layout+20,0x540);
  }
  ptr(bytes,0x204,0x600);
+ ptr(bytes,0x20c,0x800);u32(bytes,0x800,1);ptr(bytes,0x804,0x820);
+ u32(bytes,0x820,1);u32(bytes,0x824,0xFFFFFFFE);
+ u16(bytes,0x82a,0xCAFE);
  bytes[0x601]=1;ptr(bytes,0x608,0x700);
  u16(bytes,0x700,1);u16(bytes,0x702,1);
  // Destination bank/map/warp all resolve to the current map.
@@ -106,4 +109,29 @@ test('cross-kind impact catches a connection record aliasing the edited warp',as
   c.firstKind==='event-warps'&&c.secondKind==='connection-records'&&
   c.changedKinds.includes('event-warps')));
  assert.equal(result.writeAuthorized,false);
+});
+
+test('connection-only edits participate in exact changed-byte ownership census',async()=>{
+ const {bytes,summary}=await fixture(),before=bytes.slice();
+ const connections=[{connectionIndex:0,
+  expected:{direction:1,rawDisplacement:0xFFFFFFFE,targetBank:0,targetMap:0,unused:0xCAFE},
+  proposed:{rawDisplacement:0xFFFFFFFD}}];
+ const result=auditHmaCubeEditOwnershipImpact(bytes,summary,{
+  ...opts,warps:[],connections
+ });
+ assert.equal(result.changedBytes,1);
+ assert.equal(result.conflicts.length,0);
+ assert.equal(result.copyOnlyRehearsalVerified,true);
+ assert.equal(result.writeAuthorized,false);
+ assert.deepEqual(bytes,before);
+ // A second map now aliases the first map's connection array.
+ ptr(bytes,0x24c,0x840);u32(bytes,0x840,1);ptr(bytes,0x844,0x820);
+ const shared=auditHmaCubeEditOwnershipImpact(bytes,summary,{
+  ...opts,warps:[],connections
+ });
+ assert.equal(shared.changedBytesTouchSharedClaims,true);
+ assert.ok(shared.conflicts.some(c=>
+  c.changedKinds.includes('connection-records')&&
+  c.firstKind==='connection-records'&&c.secondKind==='connection-records'));
+ assert.equal(shared.writeAuthorized,false);
 });

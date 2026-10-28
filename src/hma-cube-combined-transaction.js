@@ -6,11 +6,16 @@
 import {previewHmaCubeCellBatch} from './hma-cube-cell-batch.js';
 import {previewHmaCubeWarpBatch} from './hma-cube-warp-batch.js';
 import {previewHmaCubeEventPositionBatch} from './hma-cube-event-batch.js';
+import {previewHmaCubeConnectionBatch} from './hma-cube-connection-edit.js';
+import {inspectHmaCubeMapConnections} from './hma-cube-map-connections.js';
 import {inspectHmaCubeMapEventWarps} from './hma-cube-map-events.js';
 import {renderHmaCubeMapViewport} from './hma-cube-map-render.js';
 import {auditHmaCubeWarpTopology} from './hma-cube-warp-arrival.js';
 
 const warpFields=['x','y','elevation','warpId','targetMap','targetBank'];
+const connectionFields=['direction','rawDisplacement','targetBank','targetMap','unused'];
+function connectionBytes(r){const d=r.direction>>>0,o=r.rawDisplacement>>>0;return [d&255,(d>>>8)&255,(d>>>16)&255,(d>>>24)&255,o&255,(o>>>8)&255,(o>>>16)&255,(o>>>24)&255,r.targetBank,r.targetMap,r.unused&255,r.unused>>>8];}
+function connectionValues(r){return Object.fromEntries(connectionFields.map(k=>[k,r[k]]));}
 function warpBytes(w){return [w.x&255,w.x>>>8,w.y&255,w.y>>>8,w.elevation,w.warpId,w.targetMap,w.targetBank];}
 function reader(source){
  if(source instanceof Uint8Array)return {length:source.length,read:i=>source[i]};
@@ -34,20 +39,21 @@ function register(patches,offset,expected,value,kind){
  patches.set(offset,Object.freeze({offset,expected,value,kind}));
 }
 /**
- * Rehearse optional map cells, warp records and event relocations together.
+ * Rehearse optional map cells, warps, events and raw connections together.
  * At least one nonempty kind is required. All plans use the same unmodified
  * source, and no generated ROM bytes are returned to callers.
  */
 export function verifyHmaCubeCombinedTransaction(source,summary,{
- bankIndex,mapIndex,mapCount,cells=[],warps=[],events=[],
+ bankIndex,mapIndex,mapCount,cells=[],warps=[],events=[],connections=[],
  targetBanks,banks,x=0,y=0,viewportWidth=10,viewportHeight=8
 }={}){
  const rom=reader(source);
  if(rom.length<1||rom.length>64*1024*1024)
   throw RangeError('Combined transaction requires a 1–64 MiB ROM');
  if(!Array.isArray(cells)||!Array.isArray(warps)||!Array.isArray(events)||
-    cells.length>32||warps.length>32||events.length>32||
-    !(cells.length||warps.length||events.length))
+    !Array.isArray(connections)||cells.length>32||warps.length>32||
+    events.length>32||connections.length>32||
+    !(cells.length||warps.length||events.length||connections.length))
   throw RangeError('Provide 1–32 proposals per kind, at least one kind');
  const opts={bankIndex,mapIndex,mapCount},patches=new Map();
  const cellPlan=cells.length?previewHmaCubeCellBatch(rom,summary,{
@@ -59,6 +65,9 @@ export function verifyHmaCubeCombinedTransaction(source,summary,{
  const eventPlan=events.length?previewHmaCubeEventPositionBatch(rom,summary,{
   ...opts,changes:events
  }):null;
+ const connectionPlan=connections.length?previewHmaCubeConnectionBatch(rom,summary,{
+  ...opts,changes:connections,targetBanks
+ }):null;
  if(cellPlan)for(const record of cellPlan.changes){
   for(let j=0;j<2;j++)register(patches,record.byteOffset+j,
    record.before.bytes[j],record.after.bytes[j],'cell');
@@ -69,6 +78,10 @@ export function verifyHmaCubeCombinedTransaction(source,summary,{
  }
  if(eventPlan)for(const patch of eventPlan.rawBytes)
   register(patches,patch.offset,patch.expected,patch.value,'event');
+ if(connectionPlan)for(const record of connectionPlan.changes){
+  const before=connectionBytes(record.before),after=connectionBytes(record.after);
+  for(let j=0;j<12;j++)register(patches,record.sourceOffset+j,before[j],after[j],'connection');
+ }
  for(const patch of patches.values())
   if(byte(rom,patch.offset)!==patch.expected)
    throw RangeError('Source changed during cross-kind preflight');
@@ -98,6 +111,20 @@ export function verifyHmaCubeCombinedTransaction(source,summary,{
  if(eventPlan)for(const record of eventPlan.changes)
   if(!equal(mapFields(afterEvents.arrays[record.kind][record.index]),record.after))
    throw RangeError('Combined event position differs from preview');
+ if(connectionPlan){
+  const beforeConnections=inspectHmaCubeMapConnections(original,summary,opts);
+  const afterConnections=inspectHmaCubeMapConnections(staged,summary,opts);
+  if(afterConnections.count!==beforeConnections.count||
+     afterConnections.arrayOffset!==beforeConnections.arrayOffset)
+   throw RangeError('Combined connection array changed structure');
+  const changed=new Map(connectionPlan.changes.map(r=>[r.connectionIndex,r]));
+  for(let i=0;i<beforeConnections.connections.length;i++){
+   const expected=changed.get(i)?.after??beforeConnections.connections[i];
+   if(afterConnections.connections[i].offset!==beforeConnections.connections[i].offset||
+      !equal(connectionValues(afterConnections.connections[i]),connectionValues(expected)))
+    throw RangeError('Combined connection re-decode differs from preview');
+  }
+ }
  if(cellPlan){
   const afterImage=renderHmaCubeMapViewport(staged,summary,{
    ...opts,x,y,viewportWidth,viewportHeight
@@ -123,6 +150,7 @@ export function verifyHmaCubeCombinedTransaction(source,summary,{
   cellChanges:cellPlan?.changedCells??0,
   warpChanges:warpPlan?.changedRecords??0,
   eventChanges:eventPlan?.changedRecords??0,
+  connectionChanges:connectionPlan?.changedRecords??0,
   claimedBytes:patches.size,changedBytes,
   combinedReDecodeVerified:true,inMemoryRollbackVerified:true,
   unrelatedBytesPreserved:true,sourceBytesPreserved:true,

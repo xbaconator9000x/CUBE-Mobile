@@ -88,8 +88,8 @@ export function bindHmaCubeBatchEditors({getContext,getSelectedCell,safeRun}){
    ...(kind==='warp'?{targetBanks:warpBanks}:{})}};
  }
  function render(kind){
-  $('cube-batch-combined-verify').disabled=!(warpQueue.length||eventQueue.length);
-  $('cube-batch-combined-ownership').disabled=!(warpQueue.length||eventQueue.length);
+  $('cube-batch-combined-verify').disabled=!(warpQueue.length||eventQueue.length||connectionQueue.length);
+  $('cube-batch-combined-ownership').disabled=!(warpQueue.length||eventQueue.length||connectionQueue.length);
   $('cube-batch-combined-status').textContent='Queues changed; rerun cross-kind verification.';
   $('cube-batch-ownership-status').textContent='Queues changed; rerun ownership impact audit.';
   const queue=kind==='warp'?warpQueue:eventQueue;
@@ -232,6 +232,10 @@ export function bindHmaCubeBatchEditors({getContext,getSelectedCell,safeRun}){
  });
  on('cube-batch-event-clear',()=>{eventQueue=[];eventSnapshot=null;render('event');});
  function renderConnection(){
+  $('cube-batch-combined-verify').disabled=!(warpQueue.length||eventQueue.length||connectionQueue.length);
+  $('cube-batch-combined-ownership').disabled=!(warpQueue.length||eventQueue.length||connectionQueue.length);
+  $('cube-batch-combined-status').textContent='Queues changed; rerun four-kind verification.';
+  $('cube-batch-ownership-status').textContent='Queues changed; rerun ownership impact audit.';
   const list=$('cube-batch-connection-list');list.replaceChildren();
   for(const action of ['preview','verify','clear'])
    $('cube-batch-connection-'+action).disabled=!connectionQueue.length;
@@ -322,12 +326,17 @@ export function bindHmaCubeBatchEditors({getContext,getSelectedCell,safeRun}){
  function combinedParams(){
   const ctx=getContext();
   const {fresh}=current(ctx?.snapshot);
-  if(!fresh||!(warpQueue.length||eventQueue.length))
-   throw Error('Queue a warp or event change before combined rehearsal');
+  if(!fresh||!(warpQueue.length||eventQueue.length||connectionQueue.length))
+   throw Error('Queue a warp, event or connection change before combined rehearsal');
   if(warpQueue.length&&warpSnapshot!==ctx.snapshot)
    throw Error('Warp queue belongs to a different map inspection');
   if(eventQueue.length&&eventSnapshot!==ctx.snapshot)
    throw Error('Event queue belongs to a different map inspection');
+  if(connectionQueue.length&&connectionSnapshot!==ctx.snapshot)
+   throw Error('Connection queue belongs to a different map inspection');
+  if(warpQueue.length&&connectionQueue.length&&
+     JSON.stringify(warpBanks)!==JSON.stringify(connectionBanks))
+   throw Error('Warp and connection destination bank declarations differ; align queues');
   const cells=ctx.cellQueue??[];
   if(cells.length&&(!ctx.cellSnapshot||ctx.cellSnapshot!==ctx.cellEvidence||
      ctx.cellSnapshot.rom!==ctx.rom||
@@ -337,7 +346,8 @@ export function bindHmaCubeBatchEditors({getContext,getSelectedCell,safeRun}){
    throw Error('Map-cell queue expired or belongs to another CUBE map; render again');
   return {ctx,params:{
    ...ctx.snapshot.options,cells,warps:warpQueue,events:eventQueue,
-   targetBanks:warpBanks??[{bankIndex:ctx.snapshot.options.bankIndex,
+   connections:connectionQueue,
+   targetBanks:warpBanks??connectionBanks??[{bankIndex:ctx.snapshot.options.bankIndex,
     mapCount:ctx.snapshot.options.mapCount}],
    x:ctx.cellSnapshot?.x??0,y:ctx.cellSnapshot?.y??0,
    viewportWidth:10,viewportHeight:8
@@ -348,7 +358,7 @@ export function bindHmaCubeBatchEditors({getContext,getSelectedCell,safeRun}){
   const r=verifyHmaCubeCombinedTransaction(ctx.rom,ctx.summary,params);
   $('cube-batch-combined-status').textContent='Combined copy-only transaction: '+
    r.cellChanges+' cells, '+r.warpChanges+' warps, '+r.eventChanges+
-   ' events; '+r.changedBytes+' changed bytes; re-decode: '+r.combinedReDecodeVerified+
+   ' events, '+r.connectionChanges+' connections; '+r.changedBytes+' changed bytes; re-decode: '+r.combinedReDecodeVerified+
    '; rollback: '+r.inMemoryRollbackVerified+'; source preserved: '+
    r.sourceBytesPreserved+'. No ROM file exported or write permission.';
  });
