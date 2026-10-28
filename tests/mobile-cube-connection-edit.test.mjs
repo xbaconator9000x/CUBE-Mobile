@@ -31,7 +31,7 @@ test('connection queue remains disabled until inspected source and explicit acti
  ]);
  assert.match(controller,/\$\('cube-batch-connection-load'\)\.disabled=!enabled/);
  assert.match(controller,/\$\('cube-batch-connection-queue'\)\.disabled=false/);
- assert.match(controller,/\$\('cube-batch-connection-'+action\)\.disabled=true/);
+ assert.ok(controller.includes("$('cube-batch-connection-'+action).disabled=true"));
  assert.match(index,/id="cube-batch-connection-verify"[^>]*disabled/);
  assert.doesNotMatch(controller,/\.writeFile\(|\.saveAs\(/);
 });
