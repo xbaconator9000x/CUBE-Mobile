@@ -49,6 +49,7 @@ import {inspectHmaCubeMapEventWarps} from './hma-cube-map-events.js';
 import {inspectHmaCubeMapConnections} from './hma-cube-map-connections.js';
 import {renderHmaCubeMapViewport} from './hma-cube-map-render.js';
 import {previewHmaCubeBlockmapVisualChange} from './hma-cube-map-cell-preview.js';
+import {inspectHmaCubeBankCatalog} from './hma-cube-bank-catalog.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
@@ -57,6 +58,7 @@ let fingerprintResult=null,fingerprintAbort=null;
 let metadataFingerprints=[],metadataImportSerial=0,mapBankMetadataReport=null,mapBankRawPointerEvidence=null,mapBankRawWindowEvidence=null,mapBankDeclaredEvidence=null,mapBankTargetEvidence=null,mapBankCustomSummary=null,cubeMapEvidence=null,cubeWarpEvidence=null,cubeConnectionEvidence=null,cubeRenderEvidence=null,cubeRenderSelection=null,cubeCellPreview=null;
 let inspectedWarpMap=null,selectedWarpPreview=null,selectedEventPreview=null,inspectedEventMap=null,inspectedMapAtlas=null,atlasBatchStart=0,atlasCoordinateBatchStart=0,atlasScriptAliasStart=0,atlasScriptCrossPageStart=0,atlasIncomingStart=0,atlasIncomingTarget=null;
 let activeRenderedMap=null,selectedRenderedHit=null;
+let cubeCatalogEvidence=null;
 let mapReviewQueue=[],mapReviewRom=null,lastMapPreviews={cell:null,warp:null,event:null};
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
 const PER_PAGE=128;
@@ -144,7 +146,7 @@ function updateIndicators(){
   drawMapBankRawPointerEvidence();
   drawMapBankRawWindowEvidence();
 }
-function installModel(name,bytes){clearCubeRenderedMap('ROM replaced; render again.');clearMapChangeReview();clearMapAtlas('ROM replaced; declared atlas invalidated.');metadataImportSerial++;metadataFingerprints=[];mapBankMetadataReport=null;mapBankRawPointerEvidence=null;mapBankRawWindowEvidence=null;mapBankDeclaredEvidence=null;mapBankTargetEvidence=null;mapBankCustomSummary=null;cubeMapEvidence=null;cubeWarpEvidence=null;cubeConnectionEvidence=null;clearRenderedMap('ROM replaced. Select vanilla header again.');$('map-grid').innerHTML='<div class="empty-state">No blockmap inspected.</div>';$('map-bank-status').textContent='ROM replaced. Re-enter independently verified vanilla bank location and counts.';clearWarpInspection('ROM replaced. Select a vanilla map header again.');clearConnectionInspection('ROM replaced. Select a vanilla map header again.');$('map-layout-status').textContent='ROM replaced. No vanilla-format layout inspected.';$('map-status').textContent='ROM replaced. Enter a verified offset and inspect again.';pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
+function installModel(name,bytes){clearCubeRenderedMap('ROM replaced; render again.');clearCubeCatalog();clearMapChangeReview();clearMapAtlas('ROM replaced; declared atlas invalidated.');metadataImportSerial++;metadataFingerprints=[];mapBankMetadataReport=null;mapBankRawPointerEvidence=null;mapBankRawWindowEvidence=null;mapBankDeclaredEvidence=null;mapBankTargetEvidence=null;mapBankCustomSummary=null;cubeMapEvidence=null;cubeWarpEvidence=null;cubeConnectionEvidence=null;clearRenderedMap('ROM replaced. Select vanilla header again.');$('map-grid').innerHTML='<div class="empty-state">No blockmap inspected.</div>';$('map-bank-status').textContent='ROM replaced. Re-enter independently verified vanilla bank location and counts.';clearWarpInspection('ROM replaced. Select a vanilla map header again.');clearConnectionInspection('ROM replaced. Select a vanilla map header again.');$('map-layout-status').textContent='ROM replaced. No vanilla-format layout inspected.';$('map-status').textContent='ROM replaced. Enter a verified offset and inspect again.';pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
 $('rom-picker').addEventListener('change',async e=>{
   const file=e.target.files?.[0];e.target.value='';if(!file)return;
   if(file.size<0xC0 || file.size>MAX_BYTES)return toast('ROM must be 192 bytes to 128 MiB',true);
@@ -414,7 +416,7 @@ if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostn
 // engine, game fingerprints and pointer allocator have been ported and tested.
 let displayedAnchors=[], selectedInspection=null;
 const encodeHex=bytes=>Array.from(bytes).map((b,i)=>hex(b,2)+(i%16===15?'\n':' ')).join('').trim();
-function metadataReset(){metadataImportSerial++;metadataFingerprints=[];clearWarpInspection('Metadata reset; inspect warps again.');clearMapChangeReview();clearCubeRenderedMap('Metadata reset; render again.');clearConnectionInspection('Metadata reset; inspect connections again.');clearMapGrid('Metadata reset; inspect map again.');metadata=[];metadataSources=[];mapBankMetadataReport=null;mapBankRawPointerEvidence=null;mapBankRawWindowEvidence=null;mapBankDeclaredEvidence=null;mapBankTargetEvidence=null;mapBankCustomSummary=null;cubeMapEvidence=null;cubeWarpEvidence=null;cubeConnectionEvidence=null;metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
+function metadataReset(){metadataImportSerial++;metadataFingerprints=[];clearWarpInspection('Metadata reset; inspect warps again.');clearMapChangeReview();clearCubeRenderedMap('Metadata reset; render again.');clearCubeCatalog();clearConnectionInspection('Metadata reset; inspect connections again.');clearMapGrid('Metadata reset; inspect map again.');metadata=[];metadataSources=[];mapBankMetadataReport=null;mapBankRawPointerEvidence=null;mapBankRawWindowEvidence=null;mapBankDeclaredEvidence=null;mapBankTargetEvidence=null;mapBankCustomSummary=null;cubeMapEvidence=null;cubeWarpEvidence=null;cubeConnectionEvidence=null;metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
 function snapshotMatchedWords(words=metadataMatchedWords){
   if(!model)return [];
   return words.map(word=>{
@@ -474,7 +476,7 @@ function metadataCommit(sources){
   metadataWordSnapshot=nextWordSnapshot;
   metadata=nextMetadata;metadataResolution=nextResolution;
   metadataSources=sources.map(({name})=>name);metadataLayoutKind=metadataCheck.layout.kind;
-  mapBankMetadataReport=nextMapBankReport;mapBankRawPointerEvidence=null;mapBankRawWindowEvidence=null;mapBankDeclaredEvidence=null;mapBankTargetEvidence=null;mapBankCustomSummary=nextMapBankCustomSummary;clearCubeRenderedMap('Metadata changed; render again.');cubeMapEvidence=null;cubeWarpEvidence=null;cubeConnectionEvidence=null;
+  mapBankMetadataReport=nextMapBankReport;mapBankRawPointerEvidence=null;mapBankRawWindowEvidence=null;mapBankDeclaredEvidence=null;mapBankTargetEvidence=null;mapBankCustomSummary=nextMapBankCustomSummary;clearCubeCatalog();clearCubeRenderedMap('Metadata changed; render again.');cubeMapEvidence=null;cubeWarpEvidence=null;cubeConnectionEvidence=null;
   metadataFingerprints=nextFingerprints;
   clearWarpInspection('Metadata changed; re-inspect vanilla warps.');
   clearConnectionInspection('Metadata changed; re-inspect vanilla connections.');
@@ -889,6 +891,7 @@ function drawMapBankMetadataReport(){
     report.declarations[0].address>model.length-report.declaredBankCount*4;
   $('map-bank-target-scan').disabled=$('map-bank-declared-scan').disabled;
   $('cube-map-inspect').disabled=$('map-bank-declared-scan').disabled||report.status!=='custom-candidate';
+  $('cube-map-catalog-scan').disabled=$('cube-map-inspect').disabled;
   drawMapBankRawPointerEvidence();
   drawMapBankRawWindowEvidence();
   drawMapBankDeclaredEvidence();
@@ -896,6 +899,11 @@ function drawMapBankMetadataReport(){
   drawCubeMapEvidence();
 }
 
+function clearCubeCatalog(message='No CUBE bank catalog inspected. Supply a verified map count (max 128).'){
+  cubeCatalogEvidence=null;
+  $('cube-map-catalog-list').replaceChildren();
+  $('cube-map-catalog-status').textContent=message;
+}
 function clearCubeRenderedMap(message='CUBE render invalidated; render again.'){
   cubeRenderEvidence=null;cubeRenderSelection=null;cubeCellPreview=null;
   $('cube-map-cell-preview').disabled=true;
@@ -1051,6 +1059,47 @@ for(const [id,axis,step] of [
     drawCubeMapEvidence();
   }));
 }
+$('cube-map-catalog-scan').addEventListener('click',()=>safeRun(()=>{
+  ensureModel();
+  const bankText=$('cube-bank-index').value,countText=$('cube-map-count').value;
+  if(!/^\d+$/.test(bankText)||!/^\d+$/.test(countText))
+    throw new RangeError('Enter explicit unsigned CUBE bank and map count');
+  const bankIndex=Number(bankText),mapCount=Number(countText);
+  const report=inspectHmaCubeBankCatalog(model,mapBankCustomSummary,{bankIndex,mapCount});
+  const snapshot={rom:model,summary:mapBankCustomSummary,bankIndex,mapCount,report};
+  cubeCatalogEvidence=snapshot;
+  const list=$('cube-map-catalog-list');list.replaceChildren();
+  $('cube-map-catalog-status').textContent='Explicit CUBE bank '+bankIndex+
+    ': '+report.decoded+' structurally decoded, '+report.invalid+' invalid/unsupported of '+
+    mapCount+' slots. Map counts and ROM authenticity NOT inferred; no writes.';
+  for(const row of report.rows){
+    const button=document.createElement('button');button.type='button';
+    button.className='subtle-button';
+    button.disabled=row.status!=='decoded';
+    button.textContent=row.status==='decoded'?
+      'Map '+row.index+' · '+row.width+' × '+row.height+
+      ' · region '+row.regionSectionId+' · events '+row.eventStatus+
+      ' · links '+row.connectionStatus+
+      (row.sameBankBlockmapAliases.length>1?
+        ' · shared blockmap within bank: '+row.sameBankBlockmapAliases.join(','):''):
+      'Map '+row.index+' · invalid or unsupported pointer/layout';
+    button.addEventListener('click',()=>safeRun(()=>{
+      if(cubeCatalogEvidence!==snapshot||snapshot.rom!==model||
+         snapshot.summary!==mapBankCustomSummary)
+        throw Error('CUBE bank catalog expired; scan again');
+      const fresh=inspectHmaCubeBankCatalog(model,mapBankCustomSummary,{bankIndex,mapCount});
+      if(JSON.stringify(fresh)!==JSON.stringify(snapshot.report))
+        throw Error('CUBE bank catalog bytes changed; scan again');
+      if(fresh.rows[row.index]?.status!=='decoded')
+        throw Error('Selected CUBE map is not structurally decoded');
+      $('cube-bank-index').value=String(bankIndex);
+      $('cube-map-count').value=String(mapCount);
+      $('cube-map-index').value=String(row.index);
+      $('cube-map-inspect').click();
+    }));
+    list.append(button);
+  }
+}));
 $('cube-map-inspect').addEventListener('click',()=>safeRun(()=>{
   ensureModel();
   const options={bankIndex:Number($('cube-bank-index').value),
