@@ -171,6 +171,10 @@ final class NativeExport {
         // never trust a provider to return a different URI from an input ROM.
         // Refuse exact matches before opening/truncating or deleting anything.
         Uri chosen = data.getData();
+        if (!SafDocumentIdentity.isContentUri(chosen.toString())) {
+            abort("Export refused: picker returned an unsafe document URI");
+            return;
+        }
         if (isImportedDocument.test(chosen)) {
             abort("Export refused: destination is an imported document");
             return;

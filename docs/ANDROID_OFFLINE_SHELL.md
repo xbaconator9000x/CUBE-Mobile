@@ -35,3 +35,11 @@ Before exporting each bounded 48 KiB Blob slice, the Android-only bridge compute
 ## Empty-document preflight before SAF export (29 October 2026)
 
 Before opening any potentially truncating provider output stream, the Android host reopens the selected ACTION_CREATE_DOCUMENT URI read-only and requires a zero-byte stream. Nonempty or unreadable targets are refused **without deletion**, reducing the risk of an alias to an imported ROM that has a different URI. An empty target is not proof of a unique file, so URI aliasing remains a documented limitation. Abort cleanup only attempts deletion after a write was attempted; an untouched empty document may remain and is reported accurately. Pure Java tests cover empty, nonempty and unreadable providers. Real provider/device behavior remains unverified.
+
+## SAF document-ID alias protection (29 October 2026)
+
+The native export destination check now compares both exact imported URIs and canonical Storage Access Framework document identities (provider authority plus decoded final `/document/<id>` segment). This catches a direct-document versus tree-scoped URI alias, percent-encoding variations, and query/fragment variations **before** opening a potentially truncating export stream. The existing empty-document preflight remains mandatory, and rejected destinations are never deleted. JVM unit tests cover these cases, including malformed URI fallback and distinct providers.
+
+This does **not** prove that two different provider authorities or opaque IDs refer to different storage, nor prevent a malicious/racy provider from swapping backing data after preflight. Android SAF writes remain non-atomic, and physical-device/provider acceptance is outstanding. No semantic CUBE ROM writing has been authorized.
+
+The Android host also rejects picker results that are not well-formed `content://` URIs with an authority and nonempty path. This applies to both imported documents and export destinations, preventing a nonconforming picker from supplying a `file://` or web URL to the document resolver. It does not authenticate the provider or eliminate cross-provider storage aliases.
