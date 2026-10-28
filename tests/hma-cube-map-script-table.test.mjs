@@ -59,14 +59,14 @@ test('rejects unsupported type, missing terminator and malformed target',async()
  assert.throws(()=>inspectHmaCubeMapScripts(bytes,summary,opts),/unsupported/i);
  bytes[0xa00]=1;
  for(let i=0;i<64;i++){bytes[0xa00+i*5]=1;ptr(bytes,0xa00+i*5+1,0xc00);}
- assert.throws(()=>inspectHmaCubeMapScripts(bytes,summary,opts),/no zero terminator/i);
+ assert.throws(()=>inspectHmaCubeMapScripts(bytes,summary,{...opts,maxEntries:63}),/no zero terminator/i);
  bytes[0xa00]=1;u32(bytes,0xa01,0x12345678);
  assert.throws(()=>inspectHmaCubeMapScripts(bytes,summary,{...opts,maxEntries:1}),/pointer/i);
 });
 test('rejects conditional table without terminator or aliasing map structures',async()=>{
  const {bytes,summary}=await fixture();
  for(let i=0;i<64;i++){u16(bytes,0xb00+i*8,0x4000);u16(bytes,0xb00+i*8+2,1);ptr(bytes,0xb00+i*8+4,0xc20);}
- assert.throws(()=>inspectHmaCubeMapScripts(bytes,summary,opts),/conditional.*terminator/i);
+ assert.throws(()=>inspectHmaCubeMapScripts(bytes,summary,{...opts,maxConditions:63}),/conditional.*terminator/i);
  ptr(bytes,0xa06,0x300);
  assert.throws(()=>inspectHmaCubeMapScripts(bytes,summary,opts),/overlaps known map structure|conditional/i);
 });
