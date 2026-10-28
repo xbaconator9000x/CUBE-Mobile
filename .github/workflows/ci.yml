@@ -23,6 +23,8 @@ jobs:
         run: npm run safety:check
       - name: Validate conservative feature parity baseline
         run: npm run parity:check
+      - name: Validate provisional engineering work baseline
+        run: npm run engineering:check
       - name: Generate standalone offline HTML
         run: npm run build:standalone
       - name: Ensure checked-in offline checkpoint matches source
