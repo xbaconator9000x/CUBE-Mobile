@@ -4,6 +4,8 @@
  * Context must be revalidated against the exact inspected source on every action.
  */
 import {inspectHmaCubeMapEventWarps} from './hma-cube-map-events.js';
+import {inspectHmaCubeMapConnections} from './hma-cube-map-connections.js';
+import {previewHmaCubeConnectionBatch,verifyHmaCubeConnectionBatchDryRun} from './hma-cube-connection-edit.js';
 import {previewHmaCubeWarpBatch,verifyHmaCubeWarpBatchDryRun} from './hma-cube-warp-batch.js';
 import {previewHmaCubeEventPositionBatch,verifyHmaCubeEventPositionBatchDryRun} from './hma-cube-event-batch.js';
 import {verifyHmaCubeCombinedTransaction} from './hma-cube-combined-transaction.js';
@@ -33,12 +35,18 @@ function declaredBanks(text){
 export function bindHmaCubeBatchEditors({getContext,getSelectedCell,safeRun}){
  const $=id=>document.getElementById(id);
  let warpQueue=[],eventQueue=[],warpSelection=null,eventSelection=null;
+ let connectionQueue=[],connectionSelection=null,connectionSnapshot=null,connectionBanks=null;
  let warpSnapshot=null,eventSnapshot=null,warpBanks=null,enabled=false;
  const names=['warp','event'];
  function status(kind,text){$('cube-batch-'+kind+'-status').textContent=text;}
  function reset(){
   warpQueue=[];eventQueue=[];warpSelection=null;eventSelection=null;
   warpSnapshot=null;eventSnapshot=null;warpBanks=null;
+  connectionQueue=[];connectionSelection=null;connectionSnapshot=null;connectionBanks=null;
+  $('cube-batch-connection-list').replaceChildren();
+  for(const action of ['queue','preview','verify','clear','load'])
+   $('cube-batch-connection-'+action).disabled=true;
+  $('cube-batch-connection-status').textContent='No queued raw connection edits. ROM unchanged.';
   $('cube-batch-combined-verify').disabled=true;
   $('cube-batch-combined-ownership').disabled=true;
   for(const kind of names)$('cube-batch-'+kind+'-use-cell').disabled=true;
@@ -54,6 +62,7 @@ export function bindHmaCubeBatchEditors({getContext,getSelectedCell,safeRun}){
  function ready(value){
   reset();enabled=Boolean(value);
   for(const kind of names)$('cube-batch-'+kind+'-load').disabled=!enabled;
+  $('cube-batch-connection-load').disabled=!enabled;
  }
  function current(snapshot){
   const ctx=getContext();
@@ -222,6 +231,94 @@ export function bindHmaCubeBatchEditors({getContext,getSelectedCell,safeRun}){
    '; source preserved: '+r.sourceBytesPreserved+'. No ROM exported.');
  });
  on('cube-batch-event-clear',()=>{eventQueue=[];eventSnapshot=null;render('event');});
+ function renderConnection(){
+  const list=$('cube-batch-connection-list');list.replaceChildren();
+  for(const action of ['preview','verify','clear'])
+   $('cube-batch-connection-'+action).disabled=!connectionQueue.length;
+  $('cube-batch-connection-status').textContent=connectionQueue.length+
+   '/32 raw connection proposals. Copy-only; no ROM export.';
+  for(const entry of connectionQueue){
+   const button=document.createElement('button');
+   button.type='button';button.className='subtle-button';
+   button.textContent='Remove connection #'+entry.connectionIndex+
+    ' → '+entry.proposed.targetBank+':'+entry.proposed.targetMap;
+   button.addEventListener('click',()=>safeRun(()=>{
+    current(connectionSnapshot);
+    connectionQueue=connectionQueue.filter(x=>x.connectionIndex!==entry.connectionIndex);
+    if(!connectionQueue.length){connectionSnapshot=null;connectionBanks=null;}
+    renderConnection();
+   }));
+   list.append(button);
+  }
+ }
+ const connectionFields=['direction','rawDisplacement','targetBank','targetMap','unused'];
+ const connectionLimits={direction:0xFFFFFFFF,rawDisplacement:0xFFFFFFFF,
+  targetBank:255,targetMap:255,unused:65535};
+ on('cube-batch-connection-load',()=>{
+  const ctx=getContext();
+  current(ctx?.snapshot);
+  const report=inspectHmaCubeMapConnections(ctx.rom,ctx.summary,ctx.snapshot.options);
+  const index=unsigned($('cube-batch-connection-index').value,65535,'Connection index');
+  if(index>=report.connections.length)throw RangeError('Connection index outside source array');
+  const record=report.connections[index];
+  connectionSelection={snapshot:ctx.snapshot,connectionIndex:index,
+   expected:Object.fromEntries(connectionFields.map(k=>[k,record[k]]))};
+  for(const key of connectionFields)
+   $('cube-batch-connection-'+key).value=String(record[key]);
+  if(!$('cube-batch-connection-banks').value.trim())
+   $('cube-batch-connection-banks').value=ctx.snapshot.options.bankIndex+
+    ':'+ctx.snapshot.options.mapCount;
+  $('cube-batch-connection-queue').disabled=false;
+  $('cube-batch-connection-status').textContent='Loaded raw connection #'+index+
+   '. Direction/offset are unverified numeric fields, not travel semantics.';
+ });
+ on('cube-batch-connection-queue',()=>{
+  const selection=connectionSelection;
+  if(!selection)throw Error('Load a connection before queueing');
+  const {ctx}=current(selection.snapshot);
+  if(unsigned($('cube-batch-connection-index').value,65535,'Connection index')!==
+     selection.connectionIndex)
+   throw Error('Connection index changed; reload');
+  const proposed=Object.fromEntries(connectionFields.map(k=>[
+   k,unsigned($('cube-batch-connection-'+k).value,connectionLimits[k],k)
+  ]));
+  const banks=declaredBanks($('cube-batch-connection-banks').value);
+  if(connectionQueue.length&&(connectionSnapshot!==selection.snapshot||
+     JSON.stringify(connectionBanks)!==JSON.stringify(banks)))
+   throw Error('Connection queue source or bank declarations changed; clear queue');
+  if(connectionQueue.length>=32||connectionQueue.some(x=>x.connectionIndex===selection.connectionIndex))
+   throw Error('Only 32 distinct connections; remove a duplicate first');
+  const changes=[...connectionQueue,{connectionIndex:selection.connectionIndex,
+   expected:selection.expected,proposed}];
+  previewHmaCubeConnectionBatch(ctx.rom,ctx.summary,{
+   ...selection.snapshot.options,changes,targetBanks:banks
+  });
+  connectionQueue=changes;connectionSnapshot=selection.snapshot;connectionBanks=banks;
+  renderConnection();
+ });
+ on('cube-batch-connection-preview',()=>{
+  const {ctx}=current(connectionSnapshot);
+  const r=previewHmaCubeConnectionBatch(ctx.rom,ctx.summary,{
+   ...connectionSnapshot.options,changes:connectionQueue,targetBanks:connectionBanks
+  });
+  $('cube-batch-connection-status').textContent='Raw connection preview: '+
+   r.changedRecords+' records, '+r.changedBytes+
+   ' changed bytes; complete array re-decode: '+r.combinedReDecodeVerified+
+   '. Destination counts are user-declared, not authenticated; no writes.';
+ });
+ on('cube-batch-connection-verify',()=>{
+  const {ctx}=current(connectionSnapshot);
+  const r=verifyHmaCubeConnectionBatchDryRun(ctx.rom,ctx.summary,{
+   ...connectionSnapshot.options,changes:connectionQueue,targetBanks:connectionBanks
+  });
+  $('cube-batch-connection-status').textContent='Connection copy-only rollback: '+
+   r.changedRecords+' records, '+r.changedBytes+' changed bytes; rollback: '+
+   r.inMemoryRollbackVerified+'; source preserved: '+r.sourceBytesPreserved+
+   '. No ROM file exported.';
+ });
+ on('cube-batch-connection-clear',()=>{
+  connectionQueue=[];connectionSnapshot=null;connectionBanks=null;renderConnection();
+ });
  function combinedParams(){
   const ctx=getContext();
   const {fresh}=current(ctx?.snapshot);
