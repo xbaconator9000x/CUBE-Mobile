@@ -1267,7 +1267,30 @@ $('cube-map-render').addEventListener('click',()=>safeRun(()=>{
   image.data.set(rendered.pixels);ctx.putImageData(image,0,0);
   const overlayMode=$('cube-map-overlay').value;
   const legend=$('cube-map-overlay-legend');legend.replaceChildren();
-  if(overlayMode!=='none'){
+  let warpOverlayReport=null;
+  if(overlayMode==='warps'){
+    warpOverlayReport=inspectHmaCubeMapEventWarps(model,mapBankCustomSummary,options);
+    legend.append(semanticChild('span','Raw CUBE warp coordinates and destinations only. No gameplay traversal or collision inference.','palette-note'));
+    for(const warp of warpOverlayReport.warps){
+      const inView=warp.x>=x&&warp.y>=y&&
+        warp.x<x+rendered.columns&&warp.y<y+rendered.rows;
+      if(!inView)continue;
+      const cx=(warp.x-x)*16,cy=(warp.y-y)*16;
+      ctx.strokeStyle=warp.specialTarget?'#ffd180':'#52d8cf';
+      ctx.lineWidth=2;ctx.strokeRect(cx+1,cy+1,14,14);
+      ctx.fillStyle='#10131c';ctx.fillRect(cx+2,cy+2,12,10);
+      ctx.fillStyle='#ffffff';ctx.font='bold 9px sans-serif';
+      ctx.fillText(String(warp.index),cx+3,cy+10,11);
+      const label=document.createElement('span');
+      label.style.display='block';
+      label.textContent='Warp #'+warp.index+' ('+warp.x+','+warp.y+
+        ') → '+warp.targetBank+':'+warp.targetMap+' #'+warp.warpId+
+        (warp.specialTarget?' · special':'');
+      legend.append(label);
+    }
+    if(!warpOverlayReport.warps.length)
+      legend.append(semanticChild('span',' No warp records on this map.','palette-note'));
+  }else if(overlayMode!=='none'){
     const overlay=buildVanillaRawMapOverlay(rendered,{mode:overlayMode,maxLegend:12});
     for(const cell of overlay.cells){
       ctx.fillStyle='rgba('+cell.rgb.join(',')+',0.45)';
@@ -1289,7 +1312,8 @@ $('cube-map-render').addEventListener('click',()=>safeRun(()=>{
   canvas.style.width=(rendered.width*2)+'px';
   canvas.style.height=(rendered.height*2)+'px';
   canvas.hidden=false;
-  cubeRenderEvidence={rom:model,options,x,y,overlayMode,map:rendered.map,
+  cubeRenderEvidence={rom:model,options,x,y,overlayMode,
+    warpOverlayJson:warpOverlayReport?JSON.stringify(warpOverlayReport):null,map:rendered.map,
     pixels:rendered.pixels.slice(),cellsJson:JSON.stringify(rendered.cells),
     attributesJson:JSON.stringify(rendered.attributes)};
   cubeRenderSelection=null;cubeCellPreview=null;$('cube-map-cell-preview').disabled=true;
@@ -1318,6 +1342,11 @@ $('cube-map-render-canvas').addEventListener('click',event=>safeRun(()=>{
      fresh.pixels.length!==snapshot.pixels.length||
      !fresh.pixels.every((value,i)=>value===snapshot.pixels[i]))
     throw Error('CUBE rendered bytes changed; render again');
+  if(snapshot.overlayMode==='warps'){
+    const freshWarps=inspectHmaCubeMapEventWarps(model,mapBankCustomSummary,snapshot.options);
+    if(JSON.stringify(freshWarps)!==snapshot.warpOverlayJson)
+      throw Error('CUBE warp marker records changed; render again');
+  }
   const canvas=$('cube-map-render-canvas'),rect=canvas.getBoundingClientRect();
   if(!rect.width||!rect.height)throw Error('Rendered canvas is not visible');
   const hit=inspectRenderedMapPixel(fresh,
