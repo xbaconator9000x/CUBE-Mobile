@@ -49,7 +49,7 @@ export function parseLocalCubeScriptTransactionArgs(argv){
 }
 /** Exact bank:map-count pairs are user declarations, never inferred map ownership. */
 function parseDeclaredBanks(value,sourceBank,sourceCount){
- if(typeof value!=='string'||!/^\\d+:\\d+(?:,\\d+:\\d+)*$/.test(value))
+ if(typeof value!=='string'||!/^[0-9]+:[0-9]+(?:,[0-9]+:[0-9]+)*$/.test(value))
   throw RangeError('Declare banks as comma-separated bank:map-count pairs');
  const banks=value.split(',').map(pair=>{
   const [bankIndex,mapCount]=pair.split(':').map(Number);
