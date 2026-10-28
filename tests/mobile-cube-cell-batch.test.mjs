@@ -17,6 +17,6 @@ test('CUBE multi-cell preview queue is wired into modular and offline apps',asyn
   assert.match(source,/partial census cannot prove exclusivity/);
  }
  assert.match(build,/stripHmaCubeCellBatch/);
- assert.match(offline,/const \{previewHmaCubeCellBatch,planHmaCubeViewportFloodFill\}=\(\(\)=>/);
+ assert.match(offline,/const \{previewHmaCubeCellBatch,planHmaCubeViewportFloodFill,planHmaCubeViewportStamp\}=\(\(\)=>/);
  assert.doesNotMatch(offline,/src\/app\.js/);
 });
