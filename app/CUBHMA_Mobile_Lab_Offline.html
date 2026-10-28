@@ -6229,6 +6229,11 @@ function summarizeHmaMapBankSources(sources,{romSize=Infinity}={}){
 
 return summarizeHmaMapBankSources;
 })();
+/**
+ * Read-only, four-byte raw evidence at a TOML-declared map-bank anchor.
+ * Conventional GBA ROM pointers are 0x08000000–0x09FFFFFF. This DOES NOT
+ * decode CUBE bank tables, custom formats, map counts or pointer ownership.
+ */
 function inspectHmaMapBankRawPointer(rom,summary){
   if(!rom||!Number.isSafeInteger(rom.length)||rom.length<0||
      typeof rom.read!=='function')throw new TypeError('Expected bounded staged ROM reader');
