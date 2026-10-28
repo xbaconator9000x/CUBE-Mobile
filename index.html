@@ -78,6 +78,9 @@
     <div class="input-wrap"><label for="cube-map-index">Map index (0-based)</label><input id="cube-map-index" type="number" min="0" max="1023" value="0"></div>
   </div>
   <div class="input-row"><button type="button" id="cube-map-inspect" class="subtle-button" disabled>Inspect declared CUBE custom map (read only)</button></div>
+  <div class="input-row"><button type="button" id="cube-map-catalog-scan" class="subtle-button" disabled>Discover CUBE bank maps (explicit count, max 128)</button></div>
+  <output id="cube-map-catalog-status" class="palette-note" aria-live="polite">No CUBE bank catalog inspected. Supply a verified map count (max 128).</output>
+  <div id="cube-map-catalog-list" class="anchor-list" aria-label="Read-only CUBE bank map catalog"></div>
   <output id="cube-map-status" class="palette-note" aria-live="polite">Requires pinned CUBE custom map format and explicit nested map count; no ROM authenticity or write permissions.</output>
   <div id="cube-map-details" class="anchor-list" aria-label="Unverified custom CUBE map header, layout and raw cells"></div>
   <div class="input-row">
