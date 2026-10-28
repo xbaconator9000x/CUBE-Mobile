@@ -7,6 +7,7 @@ import {inspectHmaCubeMapEventWarps} from './hma-cube-map-events.js';
 import {previewHmaCubeWarpBatch,verifyHmaCubeWarpBatchDryRun} from './hma-cube-warp-batch.js';
 import {previewHmaCubeEventPositionBatch,verifyHmaCubeEventPositionBatchDryRun} from './hma-cube-event-batch.js';
 import {verifyHmaCubeCombinedTransaction} from './hma-cube-combined-transaction.js';
+import {auditHmaCubeEditOwnershipImpact} from './hma-cube-edit-ownership-impact.js';
 import {auditHmaCubeRawPlacements} from './hma-cube-raw-placement-audit.js';
 
 const warpFields=['x','y','elevation','warpId','targetMap','targetBank'];
@@ -39,8 +40,10 @@ export function bindHmaCubeBatchEditors({getContext,getSelectedCell,safeRun}){
   warpQueue=[];eventQueue=[];warpSelection=null;eventSelection=null;
   warpSnapshot=null;eventSnapshot=null;warpBanks=null;
   $('cube-batch-combined-verify').disabled=true;
+  $('cube-batch-combined-ownership').disabled=true;
   for(const kind of names)$('cube-batch-'+kind+'-use-cell').disabled=true;
   $('cube-batch-combined-status').textContent='No cross-kind rehearsal performed.';
+  $('cube-batch-ownership-status').textContent='No ownership impact audit performed.';
   for(const kind of names){
    $('cube-batch-'+kind+'-list').replaceChildren();
    for(const action of ['load','queue','preview','verify','clear'])
@@ -77,7 +80,9 @@ export function bindHmaCubeBatchEditors({getContext,getSelectedCell,safeRun}){
  }
  function render(kind){
   $('cube-batch-combined-verify').disabled=!(warpQueue.length||eventQueue.length);
+  $('cube-batch-combined-ownership').disabled=!(warpQueue.length||eventQueue.length);
   $('cube-batch-combined-status').textContent='Queues changed; rerun cross-kind verification.';
+  $('cube-batch-ownership-status').textContent='Queues changed; rerun ownership impact audit.';
   const queue=kind==='warp'?warpQueue:eventQueue;
   const list=$('cube-batch-'+kind+'-list');list.replaceChildren();
   for(const action of ['preview','verify','clear'])
@@ -217,7 +222,7 @@ export function bindHmaCubeBatchEditors({getContext,getSelectedCell,safeRun}){
    '; source preserved: '+r.sourceBytesPreserved+'. No ROM exported.');
  });
  on('cube-batch-event-clear',()=>{eventQueue=[];eventSnapshot=null;render('event');});
- on('cube-batch-combined-verify',()=>{
+ function combinedParams(){
   const ctx=getContext();
   const {fresh}=current(ctx?.snapshot);
   if(!fresh||!(warpQueue.length||eventQueue.length))
@@ -233,18 +238,35 @@ export function bindHmaCubeBatchEditors({getContext,getSelectedCell,safeRun}){
      ctx.cellSnapshot.options.mapIndex!==ctx.snapshot.options.mapIndex||
      ctx.cellSnapshot.options.mapCount!==ctx.snapshot.options.mapCount))
    throw Error('Map-cell queue expired or belongs to another CUBE map; render again');
-  const r=verifyHmaCubeCombinedTransaction(ctx.rom,ctx.summary,{
+  return {ctx,params:{
    ...ctx.snapshot.options,cells,warps:warpQueue,events:eventQueue,
    targetBanks:warpBanks??[{bankIndex:ctx.snapshot.options.bankIndex,
     mapCount:ctx.snapshot.options.mapCount}],
    x:ctx.cellSnapshot?.x??0,y:ctx.cellSnapshot?.y??0,
    viewportWidth:10,viewportHeight:8
-  });
+  }};
+ }
+ on('cube-batch-combined-verify',()=>{
+  const {ctx,params}=combinedParams();
+  const r=verifyHmaCubeCombinedTransaction(ctx.rom,ctx.summary,params);
   $('cube-batch-combined-status').textContent='Combined copy-only transaction: '+
    r.cellChanges+' cells, '+r.warpChanges+' warps, '+r.eventChanges+
    ' events; '+r.changedBytes+' changed bytes; re-decode: '+r.combinedReDecodeVerified+
    '; rollback: '+r.inMemoryRollbackVerified+'; source preserved: '+
    r.sourceBytesPreserved+'. No ROM file exported or write permission.';
+ });
+ on('cube-batch-combined-ownership',()=>{
+  const {ctx,params}=combinedParams();
+  const banks=declaredBanks($('cube-batch-ownership-banks').value);
+  const r=auditHmaCubeEditOwnershipImpact(ctx.rom,ctx.summary,{...params,banks});
+  $('cube-batch-ownership-status').textContent='Changed-byte ownership impact: '+
+   r.changedBytes+' changed bytes, '+r.decodedMaps+'/'+r.inspectedMaps+
+   ' declared maps decoded, '+r.conflicts.length+' edited-byte overlap(s), '+
+   r.eventIssueCount+' invalid event array(s), '+r.invalidMaps+
+   ' invalid map(s). '+(r.changedBytesTouchSharedClaims?
+    'SHARED MAP CLAIM DETECTED. ':'')+
+   (r.censusIncomplete?'Census incomplete. ':'')+
+   'Partial bank census only; global aliases, ROM identity and safe writing NOT proven.';
  });
  reset();
  return Object.freeze({reset,ready});
