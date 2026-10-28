@@ -84,6 +84,7 @@
   <div class="input-row" aria-label="Read-only CUBE cross-bank ownership census">
     <div class="input-wrap"><label for="cube-ownership-banks">Explicit CUBE bank:map-count pairs (up to 8 banks, 256 maps)</label><input id="cube-ownership-banks" type="text" value="0:1" placeholder="0:2,1:3" spellcheck="false"></div>
     <label class="input-wrap"><input id="cube-ownership-events" type="checkbox"> Include event groups and arrays</label>
+    <label class="input-wrap"><input id="cube-ownership-connections" type="checkbox"> Include connection groups and arrays</label>
      <button type="button" id="cube-ownership-scan" class="subtle-button" disabled>Audit map and event ownership</button>
   </div>
   <output id="cube-ownership-status" class="palette-note" aria-live="polite">No cross-bank census. Supply explicit bank:count pairs; results never authorize writes.</output>
