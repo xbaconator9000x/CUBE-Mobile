@@ -12,10 +12,28 @@
   let blob = null, offset = 0, index = 0, waiting = false, chunkLength = 0;
   let sequence = 0, session = null, preparing = false;
   const post = data => window.CubeExport.postMessage(JSON.stringify(data));
+  // Android-only 48px touch target, visible throughout picker/stream/readback.
+  // It does not exist in the browser/PWA build.
+  const cancelButton = document.createElement('button');
+  cancelButton.type = 'button';
+  cancelButton.textContent = 'Cancel export';
+  cancelButton.setAttribute('aria-label', 'Cancel current document export');
+  cancelButton.style.cssText = 'position:fixed;right:16px;bottom:16px;' +
+    'min-height:48px;min-width:120px;padding:10px 16px;z-index:2147483647;' +
+    'border:2px solid #fff;border-radius:10px;background:#742020;' +
+    'color:#fff;font:600 16px system-ui,sans-serif;box-shadow:0 2px 12px #0008';
+  cancelButton.hidden = true;
+  document.body.appendChild(cancelButton);
   const reset = () => {
     blob = null; offset = 0; index = 0; waiting = false; chunkLength = 0;
-    session = null; preparing = false;
+    session = null; preparing = false; cancelButton.hidden = true;
   };
+  cancelButton.addEventListener('click', () => {
+    if (!session) return;
+    const active = session;
+    post({kind: 'abort', session: active});
+    reset();
+  });
   window.__cubeNativeCancel = id => {
     if (id === session) reset();
   };
@@ -79,6 +97,7 @@
       offset = 0; index = 0; waiting = false;
       session = String(++sequence);
       preparing = false;
+      cancelButton.hidden = false;
       post({kind: 'start', session, name: target.download || 'cube-export.bin',
         mime: value.type || 'application/octet-stream', size: value.size});
     } catch (failure) {

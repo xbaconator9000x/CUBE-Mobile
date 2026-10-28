@@ -19,11 +19,25 @@ function harness(blob) {
     }
   }
   const window = {CubeExport: {postMessage: value => messages.push(JSON.parse(value))}};
-  const document = {addEventListener: (event, handler, capture) => {
-    assert.equal(event, 'click');
-    assert.equal(capture, true);
-    click = handler;
-  }};
+  let cancelButton;
+  const document = {
+    body: {appendChild: button => { assert.equal(button, cancelButton); }},
+    createElement: tag => {
+      assert.equal(tag, 'button');
+      const button = {hidden: true, style: {}, setAttribute: () => {},
+        addEventListener: (event, handler) => {
+          assert.equal(event, 'click');
+          button.click = handler;
+        }};
+      cancelButton = button;
+      return button;
+    },
+    addEventListener: (event, handler, capture) => {
+      assert.equal(event, 'click');
+      assert.equal(capture, true);
+      click = handler;
+    }
+  };
   runInNewContext(script, {window, document, Element, FileReader,
     fetch: async () => ({ok: true, blob: async () => blob}),
     alert: message => { throw new Error('Unexpected alert: ' + message); }});
@@ -34,7 +48,7 @@ function harness(blob) {
       stopImmediatePropagation: () => { stopped = true; }});
     assert.ok(prevented && stopped);
   };
-  return {messages, window, trigger};
+  return {messages, window, trigger, cancel: () => cancelButton.click(), cancelButton};
 }
 async function until(predicate) {
   for (let n = 0; n < 100; n++) {
@@ -130,4 +144,31 @@ test('Android export bridge retains session until native readback completes', as
   await h.trigger();
   assert.equal(h.messages.filter(x => x.kind === 'start').length, 2);
   assert.notEqual(h.messages.findLast(x => x.kind === 'start').session, first);
+});
+
+test('Android export touch cancellation aborts only the active session', async () => {
+  const h = harness(new Blob([Buffer.alloc(100000)]));
+  assert.equal(h.cancelButton.hidden, true);
+  await h.trigger();
+  const first = h.messages[0].session;
+  assert.equal(h.cancelButton.hidden, false);
+  h.window.__cubeNativeBegin(first);
+  await until(() => h.messages.some(x => x.kind === 'chunk'));
+  h.cancel();
+  assert.equal(h.cancelButton.hidden, true);
+  assert.equal(h.messages.filter(x => x.kind === 'abort').length, 1);
+  assert.equal(h.messages.findLast(x => x.kind === 'abort').session, first);
+  const before = h.messages.length;
+  h.window.__cubeNativeAck(first, 0);
+  h.window.__cubeNativeComplete(first);
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(h.messages.length, before);
+  await h.trigger();
+  const second = h.messages.findLast(x => x.kind === 'start').session;
+  assert.notEqual(first, second);
+  assert.equal(h.cancelButton.hidden, false);
+  h.window.__cubeNativeCancel(first);
+  assert.equal(h.cancelButton.hidden, false);
+  h.window.__cubeNativeCancel(second);
+  assert.equal(h.cancelButton.hidden, true);
 });
