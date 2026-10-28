@@ -227,6 +227,23 @@
     <button type="button" id="cube-warp-trace-open" class="subtle-button" disabled>Inspect raw destination map</button>
   </div>
   <output id="cube-warp-trace-status" class="palette-note" aria-live="polite">Inspect CUBE warps, then supply an explicit destination-bank map count.</output>
+  <div class="input-row" aria-label="Read-only CUBE warp record editing preflight">
+    <div class="input-wrap"><label for="cube-warp-edit-index">Warp index</label><input id="cube-warp-edit-index" type="number" min="0" max="254" value="0"></div>
+    <button type="button" id="cube-warp-edit-load" class="subtle-button" disabled>Load raw warp fields</button>
+  </div>
+  <div class="input-row" aria-label="Proposed CUBE warp raw fields">
+    <div class="input-wrap"><label for="cube-warp-edit-x">X</label><input id="cube-warp-edit-x" type="number" min="0" max="65535" value="0"></div>
+    <div class="input-wrap"><label for="cube-warp-edit-y">Y</label><input id="cube-warp-edit-y" type="number" min="0" max="65535" value="0"></div>
+    <div class="input-wrap"><label for="cube-warp-edit-elevation">Elevation</label><input id="cube-warp-edit-elevation" type="number" min="0" max="255" value="0"></div>
+    <div class="input-wrap"><label for="cube-warp-edit-warpId">Target warp ID</label><input id="cube-warp-edit-warpId" type="number" min="0" max="255" value="0"></div>
+    <div class="input-wrap"><label for="cube-warp-edit-targetMap">Target map</label><input id="cube-warp-edit-targetMap" type="number" min="0" max="255" value="0"></div>
+    <div class="input-wrap"><label for="cube-warp-edit-targetBank">Target bank</label><input id="cube-warp-edit-targetBank" type="number" min="0" max="255" value="0"></div>
+  </div>
+  <div class="input-row">
+    <div class="input-wrap"><label for="cube-warp-edit-target-banks">Optional explicit bank:map-count declarations</label><input id="cube-warp-edit-target-banks" type="text" placeholder="0:12,1:9" spellcheck="false"></div>
+    <button type="button" id="cube-warp-edit-preview" class="subtle-button" disabled>Compare virtual warp change</button>
+  </div>
+  <output id="cube-warp-edit-status" class="palette-note" aria-live="polite">Inspect CUBE warps, then load a record. This tool never writes ROM bytes.</output>
   <div class="input-row" aria-label="Bounded CUBE raw warp topology audit">
     <div class="input-wrap"><label for="cube-warp-audit-banks">Destination bank:map-count declarations</label><input id="cube-warp-audit-banks" type="text" value="0:1" placeholder="0:12,1:9" spellcheck="false"></div>
     <button type="button" id="cube-warp-audit" class="subtle-button" disabled>Audit all raw map warps (max 32)</button>
@@ -7237,6 +7254,123 @@ function auditHmaCubeWarpTopology(source,summary,{
 
 return {traceHmaCubeWarpArrival,auditHmaCubeWarpTopology};
 })();
+const previewHmaCubeWarpRecordChange=(()=>{
+/**
+ * CUBE Emerald 8-byte warp record preflight, source-grounded in pinned
+ * kcradi/CUBHMA MapModel.cs WarpsFormat. This is an immutable virtual
+ * comparison, NOT a ROM writer, independent authentication or gameplay test.
+ */
+const fields=['x','y','elevation','warpId','targetMap','targetBank'];
+function reader(source){
+ if(source instanceof Uint8Array)return {length:source.length,read:i=>source[i]};
+ if(source&&Number.isSafeInteger(source.length)&&source.length>0&&
+    typeof source.read==='function')return source;
+ throw new TypeError('Expected staged ROM reader');
+}
+function integer(n,max,name){
+ if(!Number.isSafeInteger(n)||n<0||n>max)
+  throw new RangeError(name+' outside raw field bounds');
+}
+function byte(rom,i){
+ if(!Number.isSafeInteger(i)||i<0||i>=rom.length)
+  throw new RangeError('Warp record byte outside ROM');
+ const v=rom.read(i);
+ integer(v,255,'ROM byte');
+ return v;
+}
+function values(record){return Object.freeze(Object.fromEntries(fields.map(k=>[k,record[k]])));}
+function same(a,b){return fields.every(k=>a[k]===b[k]);}
+function destinations(targetBanks){
+ if(targetBanks===undefined)return new Map();
+ if(!Array.isArray(targetBanks)||targetBanks.length>8)
+  throw new RangeError('At most eight explicitly counted target banks');
+ const counts=new Map();
+ for(const b of targetBanks){
+  if(!b||!Number.isSafeInteger(b.bankIndex)||b.bankIndex<0||b.bankIndex>255||
+     !Number.isSafeInteger(b.mapCount)||b.mapCount<1||b.mapCount>1024||
+     counts.has(b.bankIndex))
+   throw new RangeError('Duplicate or invalid destination-bank count');
+  counts.set(b.bankIndex,b.mapCount);
+ }
+ return counts;
+}
+function trace(source,summary,opts,record,counts,declaredBankCount){
+ if(record.specialTarget||record.warpId===255)
+  return Object.freeze({status:'special-or-unresolved'});
+ if(record.targetBank>=declaredBankCount)
+  return Object.freeze({status:'outside-declared-bank-table'});
+ if(!counts.has(record.targetBank))
+  return Object.freeze({status:'target-bank-count-not-declared'});
+ const result=traceHmaCubeWarpArrival(source,summary,{
+  ...opts,warpIndex:record.index,targetMapCount:counts.get(record.targetBank)
+ });
+ return Object.freeze({status:result.status,
+  ...(result.arrival?{arrival:result.arrival}:{}),
+  ...(result.targetWarpCount!==undefined?{targetWarpCount:result.targetWarpCount}:{})});
+}
+
+/**
+ * Verify exact original fields, apply one warp record to a virtual accessor,
+ * re-decode all source warps and compare raw destination traces. The output
+ * never includes a ROM, a patch or write authority.
+ */
+function previewHmaCubeWarpRecordChange(source,summary,{
+ bankIndex,mapIndex,mapCount,warpIndex,expected,proposed,targetBanks
+}={}){
+ const rom=reader(source),opts={bankIndex,mapIndex,mapCount};
+ const before=inspectHmaCubeMapEventWarps(rom,summary,opts);
+ integer(warpIndex,before.warps.length-1,'Warp index');
+ const record=before.warps[warpIndex];
+ if(!expected||typeof expected!=='object'||!fields.every(k=>Object.hasOwn(expected,k)))
+  throw new RangeError('Exact six-field expected warp record required');
+ for(const k of fields)integer(expected[k],k==='x'||k==='y'?65535:255,'Expected '+k);
+ if(!same(record,expected))
+  throw new RangeError('Warp record changed since selection; inspect again');
+ if(!proposed||typeof proposed!=='object'||
+    !Object.keys(proposed).length||Object.keys(proposed).some(k=>!fields.includes(k)))
+  throw new RangeError('Provide at least one supported warp field proposal');
+ const next={...values(record),...proposed};
+ for(const k of fields)integer(next[k],k==='x'||k==='y'?65535:255,'Proposed '+k);
+ if(next.x>=before.map.layout.width||next.y>=before.map.layout.height)
+  throw new RangeError('Proposed warp coordinates outside declared map');
+ const counts=destinations(targetBanks);
+ const raw=[next.x&255,next.x>>>8,next.y&255,next.y>>>8,
+  next.elevation,next.warpId,next.targetMap,next.targetBank];
+ const overlay=new Map(raw.map((v,i)=>[record.offset+i,v]));
+ // Revalidate all original bytes before returning a virtual result.
+ const original=[record.x&255,record.x>>>8,record.y&255,record.y>>>8,
+  record.elevation,record.warpId,record.targetMap,record.targetBank];
+ for(let i=0;i<8;i++)if(byte(rom,record.offset+i)!==original[i])
+  throw new RangeError('Warp source bytes changed during preflight');
+ const staged=Object.freeze({length:rom.length,read:i=>
+  overlay.has(i)?overlay.get(i):byte(rom,i)});
+ const after=inspectHmaCubeMapEventWarps(staged,summary,opts);
+ if(after.warps.length!==before.warps.length||
+    after.warps[warpIndex].offset!==record.offset||
+    !same(after.warps[warpIndex],next))
+  throw new RangeError('Warp record virtual re-decode failed');
+ for(let i=0;i<before.warps.length;i++)
+  if(i!==warpIndex&&(!same(before.warps[i],after.warps[i])||
+      before.warps[i].offset!==after.warps[i].offset))
+   throw new RangeError('Unrelated warp changed during virtual preview');
+ const beforeTrace=trace(rom,summary,opts,record,counts,before.map.declaredBankCount);
+ const afterTrace=trace(staged,summary,opts,after.warps[warpIndex],counts,after.map.declaredBankCount);
+ return Object.freeze({
+  bankIndex,mapIndex,mapCount,warpIndex,sourceOffset:record.offset,
+  before:values(record),after:values(after.warps[warpIndex]),
+  changedFields:Object.freeze(fields.filter(k=>record[k]!==next[k])),
+  beforeTrace,afterTrace,
+  proposedCoordinatesInBounds:true,otherWarpsPreserved:true,
+  destinationCountsExplicit:counts.size>0,
+  readOnly:true,previewOnly:true,writeAuthorized:false,
+  romAuthenticated:false,cubeLayoutAuthenticated:false,
+  exclusiveOwnershipProven:false,emulatorVerified:false,
+  authenticSaveReopenVerified:false
+ });
+}
+
+return previewHmaCubeWarpRecordChange;
+})();
 const traceHmaCubeConnectionDestination=(()=>{
 /**
  * Read-only CUBE custom connection destination inspection.
@@ -7783,7 +7917,7 @@ let fingerprintResult=null,fingerprintAbort=null;
 let metadataFingerprints=[],metadataImportSerial=0,mapBankMetadataReport=null,mapBankRawPointerEvidence=null,mapBankRawWindowEvidence=null,mapBankDeclaredEvidence=null,mapBankTargetEvidence=null,mapBankCustomSummary=null,cubeMapEvidence=null,cubeWarpEvidence=null,cubeConnectionEvidence=null,cubeRenderEvidence=null,cubeRenderSelection=null,cubeCellPreview=null;
 let inspectedWarpMap=null,selectedWarpPreview=null,selectedEventPreview=null,inspectedEventMap=null,inspectedMapAtlas=null,atlasBatchStart=0,atlasCoordinateBatchStart=0,atlasScriptAliasStart=0,atlasScriptCrossPageStart=0,atlasIncomingStart=0,atlasIncomingTarget=null;
 let activeRenderedMap=null,selectedRenderedHit=null;
-let cubeCatalogEvidence=null,cubeWarpTraceEvidence=null,cubeConnectionTraceEvidence=null,cubeOwnershipEvidence=null,cubeWarpAuditEvidence=null;
+let cubeCatalogEvidence=null,cubeWarpTraceEvidence=null,cubeConnectionTraceEvidence=null,cubeOwnershipEvidence=null,cubeWarpAuditEvidence=null,cubeWarpEditSelection=null;
 let cubeCellBatchQueue=[],cubeCellBatchSnapshot=null;
 let mapReviewQueue=[],mapReviewRom=null,lastMapPreviews={cell:null,warp:null,event:null};
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
@@ -9283,8 +9417,15 @@ function clearCubeWarpAudit(){
   $('cube-warp-audit-list').replaceChildren();
   $('cube-warp-audit-status').textContent='Declare destination bank counts to check raw reciprocal warp indices. No gameplay inference.';
 }
+function clearCubeWarpEditPreview(){
+  cubeWarpEditSelection=null;
+  $('cube-warp-edit-load').disabled=true;
+  $('cube-warp-edit-preview').disabled=true;
+  $('cube-warp-edit-status').textContent='Inspect CUBE warps, then load a record. This tool never writes ROM bytes.';
+}
 function clearCubeWarpTrace(){
   clearCubeWarpAudit();
+  clearCubeWarpEditPreview();
   cubeWarpTraceEvidence=null;
   $('cube-warp-trace-open').disabled=true;
   $('cube-warp-trace-status').textContent='Inspect CUBE warps, then supply an explicit destination-bank map count.';
@@ -9295,6 +9436,7 @@ function drawCubeWarpEvidence(){
   const snapshot=cubeWarpEvidence;
   $('cube-warp-trace').disabled=!snapshot;
   $('cube-warp-audit').disabled=!snapshot;
+  $('cube-warp-edit-load').disabled=!snapshot;
   if(!snapshot){
     status.textContent='No CUBE custom event arrays inspected. Select a map and inspect raw warps.';
     return;
@@ -9364,6 +9506,67 @@ function drawCubeWarpEvidence(){
     }
   }
 }
+const cubeWarpRawFields=['x','y','elevation','warpId','targetMap','targetBank'];
+function freshCubeWarpEditSource(snapshot){
+  if(!snapshot||!cubeMapEvidence||snapshot.options!==cubeMapEvidence.options)
+    throw Error('Inspect current CUBE warp records first');
+  const fresh=inspectHmaCubeMapEventWarps(ensureModel(),mapBankCustomSummary,snapshot.options);
+  if(JSON.stringify(fresh)!==JSON.stringify(snapshot.report))
+    throw Error('CUBE warp source changed; inspect again');
+  return fresh;
+}
+$('cube-warp-edit-load').addEventListener('click',()=>safeRun(()=>{
+  const snapshot=cubeWarpEvidence;
+  const fresh=freshCubeWarpEditSource(snapshot);
+  const input=$('cube-warp-edit-index').value;
+  if(!/^\d+$/.test(input))throw new RangeError('Warp index must be an integer');
+  const warpIndex=Number(input);
+  if(!Number.isSafeInteger(warpIndex)||warpIndex>=fresh.warps.length)
+    throw new RangeError('Warp index outside inspected source records');
+  const record=fresh.warps[warpIndex];
+  const expected=Object.fromEntries(cubeWarpRawFields.map(key=>[key,record[key]]));
+  for(const key of cubeWarpRawFields)$('cube-warp-edit-'+key).value=String(expected[key]);
+  cubeWarpEditSelection={rom:model,summary:mapBankCustomSummary,
+    sourceReport:snapshot.report,options:snapshot.options,warpIndex,expected};
+  $('cube-warp-edit-preview').disabled=false;
+  $('cube-warp-edit-status').textContent='Warp #'+warpIndex+' loaded from 0x'+hex(record.offset)+
+    '. Adjust raw fields and compare; no ROM changes will be saved.';
+}));
+$('cube-warp-edit-preview').addEventListener('click',()=>safeRun(()=>{
+  const selection=cubeWarpEditSelection;
+  if(!selection||selection.rom!==model||selection.summary!==mapBankCustomSummary||
+     cubeWarpEvidence?.report!==selection.sourceReport)
+    throw Error('CUBE warp edit selection expired; inspect and load again');
+  freshCubeWarpEditSource(cubeWarpEvidence);
+  if($('cube-warp-edit-index').value!==String(selection.warpIndex))
+    throw Error('Warp index changed; load the new warp first');
+  const proposed={};
+  for(const key of cubeWarpRawFields){
+    const input=$('cube-warp-edit-'+key).value;
+    if(!/^\d+$/.test(input))throw new RangeError('Raw '+key+' must be a nonnegative integer');
+    proposed[key]=Number(input);
+  }
+  const bankText=$('cube-warp-edit-target-banks').value.trim();
+  const parts=bankText?bankText.split(',').map(x=>x.trim()):[];
+  if(parts.length>8||parts.some(x=>!/^\d+:\d+$/.test(x)))
+    throw new RangeError('Declare at most eight bank:map-count pairs');
+  const targetBanks=parts.map(part=>{
+    const [bankIndex,mapCount]=part.split(':').map(Number);
+    return {bankIndex,mapCount};
+  });
+  const result=previewHmaCubeWarpRecordChange(model,mapBankCustomSummary,{
+    ...selection.options,warpIndex:selection.warpIndex,
+    expected:selection.expected,proposed,targetBanks});
+  $('cube-warp-edit-status').textContent='Virtual warp #'+result.warpIndex+
+    ' · changed: '+(result.changedFields.join(', ')||'none')+
+    ' · before: '+result.beforeTrace.status+
+    ' · after: '+result.afterTrace.status+
+    (result.afterTrace.arrival?
+      ' · arrival ('+result.afterTrace.arrival.x+','+result.afterTrace.arrival.y+')'+
+      ' · raw return: '+result.afterTrace.arrival.returnsToOrigin:'')+
+    '. Other warps preserved: '+result.otherWarpsPreserved+
+    '. Preview only: no ROM writing, no emulator or walkability verification.';
+}));
 $('cube-warp-audit').addEventListener('click',()=>safeRun(()=>{
   const snapshot=cubeWarpEvidence;
   if(!snapshot||!cubeMapEvidence||snapshot.options!==cubeMapEvidence.options)
