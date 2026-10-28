@@ -14,6 +14,7 @@ import {inspectHmaDeclaredBankTargetWindows} from '../src/hma-map-bank-target-wi
 import {inspectHmaCubeMapEntry} from '../src/hma-cube-map-discovery.js';
 import {inspectHmaCubeMapEventWarps} from '../src/hma-cube-map-events.js';
 import {renderHmaCubeMapViewport} from '../src/hma-cube-map-render.js';
+import {inspectHmaCubeMapScripts} from '../src/hma-cube-map-script-table.js';
 
 const SHA=/^[0-9a-f]{64}$/i;
 export function parseLocalCubeBankSmokeArgs(argv){
@@ -109,6 +110,7 @@ export async function inspectLocalCubeBankSmoke(argv){
    mapCount:Number(args['--map-count'])};
  const custom=customOptions?inspectHmaCubeMapEntry(reader,metadata,customOptions):null;
  const events=customOptions?inspectHmaCubeMapEventWarps(reader,metadata,customOptions):null;
+ const mapScripts=customOptions?inspectHmaCubeMapScripts(reader,metadata,customOptions):null;
  const render=args['--render-map']===undefined?null:
    renderHmaCubeMapViewport(reader,metadata,{...customOptions,
      x:Number(args['--viewport-x']??0),
@@ -146,6 +148,9 @@ export async function inspectLocalCubeBankSmoke(argv){
     customMapWidth:custom.layout.width,customMapHeight:custom.layout.height,
     customMapRawCellCount:custom.layout.width*custom.layout.height,
     customMapMetadataFormatRecognized:custom.metadataFormatRecognized,
+    customMapScriptEntries:mapScripts.scriptEntries,
+    customConditionalScriptTables:mapScripts.conditionalTableCount,
+    customConditionalScriptEntries:mapScripts.conditionalEntries,
     customEventCounts:events.counts,customWarpOutsideMapCount:events.warps.filter(w=>w.outsideDeclaredMap).length,
     customWarpSpecialTargetCount:events.warps.filter(w=>w.specialTarget).length
   }:{}),
