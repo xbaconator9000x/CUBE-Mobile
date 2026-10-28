@@ -203,3 +203,25 @@ test('Android export IDs do not repeat across separate WebView page loads', asyn
   second.window.__cubeNativeBegin(a);
   assert.equal(second.messages.length, 1);
 });
+
+
+test('Android touch export reports bounded transfer progress and native verification', async () => {
+  const h = harness(new Blob([Buffer.alloc(100000)]));
+  await h.trigger();
+  const id = h.messages[0].session;
+  assert.match(h.cancelButton.textContent, /choose destination/);
+  h.window.__cubeNativeBegin(id);
+  assert.match(h.cancelButton.textContent, /0%/);
+  for (let i = 0; i < 3; i++) {
+    await until(() => h.messages.some(x => x.kind === 'chunk' && x.index === i));
+    h.window.__cubeNativeAck(id, i);
+    if (i === 0) assert.match(h.cancelButton.textContent, /49%/);
+    if (i === 1) assert.match(h.cancelButton.textContent, /98%/);
+  }
+  await until(() => h.messages.some(x => x.kind === 'finish'));
+  assert.match(h.cancelButton.textContent, /verifying saved file/);
+  assert.equal(h.cancelButton.hidden, false);
+  h.window.__cubeNativeComplete(id);
+  assert.equal(h.cancelButton.hidden, true);
+  assert.equal(h.cancelButton.textContent, 'Cancel export');
+});

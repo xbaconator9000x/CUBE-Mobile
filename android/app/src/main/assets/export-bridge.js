@@ -33,9 +33,15 @@
     'color:#fff;font:600 16px system-ui,sans-serif;box-shadow:0 2px 12px #0008';
   cancelButton.hidden = true;
   document.body.appendChild(cancelButton);
+  const progress = label => {
+    cancelButton.textContent = 'Cancel export (' + label + ')';
+    cancelButton.setAttribute('aria-label', cancelButton.textContent);
+  };
   const reset = () => {
     blob = null; offset = 0; index = 0; waiting = false; chunkLength = 0;
     session = null; preparing = false; cancelButton.hidden = true;
+    cancelButton.textContent = 'Cancel export';
+    cancelButton.setAttribute('aria-label', 'Cancel current document export');
   };
   cancelButton.addEventListener('click', () => {
     if (!session) return;
@@ -53,6 +59,7 @@
     if (!blob || waiting || !session) return;
     const active = session;
     if (offset === blob.size) {
+      progress('verifying saved file');
       waiting = true; // Native readback must finish before a new export starts.
       post({kind: 'finish', session: active});
       return;
@@ -82,12 +89,14 @@
   };
   window.__cubeNativeBegin = id => {
     if (id !== session) return;
+    progress('0%');
     pump().catch(() => fail(id));
   };
   window.__cubeNativeAck = (id, acknowledged) => {
     if (id !== session || !blob || !waiting || acknowledged !== index) return;
     offset += chunkLength;
     index++;
+    progress(Math.min(99, Math.floor(offset * 100 / blob.size)) + '%');
     waiting = false;
     pump().catch(() => fail(id));
   };
@@ -112,6 +121,7 @@
       session = newSessionId();
       preparing = false;
       cancelButton.hidden = false;
+      progress('choose destination');
       post({kind: 'start', session, name: target.download || 'cube-export.bin',
         mime: value.type || 'application/octet-stream', size: value.size});
     } catch (failure) {
