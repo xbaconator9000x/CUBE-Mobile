@@ -50,7 +50,7 @@ test('symlink source and same-path Save As are rejected',async()=>{
   await symlink(args.sourcePath,alias);
   await assert.rejects(saveUnmodifiedRomAs({...args,sourcePath:alias}),/regular file|symlink/);
   await assert.rejects(saveUnmodifiedRomAs({...args,destinationPath:args.sourcePath}),/must differ/);
-  assert.deepEqual(await readdir(args.dir),['source-alias.bin','synthetic.bin']);
+  assert.deepEqual((await readdir(args.dir)).sort(),['source-alias.bin','synthetic.bin']);
  });
 });
 test('local CLI returns aggregate-only report and refuses existing destination',async()=>{
