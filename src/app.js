@@ -1165,15 +1165,18 @@ $('cube-ownership-scan').addEventListener('click',()=>safeRun(()=>{
     const [bankIndex,mapCount]=part.split(':').map(Number);
     return {bankIndex,mapCount};
   });
-  const report=auditHmaCubeCrossBankOwnership(model,mapBankCustomSummary,{banks});
-  const snapshot={rom:model,summary:mapBankCustomSummary,banks,report};
+  const includeEvents=$('cube-ownership-events').checked;
+   const report=auditHmaCubeCrossBankOwnership(model,mapBankCustomSummary,{banks,includeEvents});
+  const snapshot={rom:model,summary:mapBankCustomSummary,banks,includeEvents,report};
   cubeOwnershipEvidence=snapshot;
   const list=$('cube-ownership-list');list.replaceChildren();
   $('cube-ownership-status').textContent=
     report.decoded+'/'+report.requestedMaps+' maps decoded across '+
     banks.length+' explicitly counted banks; '+report.crossBankRelationshipCount+
-    ' cross-bank overlap(s), '+report.invalid+' invalid. Partial census only; exclusive ownership and safe editing NOT proven.';
-  for(const relationship of report.relationships.slice(0,80)){
+    ' cross-bank overlap(s), '+report.sameMapRelationships.length+' within-map overlap(s), '+
+     report.eventIssues.length+' invalid event array(s), '+report.invalid+
+     ' invalid maps. Partial census only; exclusive ownership and safe editing NOT proven.';
+  for(const relationship of [...report.relationships,...report.sameMapRelationships].slice(0,80)){
     const button=document.createElement('button');button.type='button';
     button.className='subtle-button';
     button.textContent=relationship.first+' '+relationship.firstKind+' overlaps '+
@@ -1183,7 +1186,9 @@ $('cube-ownership-scan').addEventListener('click',()=>safeRun(()=>{
       if(cubeOwnershipEvidence!==snapshot||snapshot.rom!==model||
          snapshot.summary!==mapBankCustomSummary)
         throw Error('CUBE ownership census expired; scan again');
-      const fresh=auditHmaCubeCrossBankOwnership(model,mapBankCustomSummary,{banks});
+      if($('cube-ownership-events').checked!==snapshot.includeEvents)
+         throw Error('Event coverage setting changed; scan again');
+       const fresh=auditHmaCubeCrossBankOwnership(model,mapBankCustomSummary,{banks,includeEvents});
       if(JSON.stringify(fresh)!==JSON.stringify(snapshot.report))
         throw Error('CUBE ownership source bytes changed; scan again');
       const [bank,map]=relationship.first.split(':').map(Number);
@@ -1197,7 +1202,7 @@ $('cube-ownership-scan').addEventListener('click',()=>safeRun(()=>{
     }));
     list.append(button);
   }
-  if(report.relationships.length>80)
+  if(report.relationships.length+report.sameMapRelationships.length>80)
     list.append(semanticChild('p','Showing first 80 overlaps. Narrow explicit bank counts to inspect further.','palette-note'));
 }));
 
