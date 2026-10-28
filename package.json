@@ -11,7 +11,8 @@
     "start": "python3 -m http.server 8000",
     "smoke:local": "node scripts/local-map-smoke.mjs",
     "smoke:cube-banks": "node scripts/local-cube-bank-smoke.mjs",
-    "map:metadata:inspect": "node scripts/hma-map-metadata-report.mjs"
+    "map:metadata:inspect": "node scripts/hma-map-metadata-report.mjs",
+    "smoke:cube-manifest": "node scripts/local-hma-manifest-smoke.mjs"
   },
   "license": "MIT"
 }
