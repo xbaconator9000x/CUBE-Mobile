@@ -51,6 +51,7 @@ import {renderHmaCubeMapViewport} from './hma-cube-map-render.js';
 import {previewHmaCubeBlockmapVisualChange} from './hma-cube-map-cell-preview.js';
 import {inspectHmaCubeBankCatalog} from './hma-cube-bank-catalog.js';
 import {traceHmaCubeWarpArrival,auditHmaCubeWarpTopology} from './hma-cube-warp-arrival.js';
+import {previewHmaCubeWarpRecordChange} from './hma-cube-warp-edit-preview.js';
 import {traceHmaCubeConnectionDestination} from './hma-cube-connection-trace.js';
 import {auditHmaCubeCrossBankOwnership} from './hma-cube-cross-bank-ownership.js';
 import {previewHmaCubeCellBatch,planHmaCubeViewportFloodFill,planHmaCubeViewportStamp,planHmaCubeViewportReplace,verifyHmaCubeCellBatchDryRun} from './hma-cube-cell-batch.js';
@@ -62,7 +63,7 @@ let fingerprintResult=null,fingerprintAbort=null;
 let metadataFingerprints=[],metadataImportSerial=0,mapBankMetadataReport=null,mapBankRawPointerEvidence=null,mapBankRawWindowEvidence=null,mapBankDeclaredEvidence=null,mapBankTargetEvidence=null,mapBankCustomSummary=null,cubeMapEvidence=null,cubeWarpEvidence=null,cubeConnectionEvidence=null,cubeRenderEvidence=null,cubeRenderSelection=null,cubeCellPreview=null;
 let inspectedWarpMap=null,selectedWarpPreview=null,selectedEventPreview=null,inspectedEventMap=null,inspectedMapAtlas=null,atlasBatchStart=0,atlasCoordinateBatchStart=0,atlasScriptAliasStart=0,atlasScriptCrossPageStart=0,atlasIncomingStart=0,atlasIncomingTarget=null;
 let activeRenderedMap=null,selectedRenderedHit=null;
-let cubeCatalogEvidence=null,cubeWarpTraceEvidence=null,cubeConnectionTraceEvidence=null,cubeOwnershipEvidence=null,cubeWarpAuditEvidence=null;
+let cubeCatalogEvidence=null,cubeWarpTraceEvidence=null,cubeConnectionTraceEvidence=null,cubeOwnershipEvidence=null,cubeWarpAuditEvidence=null,cubeWarpEditSelection=null;
 let cubeCellBatchQueue=[],cubeCellBatchSnapshot=null;
 let mapReviewQueue=[],mapReviewRom=null,lastMapPreviews={cell:null,warp:null,event:null};
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
@@ -1562,8 +1563,15 @@ function clearCubeWarpAudit(){
   $('cube-warp-audit-list').replaceChildren();
   $('cube-warp-audit-status').textContent='Declare destination bank counts to check raw reciprocal warp indices. No gameplay inference.';
 }
+function clearCubeWarpEditPreview(){
+  cubeWarpEditSelection=null;
+  $('cube-warp-edit-load').disabled=true;
+  $('cube-warp-edit-preview').disabled=true;
+  $('cube-warp-edit-status').textContent='Inspect CUBE warps, then load a record. This tool never writes ROM bytes.';
+}
 function clearCubeWarpTrace(){
   clearCubeWarpAudit();
+  clearCubeWarpEditPreview();
   cubeWarpTraceEvidence=null;
   $('cube-warp-trace-open').disabled=true;
   $('cube-warp-trace-status').textContent='Inspect CUBE warps, then supply an explicit destination-bank map count.';
@@ -1574,6 +1582,7 @@ function drawCubeWarpEvidence(){
   const snapshot=cubeWarpEvidence;
   $('cube-warp-trace').disabled=!snapshot;
   $('cube-warp-audit').disabled=!snapshot;
+  $('cube-warp-edit-load').disabled=!snapshot;
   if(!snapshot){
     status.textContent='No CUBE custom event arrays inspected. Select a map and inspect raw warps.';
     return;
@@ -1643,6 +1652,67 @@ function drawCubeWarpEvidence(){
     }
   }
 }
+const cubeWarpRawFields=['x','y','elevation','warpId','targetMap','targetBank'];
+function freshCubeWarpEditSource(snapshot){
+  if(!snapshot||!cubeMapEvidence||snapshot.options!==cubeMapEvidence.options)
+    throw Error('Inspect current CUBE warp records first');
+  const fresh=inspectHmaCubeMapEventWarps(ensureModel(),mapBankCustomSummary,snapshot.options);
+  if(JSON.stringify(fresh)!==JSON.stringify(snapshot.report))
+    throw Error('CUBE warp source changed; inspect again');
+  return fresh;
+}
+$('cube-warp-edit-load').addEventListener('click',()=>safeRun(()=>{
+  const snapshot=cubeWarpEvidence;
+  const fresh=freshCubeWarpEditSource(snapshot);
+  const input=$('cube-warp-edit-index').value;
+  if(!/^\d+$/.test(input))throw new RangeError('Warp index must be an integer');
+  const warpIndex=Number(input);
+  if(!Number.isSafeInteger(warpIndex)||warpIndex>=fresh.warps.length)
+    throw new RangeError('Warp index outside inspected source records');
+  const record=fresh.warps[warpIndex];
+  const expected=Object.fromEntries(cubeWarpRawFields.map(key=>[key,record[key]]));
+  for(const key of cubeWarpRawFields)$('cube-warp-edit-'+key).value=String(expected[key]);
+  cubeWarpEditSelection={rom:model,summary:mapBankCustomSummary,
+    sourceReport:snapshot.report,options:snapshot.options,warpIndex,expected};
+  $('cube-warp-edit-preview').disabled=false;
+  $('cube-warp-edit-status').textContent='Warp #'+warpIndex+' loaded from 0x'+hex(record.offset)+
+    '. Adjust raw fields and compare; no ROM changes will be saved.';
+}));
+$('cube-warp-edit-preview').addEventListener('click',()=>safeRun(()=>{
+  const selection=cubeWarpEditSelection;
+  if(!selection||selection.rom!==model||selection.summary!==mapBankCustomSummary||
+     cubeWarpEvidence?.report!==selection.sourceReport)
+    throw Error('CUBE warp edit selection expired; inspect and load again');
+  freshCubeWarpEditSource(cubeWarpEvidence);
+  if($('cube-warp-edit-index').value!==String(selection.warpIndex))
+    throw Error('Warp index changed; load the new warp first');
+  const proposed={};
+  for(const key of cubeWarpRawFields){
+    const input=$('cube-warp-edit-'+key).value;
+    if(!/^\d+$/.test(input))throw new RangeError('Raw '+key+' must be a nonnegative integer');
+    proposed[key]=Number(input);
+  }
+  const bankText=$('cube-warp-edit-target-banks').value.trim();
+  const parts=bankText?bankText.split(',').map(x=>x.trim()):[];
+  if(parts.length>8||parts.some(x=>!/^\d+:\d+$/.test(x)))
+    throw new RangeError('Declare at most eight bank:map-count pairs');
+  const targetBanks=parts.map(part=>{
+    const [bankIndex,mapCount]=part.split(':').map(Number);
+    return {bankIndex,mapCount};
+  });
+  const result=previewHmaCubeWarpRecordChange(model,mapBankCustomSummary,{
+    ...selection.options,warpIndex:selection.warpIndex,
+    expected:selection.expected,proposed,targetBanks});
+  $('cube-warp-edit-status').textContent='Virtual warp #'+result.warpIndex+
+    ' · changed: '+(result.changedFields.join(', ')||'none')+
+    ' · before: '+result.beforeTrace.status+
+    ' · after: '+result.afterTrace.status+
+    (result.afterTrace.arrival?
+      ' · arrival ('+result.afterTrace.arrival.x+','+result.afterTrace.arrival.y+')'+
+      ' · raw return: '+result.afterTrace.arrival.returnsToOrigin:'')+
+    '. Other warps preserved: '+result.otherWarpsPreserved+
+    '. Preview only: no ROM writing, no emulator or walkability verification.';
+}));
 $('cube-warp-audit').addEventListener('click',()=>safeRun(()=>{
   const snapshot=cubeWarpEvidence;
   if(!snapshot||!cubeMapEvidence||snapshot.options!==cubeMapEvidence.options)
