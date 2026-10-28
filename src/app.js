@@ -1460,7 +1460,10 @@ $('cube-map-batch-preview').addEventListener('click',()=>safeRun(()=>{
     result.changedCells+' changed CUBE cells, '+result.changedPixels+
     ' changed pixels. '+(result.ownership?
       result.ownership.overlapCount+' known ownership overlaps; ':'Ownership not audited; ')+
-    'partial census cannot prove exclusivity. No ROM writes or walkability claims.';
+    'partial census cannot prove exclusivity. '+
+    (result.eventInspectionStatus==='decoded'?result.eventRecordsAffected+
+      ' raw event record(s) occupy changed cells. ':'Event table unavailable; impact unknown. ')+
+    'No ROM writes or walkability claims.';
 }));
 $('cube-map-cell-preview').addEventListener('click',()=>safeRun(()=>{
   const selected=cubeRenderSelection,snapshot=selected?.snapshot;

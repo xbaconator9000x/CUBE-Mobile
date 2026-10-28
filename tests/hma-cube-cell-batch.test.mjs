@@ -75,3 +75,29 @@ test('rejects unsupported CUBE lighting and never calls source writes',async()=>
  assert.throws(()=>previewHmaCubeCellBatch(staged,summary,{...options,
   changes:[{x:0,y:0,tileId:512,expectedRaw:0}]}),/light/i);
 });
+
+test('batch preview identifies event records on changed cells without inferring passability',async()=>{
+ const {bytes,summary}=await fixture(),before=bytes.slice();
+ ptr(bytes,0x204,0x600);bytes[0x601]=1;ptr(bytes,0x608,0x800);
+ u16(bytes,0x800,0);u16(bytes,0x802,0);
+ const original=bytes.slice();
+ const result=previewHmaCubeCellBatch(bytes,summary,{...options,
+  changes:[{x:0,y:0,tileId:1,collision:3,expectedRaw:0}]});
+ assert.equal(result.eventInspectionStatus,'decoded');
+ assert.equal(result.eventRecordsAffected,1);
+ assert.equal(result.eventImpacts[0].rawHighBitsChanged,true);
+ assert.equal(result.eventImpacts[0].tileChanged,true);
+ assert.deepEqual(result.eventImpacts[0].events.map(e=>e.kind),['warps']);
+ assert.equal(result.walkabilityVerified,false);
+ assert.equal(result.writeAuthorized,false);
+ assert.deepEqual(bytes,original);
+});
+test('invalid event array never masquerades as a clean edit impact report',async()=>{
+ const {bytes,summary}=await fixture();
+ ptr(bytes,0x204,0x600);bytes[0x601]=1;
+ const result=previewHmaCubeCellBatch(bytes,summary,{...options,
+  changes:[{x:0,y:0,tileId:1,expectedRaw:0}]});
+ assert.equal(result.eventInspectionStatus,'unavailable');
+ assert.equal(result.eventRecordsAffected,0);
+ assert.equal(result.writeAuthorized,false);
+});
