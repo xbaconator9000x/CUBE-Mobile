@@ -83,9 +83,9 @@ const stripHmaCubeBankCatalog='const inspectHmaCubeBankCatalog=(()=>{\n'+
 const stripHmaCubeWarpArrival='const {traceHmaCubeWarpArrival,auditHmaCubeWarpTopology}=(()=>{\n'+
  hmaCubeWarpArrival.replace(/^import .*?;\s*/gm,'').replace(/\bexport (const|class|function)\b/g,'$1')+
  '\nreturn {traceHmaCubeWarpArrival,auditHmaCubeWarpTopology};\n})();';
-const stripHmaCubeWarpEditPreview='const previewHmaCubeWarpRecordChange=(()=>{\n'+
+const stripHmaCubeWarpEditPreview='const {previewHmaCubeWarpRecordChange,verifyHmaCubeWarpRecordDryRun}=(()=>{\n'+
  hmaCubeWarpEditPreview.replace(/^import .*?;\s*/gm,'').replace(/\bexport (const|class|function)\b/g,'$1')+
- '\nreturn previewHmaCubeWarpRecordChange;\n})();';
+ '\nreturn {previewHmaCubeWarpRecordChange,verifyHmaCubeWarpRecordDryRun};\n})();';
 const stripHmaCubeConnectionTrace='const traceHmaCubeConnectionDestination=(()=>{\n'+
  hmaCubeConnectionTrace.replace(/^import .*?;\s*/gm,'').replace(/\bexport (const|class|function)\b/g,'$1')+
  '\nreturn traceHmaCubeConnectionDestination;\n})();';
