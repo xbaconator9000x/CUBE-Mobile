@@ -1090,7 +1090,7 @@ $('cube-map-catalog-scan').addEventListener('click',()=>safeRun(()=>{
       const fresh=inspectHmaCubeBankCatalog(model,mapBankCustomSummary,{bankIndex,mapCount});
       if(JSON.stringify(fresh)!==JSON.stringify(snapshot.report))
         throw Error('CUBE bank catalog bytes changed; scan again');
-      if(fresh.rows[row.index]?.status!=='decoded)
+      if(fresh.rows[row.index]?.status!=='decoded')
         throw Error('Selected CUBE map is not structurally decoded');
       $('cube-bank-index').value=String(bankIndex);
       $('cube-map-count').value=String(mapCount);
