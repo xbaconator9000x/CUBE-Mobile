@@ -126,6 +126,13 @@
   <div class="input-row"><button type="button" id="cube-map-connections" class="subtle-button" disabled>Inspect CUBE custom map connections (read only)</button></div>
   <output id="cube-connections-status" class="palette-note" aria-live="polite">Inspect a custom CUBE map before reading its connections.</output>
   <div id="cube-connections-list" class="anchor-list" aria-label="Unverified CUBE connection records"></div>
+  <div class="input-row" aria-label="Read-only CUBE connection destination trace">
+    <div class="input-wrap"><label for="cube-connection-trace-index">Source connection index</label><input id="cube-connection-trace-index" type="number" min="0" max="1023" value="0"></div>
+    <div class="input-wrap"><label for="cube-connection-target-count">Maps in destination bank (explicit)</label><input id="cube-connection-target-count" type="number" min="1" max="128" value="1"></div>
+    <button type="button" id="cube-connection-trace" class="subtle-button" disabled>Trace raw CUBE connection</button>
+    <button type="button" id="cube-connection-trace-open" class="subtle-button" disabled>Inspect destination map</button>
+  </div>
+  <output id="cube-connection-trace-status" class="palette-note" aria-live="polite">Inspect CUBE connections, then provide the destination-bank map count.</output>
   <p class="palette-note">Metadata format hints are not proof of CUBE compatibility, collision semantics or safe ROM editing.</p>
  </div>
  <div class="toolbar-card"><div class="input-wrap"><label for="anchor-find">Search named anchors</label><input id="anchor-find" placeholder="e.g. pokemon.stats, maps, trainers, sound…" spellcheck="false"></div><div class="input-wrap"><label for="anchor-group">Category</label><select id="anchor-group"><option value="all">All categories</option></select></div></div>
