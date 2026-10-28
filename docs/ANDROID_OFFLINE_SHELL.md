@@ -31,3 +31,7 @@ The Android export host now streams the final document readback and SHA-256 veri
 ## Per-chunk source Blob integrity (29 October 2026)
 
 Before exporting each bounded 48 KiB Blob slice, the Android-only bridge computes its WebCrypto SHA-256. The native host independently hashes the decoded bytes and refuses mismatches before writing that chunk. The native end-to-end reopened-document digest still verifies the saved result. This avoids a full-ROM JS hash allocation while checking both source-to-native transfer and native-to-provider readback. Synthetic JS and pure Java tests cover matching and corrupted chunks. This is not proof of a trustworthy source ROM, provider atomicity, CUBE semantic writes or physical-device acceptance.
+
+## Empty-document preflight before SAF export (29 October 2026)
+
+Before opening any potentially truncating provider output stream, the Android host reopens the selected ACTION_CREATE_DOCUMENT URI read-only and requires a zero-byte stream. Nonempty or unreadable targets are refused **without deletion**, reducing the risk of an alias to an imported ROM that has a different URI. An empty target is not proof of a unique file, so URI aliasing remains a documented limitation. Abort cleanup only attempts deletion after a write was attempted; an untouched empty document may remain and is reported accurately. Pure Java tests cover empty, nonempty and unreadable providers. Real provider/device behavior remains unverified.
