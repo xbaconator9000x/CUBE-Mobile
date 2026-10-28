@@ -140,8 +140,16 @@ public final class MainActivity extends Activity {
         fileCallback = null;
         Uri[] selected = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
         if (selected != null) {
+            // ACTION_OPEN_DOCUMENT should return content URIs. Reject an
+            // untrusted picker that supplies file/http or malformed URIs.
             for (Uri uri : selected) {
-                if (uri != null) importedDocuments.add(uri);
+                if (uri == null || !SafDocumentIdentity.isContentUri(uri.toString())) {
+                    selected = null;
+                    break;
+                }
+            }
+            if (selected != null) {
+                for (Uri uri : selected) importedDocuments.add(uri);
             }
         }
         callback.onReceiveValue(selected);

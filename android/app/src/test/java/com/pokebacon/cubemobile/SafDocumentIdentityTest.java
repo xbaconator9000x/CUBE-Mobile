@@ -4,6 +4,17 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 public class SafDocumentIdentityTest {
+    @Test public void pickerRequiresWellFormedContentUri() {
+        assertTrue(SafDocumentIdentity.isContentUri(
+            "content://com.example.documents/document/primary%3Agame.gba"));
+        assertFalse(SafDocumentIdentity.isContentUri("file:///sdcard/game.gba"));
+        assertFalse(SafDocumentIdentity.isContentUri("https://example.com/game.gba"));
+        assertFalse(SafDocumentIdentity.isContentUri("content:///document/game.gba"));
+        assertFalse(SafDocumentIdentity.isContentUri("content://example.documents"));
+        assertFalse(SafDocumentIdentity.isContentUri("content://example.documents/%ZZ"));
+        assertFalse(SafDocumentIdentity.isContentUri(null));
+    }
+
     @Test public void exactUriIsProtectedEvenWithoutSafShape() {
         assertTrue(SafDocumentIdentity.aliases("content://other/item/4", "content://other/item/4"));
         assertFalse(SafDocumentIdentity.aliases(null, "content://other/item/4"));

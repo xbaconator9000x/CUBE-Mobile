@@ -13,6 +13,19 @@ import java.util.Locale;
 final class SafDocumentIdentity {
     private SafDocumentIdentity() { }
 
+    /** Reject picker-supplied file/http URIs before passing them to a resolver. */
+    static boolean isContentUri(String value) {
+        if (value == null) return false;
+        try {
+            URI uri = new URI(value);
+            return "content".equalsIgnoreCase(uri.getScheme()) &&
+                uri.getRawAuthority() != null && !uri.getRawAuthority().isEmpty() &&
+                uri.getRawPath() != null && uri.getRawPath().length() > 1;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
     static boolean aliases(String imported, String destination) {
         if (imported == null || destination == null) return false;
         if (imported.equals(destination)) return true;
