@@ -6,6 +6,7 @@
 import {inspectHmaCubeMapEntry} from './hma-cube-map-discovery.js';
 import {inspectHmaCubeMapEventWarps} from './hma-cube-map-events.js';
 import {inspectHmaCubeMapConnections} from './hma-cube-map-connections.js';
+import {inspectHmaCubeMapScripts} from './hma-cube-map-script-table.js';
 
 function asReader(source) {
   if(source instanceof Uint8Array)return {length:source.length,read:i=>source[i]};
@@ -16,9 +17,10 @@ function asReader(source) {
 function overlaps(a,b) {
   return a.start < b.start+b.size && b.start < a.start+a.size;
 }
-export function auditHmaCubeCrossBankOwnership(source,summary,{banks,includeEvents=false,includeConnections=false}={}) {
-  if(typeof includeEvents!=='boolean'||typeof includeConnections!=='boolean')
-  throw new TypeError('includeEvents and includeConnections must be boolean');
+export function auditHmaCubeCrossBankOwnership(source,summary,{banks,includeEvents=false,includeConnections=false,includeMapScripts=false}={}) {
+  if(typeof includeEvents!=='boolean'||typeof includeConnections!=='boolean'||
+     typeof includeMapScripts!=='boolean')
+  throw new TypeError('includeEvents, includeConnections and includeMapScripts must be boolean');
   const rom=asReader(source);
   if(!Array.isArray(banks)||banks.length<1||banks.length>8)
     throw new RangeError('Provide 1–8 explicitly counted CUBE banks');
@@ -33,7 +35,7 @@ export function auditHmaCubeCrossBankOwnership(source,summary,{banks,includeEven
     if(budget>256)throw new RangeError('CUBE census exceeds 256-map budget');
   }
   const maps=[],claims=[];
-  const eventIssues=[],connectionIssues=[];
+  const eventIssues=[],connectionIssues=[],mapScriptIssues=[];
   const widths={objects:24,warps:8,scripts:16,signposts:12};
   for(const {bankIndex,mapCount} of banks)for(let mapIndex=0;mapIndex<mapCount;mapIndex++){
     const id=bankIndex+':'+mapIndex;
@@ -63,6 +65,22 @@ export function auditHmaCubeCrossBankOwnership(source,summary,{banks,includeEven
         }catch(error){
           eventIssues.push(Object.freeze({id,bankIndex,mapIndex,
             status:'event-arrays-invalid-or-unsupported',
+            reason:error instanceof Error?error.message:'Unknown decoder error'}));
+        }
+      }
+      if(includeMapScripts){
+        try{
+          const scripts=inspectHmaCubeMapScripts(rom,summary,{bankIndex,mapIndex,mapCount});
+          if(scripts.hasTable){
+            claims.push({id,kind:'map-scripts-table',start:scripts.tableOffset,
+              size:scripts.tableBytes});
+            for(const entry of scripts.entries)if(entry.conditional)
+              claims.push({id,kind:'map-scripts-conditions',start:entry.targetOffset,
+                size:entry.conditions.length*8+2});
+          }
+        }catch(error){
+          mapScriptIssues.push(Object.freeze({id,bankIndex,mapIndex,
+            status:'map-scripts-invalid-or-unsupported',
             reason:error instanceof Error?error.message:'Unknown decoder error'}));
         }
       }
@@ -111,6 +129,9 @@ export function auditHmaCubeCrossBankOwnership(source,summary,{banks,includeEven
     includeConnections,connectionClaimsInspected:includeConnections?
       claims.filter(c=>c.kind.startsWith('connection')).length:0,
     connectionIssues:Object.freeze(connectionIssues),
+    includeMapScripts,mapScriptClaimsInspected:includeMapScripts?
+      claims.filter(c=>c.kind.startsWith('map-scripts-')).length:0,
+    mapScriptIssues:Object.freeze(mapScriptIssues),
     sameMapRelationships:Object.freeze(sameMapRelationships),
     crossBankRelationshipCount:crossBank.length,
     completeOwnershipProven:false,partialCoverage:true,
