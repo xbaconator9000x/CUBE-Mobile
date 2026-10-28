@@ -197,6 +197,8 @@ final class NativeExport {
         if (bytes.length == 0 || bytes.length > CHUNK_BYTES ||
             written + bytes.length > expected)
             throw new IOException("Invalid export chunk");
+        if (!ExportChunkIntegrity.verify(bytes, data.getString("sha256")))
+            throw new IOException("Export chunk digest differs from source Blob");
         output.write(bytes);
         writingDigest.update(bytes);
         written += bytes.length;
