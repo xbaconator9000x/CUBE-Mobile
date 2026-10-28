@@ -27,3 +27,10 @@ The README opening remains the non-descript `# Test` / `This is a test.`. Reposi
 ## 28 October 2026: CUBE warp implementation reassessment
 
 Following PRs #180–#182, the `warps` family's midpoint completion fraction moves from 0.24 to 0.28 (low 0.13→0.14; high 0.40→0.42). Evidence is the CUBE warp raw-field mobile/offline UI, virtual before/after arrival comparison, and isolated copy-only re-decode/rollback tests in `src/hma-cube-warp-edit-preview.js` and `tests/hma-cube-warp-edit-preview.test.mjs`. This is a **small, judgement-based increment**, not measured hours or authenticated game compatibility. The same 286 effort units and six shared workstreams remain. Persisted editing, full ownership proof, genuine save/reopen, emulator and Android acceptance remain outstanding. Strict parity remains 0/30.
+
+
+## 28 October 2026: CUBE event and atomic warp core reassessment
+
+PRs #184–#186 add multi-warp atomic combined-topology preview and copy-only rollback, source-grounded CUBE object/trigger/signpost position preflight, and atomic multi-kind event repositioning with destination co-location review. Evidence: `src/hma-cube-warp-batch.js`, `src/hma-cube-event-position.js`, `src/hma-cube-event-batch.js` and their regression tests.
+
+The `warps` family midpoint is provisionally revised **0.28 → 0.31** (low 0.14 → 0.15, high 0.42 → 0.44). The `map-events` midpoint is revised **0.18 → 0.23** (low 0.10 → 0.11, high 0.31 → 0.35). Both are small judgement-based effort credits for additional tested core implementation, not time measurements, UI acceptance or verified CUBE compatibility. The 286-unit denominator, six shared tracks and all other fractions remain unchanged. Current rounded planning estimate: **10.9%** (sensitivity **5.3–18.7%**, low confidence). Strict accepted parity remains **0/30**. Real-ROM save/reopen, ownership authentication, emulator and Android hardware acceptance have not been demonstrated.

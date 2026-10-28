@@ -205,29 +205,29 @@
       "id": "map-events",
       "effortUnits": 8,
       "completion": {
-        "low": 0.1,
-        "mid": 0.18,
-        "high": 0.31
+        "low": 0.11,
+        "mid": 0.23,
+        "high": 0.35
       },
       "upstreamPath": "src/HexManiac.Core/ViewModels/Map/EventTemplate.cs",
       "localEvidence": [
         "tests/map-events.test.mjs"
       ],
-      "rationale": "Read-only event records and impact preview; editing/save not implemented."
+      "rationale": "Source-grounded CUBE object/trigger/signpost position preflight, multi-event atomic overlay, co-location review, isolated apply/re-decode/rollback; mobile UI, persistent editing and authentic ROM/emulator/Android acceptance still missing."
     },
     {
       "id": "warps",
       "effortUnits": 8,
       "completion": {
-        "low": 0.14,
-        "mid": 0.28,
-        "high": 0.42
+        "low": 0.15,
+        "mid": 0.31,
+        "high": 0.44
       },
       "upstreamPath": "src/HexManiac.Core/ViewModels/Map/SurfConnectionViewModel.cs",
       "localEvidence": [
         "tests/map-link-audit.test.mjs"
       ],
-      "rationale": "Mobile/offline CUBE warp field loading, virtual before/after trace and isolated copy-only apply/re-decode/rollback are implemented and tested; no persisted semantic edit, authenticated CUBE acceptance or gameplay validation."
+      "rationale": "Mobile/offline single CUBE warp preview and rollback plus 1–32 warp atomic combined-topology and isolated rollback core; no multi-warp UI, persisted semantic edit, authenticated CUBE acceptance or gameplay validation."
     },
     {
       "id": "wild",
