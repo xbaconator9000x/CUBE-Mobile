@@ -10,6 +10,7 @@ import {previewHmaCubeCellBatch} from './hma-cube-cell-batch.js';
 import {previewHmaCubeWarpBatch} from './hma-cube-warp-batch.js';
 import {previewHmaCubeEventPositionBatch} from './hma-cube-event-batch.js';
 import {previewHmaCubeConnectionBatch} from './hma-cube-connection-edit.js';
+import {previewHmaCubeScriptRetargetBatch} from './hma-cube-script-retarget.js';
 import {auditHmaCubeCrossBankOwnership} from './hma-cube-cross-bank-ownership.js';
 import {verifyHmaCubeCombinedTransaction} from './hma-cube-combined-transaction.js';
 
@@ -48,7 +49,7 @@ function intersectChanged(changes,start,length) {
  * remain unresolved even when the bounded census has no intersections.
  */
 export function auditHmaCubeEditOwnershipImpact(source,summary,options={}) {
- const {bankIndex,mapIndex,mapCount,banks,cells=[],warps=[],events=[],connections=[],
+ const {bankIndex,mapIndex,mapCount,banks,cells=[],warps=[],events=[],connections=[],scripts=[],
   targetBanks,x=0,y=0,viewportWidth=10,viewportHeight=8}=options;
  if(!Array.isArray(banks)||!banks.some(b=>
     b?.bankIndex===bankIndex&&b?.mapCount===mapCount))
@@ -92,6 +93,13 @@ export function auditHmaCubeEditOwnershipImpact(source,summary,options={}) {
    for(let i=0;i<12;i++)
     addChanged(changes,r.sourceOffset+i,before[i],after[i],'connection-records');
   }
+ }
+ if(scripts.length) {
+  const plan=previewHmaCubeScriptRetargetBatch(source,summary,{
+   ...opts,changes:scripts
+  });
+  for(const r of plan.rawBytes)
+   addChanged(changes,r.offset,r.expected,r.value,'script-reference');
  }
  if(changes.size!==rehearsal.changedBytes)
   throw new RangeError('Ownership edit bytes disagree with combined rollback');
