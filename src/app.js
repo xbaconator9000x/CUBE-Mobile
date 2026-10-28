@@ -1075,21 +1075,44 @@ function drawCubeWarpEvidence(){
     setPageForOffset(now.eventsOffset);gotoTab('hex');
   }));
   list.append(head);
-  for(const warp of fresh.warps){
-    const button=document.createElement('button');button.type='button';
-    button.className='subtle-button';
-    button.textContent='#'+warp.index+' ('+warp.x+','+warp.y+') → bank '+
-      warp.targetBank+', map '+warp.targetMap+', warp '+warp.warpId+
-      (warp.outsideDeclaredMap?' · outside map':'')+
-      (warp.specialTarget?' · special target':'');
-    button.addEventListener('click',()=>safeRun(()=>{
-      if(cubeWarpEvidence!==snapshot)throw Error('Event inspection expired');
-      const now=inspectHmaCubeMapEventWarps(ensureModel(),mapBankCustomSummary,snapshot.options);
-      if(JSON.stringify(now)!==JSON.stringify(snapshot.report))
-        throw Error('Raw warp record changed; inspect again');
-      setPageForOffset(now.warps[warp.index].offset);gotoTab('hex');
-    }));
-    list.append(button);
+  const labels={objects:'Object',warps:'Warp',scripts:'Trigger',signposts:'Sign'};
+  for(const [kind,records] of Object.entries(fresh.arrays)){
+    for(const record of records){
+      const button=document.createElement('button');button.type='button';
+      button.className='subtle-button';
+      let info='';
+      if(kind==='warps')info=' → bank '+record.targetBank+', map '+
+        record.targetMap+', warp '+record.warpId+(record.specialTarget?' · special target':'');
+      else if(kind==='objects')info=' · object ID '+record.id+', graphics '+record.graphics+
+        ', movement '+record.movement+', flag '+record.flag;
+      else if(kind==='scripts')info=' · trigger '+record.trigger+
+        ', raw index '+record.indexValue;
+      else info=' · kind '+record.kind+', raw argument 0x'+hex(record.rawArgument,8);
+      button.textContent=labels[kind]+' #'+record.index+' ('+record.x+','+record.y+')'+
+        info+(record.outsideDeclaredMap?' · outside map':'');
+      button.addEventListener('click',()=>safeRun(()=>{
+        if(cubeWarpEvidence!==snapshot)throw Error('Event inspection expired');
+        const now=inspectHmaCubeMapEventWarps(ensureModel(),mapBankCustomSummary,snapshot.options);
+        if(JSON.stringify(now)!==JSON.stringify(snapshot.report))
+          throw Error('Raw event record changed; inspect again');
+        setPageForOffset(now.arrays[kind][record.index].offset);gotoTab('hex');
+      }));
+      list.append(button);
+      if(record.scriptPointerSource!==undefined){
+        const source=document.createElement('button');source.type='button';
+        source.className='subtle-button';
+        source.textContent='Script pointer field · 0x'+hex(record.scriptPointerSource)+
+          ' (raw 0x'+hex(record.scriptPointer,8)+')';
+        source.addEventListener('click',()=>safeRun(()=>{
+          if(cubeWarpEvidence!==snapshot)throw Error('Event inspection expired');
+          const now=inspectHmaCubeMapEventWarps(ensureModel(),mapBankCustomSummary,snapshot.options);
+          if(JSON.stringify(now)!==JSON.stringify(snapshot.report))
+            throw Error('Raw script pointer field changed; inspect again');
+          setPageForOffset(now.arrays[kind][record.index].scriptPointerSource);gotoTab('hex');
+        }));
+        list.append(source);
+      }
+    }
   }
 }
 $('cube-map-warps').addEventListener('click',()=>safeRun(()=>{
@@ -1101,6 +1124,57 @@ $('cube-map-warps').addEventListener('click',()=>safeRun(()=>{
   const report=inspectHmaCubeMapEventWarps(model,mapBankCustomSummary,options);
   cubeWarpEvidence={options,report};
   drawCubeWarpEvidence();
+}));
+
+function drawCubeConnectionEvidence(){
+  const status=$('cube-connections-status'),list=$('cube-connections-list');
+  list.replaceChildren();
+  const snapshot=cubeConnectionEvidence;
+  if(!snapshot){
+    status.textContent='No CUBE custom connections inspected. Select a map first.';
+    return;
+  }
+  let fresh;
+  try{
+    if(!cubeMapEvidence||cubeMapEvidence.options!==snapshot.options)
+      throw Error('Selected CUBE map changed');
+    fresh=inspectHmaCubeMapConnections(ensureModel(),mapBankCustomSummary,snapshot.options);
+    if(JSON.stringify(fresh)!==JSON.stringify(snapshot.report))
+      throw Error('Connection records changed');
+  }catch(_err){
+    cubeConnectionEvidence=null;
+    status.textContent='CUBE connections changed or expired. Inspect again before navigation.';
+    return;
+  }
+  status.textContent=fresh.count+' raw CUBE connection(s). Direction, displacement and target IDs are unverified gameplay links.';
+  if(fresh.connectionsOffset===null)return;
+  for(const record of [{index:-1,offset:fresh.connectionsOffset},...fresh.connections]){
+    const button=document.createElement('button');button.type='button';
+    button.className='subtle-button';
+    button.textContent=record.index<0?'Connection header · 0x'+hex(record.offset):
+      '#'+record.index+' direction '+record.direction+' · displacement '+
+      record.displacement+' → bank '+record.targetBank+', map '+record.targetMap+
+      ' · source 0x'+hex(record.offset);
+    button.addEventListener('click',()=>safeRun(()=>{
+      if(cubeConnectionEvidence!==snapshot)throw Error('Connection inspection expired');
+      const now=inspectHmaCubeMapConnections(ensureModel(),mapBankCustomSummary,snapshot.options);
+      if(JSON.stringify(now)!==JSON.stringify(snapshot.report))
+        throw Error('Connection record changed; inspect again');
+      const target=record.index<0?now.connectionsOffset:now.connections[record.index].offset;
+      setPageForOffset(target);gotoTab('hex');
+    }));
+    list.append(button);
+  }
+}
+$('cube-map-connections').addEventListener('click',()=>safeRun(()=>{
+  if(!cubeMapEvidence)throw Error('Inspect a CUBE custom map first');
+  const options=cubeMapEvidence.options;
+  const map=inspectHmaCubeMapEntry(ensureModel(),mapBankCustomSummary,options);
+  if(JSON.stringify(map)!==JSON.stringify(cubeMapEvidence.report))
+    throw Error('Selected CUBE map changed; inspect again');
+  const report=inspectHmaCubeMapConnections(model,mapBankCustomSummary,options);
+  cubeConnectionEvidence={options,report};
+  drawCubeConnectionEvidence();
 }));
 
 function drawAnchors(){
