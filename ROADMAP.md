@@ -1,3 +1,8 @@
+## Checkpoint — local ordered CUBE TOML manifest smoke (28 October 2026)
+- [x] Add opt-in CLI to compare locally supplied ROM and 1–16 ordered exact TOML files against a separately supplied version-pinned JSON manifest, without exporting bytes, digests, paths or addresses.
+- [x] Enforce bounded reads, immutable inputs, duplicate-basename rejection and clear mismatch statuses; add synthetic CLI regressions and package command.
+- [ ] Independently curate authentic CUBE ROM/metadata provenance, mobile acceptance and genuine save/reopen/emulator/Android tests before strict parity credit. See [local manifest smoke](docs/LOCAL_HMA_ORDERED_MANIFEST_SMOKE.md).
+
 ## Checkpoint — ordered exact CUBHMA TOML manifests (28 October 2026)
 - [x] Add strict, immutable, source-pinned ordered multi-file manifest identity checks for ROM digest/header and exact TOML filenames, byte lengths and SHA-256 digests.
 - [x] Reject reordered, missing, renamed, duplicate, oversized, stale or changed inputs; keep curated registry empty and all semantic writes disabled.
