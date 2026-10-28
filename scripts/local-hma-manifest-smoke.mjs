@@ -12,11 +12,14 @@ import {fingerprintRomSha256} from '../src/rom-fingerprint.js';
 import {fingerprintMetadataFiles} from '../src/metadata-fingerprint.js';
 import {compareHmaMetadataManifest,validateHmaMetadataManifests}
   from '../src/hma-metadata-manifest.js';
+import {inspectHmaMapBankAnchorSources} from '../src/hma-map-bank-metadata.js';
+import {inspectHmaDeclaredBankPointerTable} from '../src/hma-map-bank-declared-table.js';
+import {inspectHmaDeclaredBankTargetWindows} from '../src/hma-map-bank-target-windows.js';
 
 export function parseLocalHmaManifestArgs(argv){
- if(!Array.isArray(argv)||argv.length<6||argv.length>36||argv.length%2!==0)
+ if(!Array.isArray(argv)||argv.length<6||argv.length>38||argv.length%2!==0)
   throw new RangeError('Usage: --rom <local.gba> --manifest <local.json> --metadata <first.toml> [--metadata <next.toml> ...]');
- let rom=null,manifest=null;const metadata=[];
+ let rom=null,manifest=null,targetWords=null;const metadata=[];
  for(let i=0;i<argv.length;i+=2){
   const key=argv[i],value=argv[i+1];
   if(typeof value!=='string'||!value||value.includes('\0'))
@@ -24,6 +27,8 @@ export function parseLocalHmaManifestArgs(argv){
   if(key==='--rom'&&!rom)rom=value;
   else if(key==='--manifest'&&!manifest)manifest=value;
   else if(key==='--metadata')metadata.push(value);
+  else if(key==='--target-words'&&targetWords===null&&/^(?:[1-9]|1[0-6])$/.test(value))
+   targetWords=Number(value);
   else throw new RangeError('Invalid or repeated local manifest smoke argument');
  }
  if(!rom||!manifest||metadata.length<1||metadata.length>16)
@@ -31,7 +36,7 @@ export function parseLocalHmaManifestArgs(argv){
  const names=metadata.map(path=>basename(path).toLowerCase());
  if(new Set(names).size!==names.length)
   throw new RangeError('Repeated metadata basename in local file set');
- return Object.freeze({rom,manifest,metadata:Object.freeze(metadata)});
+ return Object.freeze({rom,manifest,targetWords,metadata:Object.freeze(metadata)});
 }
 async function boundedRead(path,max){
  const before=await stat(path);
@@ -64,17 +69,40 @@ export async function inspectLocalHmaManifest(argv){
  }
  const records=fingerprintMetadataFiles(files);
  const checked=compareHmaMetadataManifest(model,fingerprint,records,{manifests:registry});
+ let bank=null;
+ if(args.targetWords!==null){
+  if(checked.status!=='exact-file-set-match')
+   throw new RangeError('Ordered file set does not match supplied manifest; bank inspection refused');
+  const decoder=new TextDecoder('utf-8',{fatal:true});
+  const sources=files.map(file=>({name:file.name,text:decoder.decode(file.bytes)}));
+  const metadata=inspectHmaMapBankAnchorSources(sources,{romSize:rom.length});
+  if(!['custom-candidate','vanilla-marker'].includes(metadata.status))
+   throw new RangeError('Unambiguous metadata-declared bank structure not available');
+  const reader={length:rom.length,read:index=>rom[index]};
+  const table=inspectHmaDeclaredBankPointerTable(reader,metadata);
+  const targets=inspectHmaDeclaredBankTargetWindows(reader,metadata,
+   {wordsPerTarget:args.targetWords});
+  bank={bankMetadataStatus:metadata.status,declaredPointerSlots:table.declaredBankCount,
+   inRomPointerWords:table.inRomCount,rawTargetsSampled:targets.sampledTargets,
+   rawTargetWindowWords:targets.wordsPerTarget,
+   rawNestedPointerShapedWords:targets.conventionalNestedWords,
+   rawNestedInRomPointerWords:targets.inRomNestedWords,
+   rawTargetOverlapSkips:targets.tableOverlaps+targets.overlappingWindows,
+   rawTargetTruncationSkips:targets.truncatedTargets,
+   rawTargetInvalidSkips:targets.invalidTargets};
+ }
  return Object.freeze({
   schema:'cube-mobile-local-ordered-hma-manifest-smoke/1',
   status:checked.status,exactFileSetMatch:checked.exactFileSetMatch,
   metadataFilesProvided:records.length,
   manifestFilesDeclared:registry[0].files.length,
+  ...(bank||{}),
   romModified:false,romExported:false,metadataExported:false,
   independentlyAuthenticated:false,cubeLayoutAuthenticated:false,
   safeSemanticEditingVerified:false,romSaveReopenVerified:false,
   emulatorVerified:false,androidHardwareVerified:false,
   independentParityEvidence:false,
-  warning:'Caller-supplied exact-byte manifest evidence is not independently curated CUBE compatibility or permission to edit.'
+  warning:'Caller-supplied exact-byte manifest evidence and optional raw bank census do not authenticate CUBE maps or permit semantic editing.'
  });
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){

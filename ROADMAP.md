@@ -1,3 +1,9 @@
+## Checkpoint — manifest-gated CUBE raw bank evidence (28 October 2026)
+- [x] Connect exact ordered local ROM/TOML identity smoke to bounded metadata-declared raw bank pointer inspection via opt-in `--target-words 1–16`.
+- [x] Refuse bank inspection on byte mismatch, ambiguous metadata or unsafe pointer budgets; return only aggregate evidence and explicit no-authentication/no-write flags.
+- [x] Add synthetic pointer-census and mismatch regression coverage, local documentation and ROM immutability assertions.
+- [ ] Independently authenticate CUBE builds and metadata, implement real map decoding, then verify emulator, Android and ROM save/reopen. Strict parity remains zero.
+
 ## Checkpoint — local ordered CUBE TOML manifest smoke (28 October 2026)
 - [x] Add opt-in CLI to compare locally supplied ROM and 1–16 ordered exact TOML files against a separately supplied version-pinned JSON manifest, without exporting bytes, digests, paths or addresses.
 - [x] Enforce bounded reads, immutable inputs, duplicate-basename rejection and clear mismatch statuses; add synthetic CLI regressions and package command.

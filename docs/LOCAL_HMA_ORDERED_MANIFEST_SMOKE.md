@@ -8,6 +8,14 @@ Example (all paths remain local):
 npm run smoke:cube-manifest -- --rom ./local.gba --manifest ./local-manifest.json --metadata ./default.toml --metadata ./cube_emerald.toml
 ```
 
+Optional bounded raw pointer evidence (only after an exact caller-manifest match):
+
+```sh
+npm run smoke:cube-manifest -- --rom ./local.gba --manifest ./local-manifest.json --metadata ./default.toml --metadata ./cube_emerald.toml --target-words 4
+```
+
+This extra mode parses the imported `data.maps.banks` TOML declaration, inspects its declared raw pointer slots and samples 1–16 words per unique aligned bank target. It reports aggregate pointer-shaped counts only, with no source addresses, byte dumps or map/layout interpretations. Any file-set mismatch, ambiguous declaration or invalid pointer budget refuses the scan. A caller-supplied exact match is **not** independently authenticated.
+
 The manifest schema uses `romSha256`, `romLength`, `gameCode`, `revision`, `layout`, `sourceCommit`, `evidenceUrl` and an ordered `files` array. Each file entry requires `name`, `length` and `sha256`. The file names must be unambiguous basenames ending in `.toml`. Every file is checked by its **exact bytes**; no concatenation, text normalization or overlay precedence is assumed.
 
 Limits: 128 MiB ROM, 128 KiB manifest, 16 metadata files, 4 MiB each, 16 MiB combined. Files are read without writing and are checked for size/mtime changes during reading. Any mismatch or invalid declaration fails closed. Synthetic tests use locally generated fake ROM bytes only.

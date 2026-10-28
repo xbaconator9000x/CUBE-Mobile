@@ -84,3 +84,47 @@ test('malformed JSON manifest is rejected before touching ROM bytes',async()=>{
   await assert.rejects(()=>inspectLocalHmaManifest(f.args),RangeError);
  }finally{await rm(f.dir,{recursive:true,force:true});}
 });
+
+test('exact ordered manifest gates bounded read-only CUBE raw bank census',async()=>{
+ const f=await fixture();
+ try{
+  const rom=f.rom.slice();
+  const put=(at,value)=>{for(let i=0;i<4;i++)rom[at+i]=(value>>>(8*i))&255;};
+  put(0x10,0x08000080);put(0x80,0x080000C0);
+  await writeFile(f.romPath,rom);
+  const toml=Buffer.from(`[[NamedAnchors]]
+Name = '''data.maps.banks'''
+Address = 0x10
+Format = '''[maps<[map<[layout<>]1>]?>]1'''
+`);
+  await writeFile(f.first,toml);
+  const updated={...f.manifest,romSha256:sha(rom),
+   files:[{name:'default.toml',length:toml.length,sha256:sha(toml)},
+    f.manifest.files[1]]};
+  await writeFile(f.manifestPath,JSON.stringify(updated));
+  const before=await readFile(f.romPath);
+  const result=await inspectLocalHmaManifest([...f.args,'--target-words','4']);
+  assert.equal(result.status,'exact-file-set-match');
+  assert.equal(result.declaredPointerSlots,1);
+  assert.equal(result.inRomPointerWords,1);
+  assert.equal(result.rawTargetsSampled,1);
+  assert.equal(result.rawNestedInRomPointerWords,1);
+  assert.equal(result.independentlyAuthenticated,false);
+  assert.equal(result.romSaveReopenVerified,false);
+  assert.deepEqual(await readFile(f.romPath),before);
+  const output=JSON.stringify(result);
+  assert.equal(output.includes(sha(rom)),false);
+  assert.equal(output.includes(f.romPath),false);
+ }finally{await rm(f.dir,{recursive:true,force:true});}
+});
+test('raw bank scan refuses mismatched metadata before pointer interpretation',async()=>{
+ const f=await fixture();
+ try{
+  await writeFile(f.first,Buffer.from('changed'));
+  await assert.rejects(
+   ()=>inspectLocalHmaManifest([...f.args,'--target-words','4']),
+   /Ordered file set does not match/);
+  assert.throws(()=>parseLocalHmaManifestArgs([...f.args,'--target-words','17']),RangeError);
+  assert.throws(()=>parseLocalHmaManifestArgs([...f.args,'--target-words','4','--target-words','4']),RangeError);
+ }finally{await rm(f.dir,{recursive:true,force:true});}
+});
