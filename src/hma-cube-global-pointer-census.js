@@ -3,6 +3,9 @@ import {previewHmaCubeWarpBatch} from './hma-cube-warp-batch.js';
 import {previewHmaCubeEventPositionBatch} from './hma-cube-event-batch.js';
 import {previewHmaCubeConnectionBatch} from './hma-cube-connection-edit.js';
 import {previewHmaCubeScriptRetargetBatch} from './hma-cube-script-retarget.js';
+import {inspectHmaCubeMapEntry} from './hma-cube-map-discovery.js';
+import {inspectHmaCubeMapEventWarps} from './hma-cube-map-events.js';
+import {inspectHmaCubeMapConnections} from './hma-cube-map-connections.js';
 
 /**
  * Conservative, read-only whole-ROM GBA pointer-candidate census.
@@ -31,7 +34,7 @@ function sourceReader(source) {
  * Scans every possible four-byte window, including unaligned script operands.
  * Reports aggregate counts only; raw matches never prove pointer ownership.
  */
-export function auditHmaCubeGlobalPointerCandidates(source, ranges) {
+export function auditHmaCubeGlobalPointerCandidates(source, ranges, {arrayAnchors=[]}={}) {
   const rom = sourceReader(source);
   if (!Number.isSafeInteger(rom.length) || rom.length < 4 || rom.length > LIMIT)
     throw new RangeError('Whole-ROM pointer census requires 4 bytes to 64 MiB');
@@ -56,6 +59,25 @@ export function auditHmaCubeGlobalPointerCandidates(source, ranges) {
       }
     }
   }
+  // Array-start pointers may alias an edited *later* record without
+  // pointing into that record. Keep these separately from record-span hits.
+  if (!Array.isArray(arrayAnchors) || arrayAnchors.length > 32)
+    throw new RangeError('Provide at most 32 decoded parent-array anchors');
+  const anchorCanonical = new Set(), anchorAlternate = new Set();
+  const uniqueAnchors = new Set();
+  for (const offset of arrayAnchors) {
+    if (!Number.isSafeInteger(offset) || offset < 0 || offset >= rom.length)
+      throw new RangeError('Parent-array anchor outside bounded ROM');
+    uniqueAnchors.add(offset);
+    anchorCanonical.add(0x08000000 + offset);
+    if (offset < 0x02000000) {
+      anchorAlternate.add(0x0A000000 + offset);
+      anchorAlternate.add(0x0C000000 + offset);
+    }
+  }
+  let alignedAnchorCanonical = 0, alignedAnchorAlternate = 0;
+  let unalignedAnchorCanonical = 0, unalignedAnchorAlternate = 0;
+  let distinctAnchorSourceWords = 0, ambiguousAnchorWords = 0;
   let alignedWords = 0, canonicalHits = 0, alternateHits = 0;
   let ambiguousExpandedHits = 0, distinctHitWords = 0;
   let unalignedWords = 0, unalignedCanonicalHits = 0;
@@ -74,14 +96,22 @@ export function auditHmaCubeGlobalPointerCandidates(source, ranges) {
     (checkedByte(2) << 16) | (checkedByte(3) << 24)) >>> 0;
   for (let at = 0; at <= rom.length - 4; at++) {
     const direct = canonical.has(word), mirror = alternate.has(word);
+    const anchorDirect = anchorCanonical.has(word);
+    const anchorMirror = anchorAlternate.has(word);
+    if (anchorDirect || anchorMirror) distinctAnchorSourceWords++;
+    if (anchorDirect && anchorMirror) ambiguousAnchorWords++;
     if (at % 4 === 0) {
       alignedWords++;
+      if (anchorDirect) alignedAnchorCanonical++;
+      if (anchorMirror) alignedAnchorAlternate++;
       if (direct) canonicalHits++;
       if (mirror) alternateHits++;
       if (direct && mirror) ambiguousExpandedHits++;
       if (direct || mirror) distinctHitWords++;
     } else {
       unalignedWords++;
+      if (anchorDirect) unalignedAnchorCanonical++;
+      if (anchorMirror) unalignedAnchorAlternate++;
       if (direct) unalignedCanonicalHits++;
       if (mirror) unalignedAlternateHits++;
       if (direct && mirror) unalignedAmbiguousHits++;
@@ -94,6 +124,13 @@ export function auditHmaCubeGlobalPointerCandidates(source, ranges) {
     scannedAlignedWords: alignedWords,
     scannedUnalignedWords: unalignedWords,
     decodedRecordRanges: ranges.length,
+    decodedParentArrayAnchors: uniqueAnchors.size,
+    alignedParentArrayCanonicalCandidates: alignedAnchorCanonical,
+    alignedParentArrayAlternateCandidates: alignedAnchorAlternate,
+    unalignedParentArrayCanonicalCandidates: unalignedAnchorCanonical,
+    unalignedParentArrayAlternateCandidates: unalignedAnchorAlternate,
+    distinctParentArrayCandidateSourceWords: distinctAnchorSourceWords,
+    ambiguousExpandedParentArrayCandidates: ambiguousAnchorWords,
     distinctTargetBytes: canonical.size,
     canonicalPointerCandidates: canonicalHits,
     alternateWindowCandidates: alternateHits,
@@ -123,18 +160,21 @@ export function auditHmaCubeGlobalEditPointerCandidates(source,summary,{
  bankIndex,mapIndex,mapCount,cells=[],warps=[],events=[],connections=[],scripts=[],
  banks,targetBanks,x=0,y=0,viewportWidth=10,viewportHeight=8
 }={}){
- const opts={bankIndex,mapIndex,mapCount},ranges=[];
+ const opts={bankIndex,mapIndex,mapCount},ranges=[],arrayAnchors=[];
+ const eventKinds=new Set();
  if(cells.length){
   const plan=previewHmaCubeCellBatch(source,summary,{
    ...opts,changes:cells,banks,x,y,viewportWidth,viewportHeight
   });
   for(const r of plan.changes)ranges.push({start:r.byteOffset,length:2});
+  arrayAnchors.push(inspectHmaCubeMapEntry(source,summary,opts).layout.blockmapOffset);
  }
  if(warps.length){
   const plan=previewHmaCubeWarpBatch(source,summary,{
    ...opts,changes:warps,targetBanks
   });
   for(const r of plan.changes)ranges.push({start:r.sourceOffset,length:8});
+  eventKinds.add('warps');
  }
  if(events.length){
   const plan=previewHmaCubeEventPositionBatch(source,summary,{
@@ -144,6 +184,7 @@ export function auditHmaCubeGlobalEditPointerCandidates(source,summary,{
   for(const r of plan.changes){
    if(!widths[r.kind])throw new RangeError('Unsupported CUBE event record kind');
    ranges.push({start:r.sourceOffset,length:widths[r.kind]});
+   eventKinds.add(r.kind);
   }
  }
  if(connections.length){
@@ -151,6 +192,8 @@ export function auditHmaCubeGlobalEditPointerCandidates(source,summary,{
    ...opts,changes:connections,targetBanks
   });
   for(const r of plan.changes)ranges.push({start:r.sourceOffset,length:12});
+  const arrayOffset=inspectHmaCubeMapConnections(source,summary,opts).arrayOffset;
+  if(arrayOffset!==null)arrayAnchors.push(arrayOffset);
  }
  if(scripts.length){
   const plan=previewHmaCubeScriptRetargetBatch(source,summary,{
@@ -160,7 +203,15 @@ export function auditHmaCubeGlobalEditPointerCandidates(source,summary,{
    const back=r.kind==='objects'?16:r.kind==='scripts'?12:8;
    const width=r.kind==='objects'?24:r.kind==='scripts'?16:12;
    ranges.push({start:r.sourceOffset-back,length:width});
+   eventKinds.add(r.kind);
   }
  }
- return auditHmaCubeGlobalPointerCandidates(source,ranges);
+ if(eventKinds.size){
+  const inspected=inspectHmaCubeMapEventWarps(source,summary,opts);
+  for(const kind of eventKinds){
+   const at=inspected.offsets[kind];
+   if(at!==null)arrayAnchors.push(at);
+  }
+ }
+ return auditHmaCubeGlobalPointerCandidates(source,ranges,{arrayAnchors});
 }

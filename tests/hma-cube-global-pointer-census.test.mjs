@@ -66,3 +66,22 @@ test('overlapping decoded ranges are deduplicated without changing source',()=>{
  assert.equal(r.unalignedCanonicalPointerCandidates,1);
  assert.deepEqual(b,before);
 });
+
+test('parent-array start aliases are counted even when edited record is later in array',()=>{
+ const b=new Uint8Array(256);
+ u32(b,1,0x08000090);u32(b,8,0x08000080);u32(b,16,0x0a000090);
+ const r=scan(b,[{start:128,length:2}],{arrayAnchors:[144,144]});
+ assert.equal(r.decodedParentArrayAnchors,1);
+ assert.equal(r.unalignedParentArrayCanonicalCandidates,1);
+ assert.equal(r.alignedParentArrayAlternateCandidates,1);
+ assert.equal(r.distinctParentArrayCandidateSourceWords,2);
+ assert.equal(r.canonicalPointerCandidates,1);
+ assert.equal(r.globalOwnershipProven,false);
+ assert.equal(r.writeAuthorized,false);
+});
+test('parent-array anchors must be bounded and caller supplied',()=>{
+ const b=new Uint8Array(32);
+ for(const bad of [[-1],[32],[1.5],Array(33).fill(0)])
+  assert.throws(()=>scan(b,[{start:4,length:1}],{arrayAnchors:bad}),RangeError);
+ assert.throws(()=>scan(b,[{start:4,length:1}],{arrayAnchors:'4'}),RangeError);
+});
