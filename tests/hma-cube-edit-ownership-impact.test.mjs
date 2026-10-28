@@ -77,7 +77,7 @@ test('invalid unrelated map or event arrays make the census incomplete',async()=
  assert.equal(result.noDetectedOverlapInInspectedMaps,false);
  const next=await fixture();
  ptr(next.bytes,0x244,0x640);next.bytes[0x641]=1;
- ptr(next.bytes,0x648,0x200);
+ ptr(next.bytes,0x648,0x240);
  result=auditHmaCubeEditOwnershipImpact(next.bytes,next.summary,opts);
  assert.equal(result.eventIssueCount,1);
  assert.equal(result.censusIncomplete,true);
