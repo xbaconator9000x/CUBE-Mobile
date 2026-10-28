@@ -17,7 +17,7 @@ test('ownership impact audit is reachable from mobile and standalone combined ed
  assert.match(controller,/ctx\.cellSnapshot!==ctx\.cellEvidence/);
  assert.match(controller,/r\.changedBytesTouchSharedClaims/);
  assert.match(controller,/r\.sameMapStructuralOverlapCount/);
- assert.match(offline,/same-map structural overlap\\(s\\)/);
+ assert.ok(offline.includes('same-map structural overlap(s)'));
  assert.match(controller,/Partial bank census only/);
  assert.match(builder,/stripHmaCubeEditOwnershipImpact/);
  assert.match(offline,/const auditHmaCubeEditOwnershipImpact=\(\(\)=>/);
