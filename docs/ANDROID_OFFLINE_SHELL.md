@@ -43,3 +43,7 @@ The native export destination check now compares both exact imported URIs and ca
 This does **not** prove that two different provider authorities or opaque IDs refer to different storage, nor prevent a malicious/racy provider from swapping backing data after preflight. Android SAF writes remain non-atomic, and physical-device/provider acceptance is outstanding. No semantic CUBE ROM writing has been authorized.
 
 The Android host also rejects picker results that are not well-formed `content://` URIs with an authority and nonempty path. This applies to both imported documents and export destinations, preventing a nonconforming picker from supplying a `file://` or web URL to the document resolver. It does not authenticate the provider or eliminate cross-provider storage aliases.
+
+## Touch export progress and verification status (29 October 2026)
+
+The Android-only cancel control now shows the export's current stage: destination selection, percentage of bytes acknowledged by the native writer (capped at 99% until completion), and final saved-document SHA-256 readback verification. The button remains a usable 48px-minimum cancellation target throughout. Status resets after completion or cancellation, and the screen never presents a transfer percentage as proof of verified save success. A JS protocol regression covers the multi-chunk progression and final readback state. This does not change ROM-write authority or establish physical-device acceptance.
