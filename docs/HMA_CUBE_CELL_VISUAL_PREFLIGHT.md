@@ -1,0 +1,5 @@
+# CUBE cell visual preflight (read-only)
+
+This checkpoint adds an explicit, bounded CUBE Emerald map-cell proposal workflow. The implementation uses the pinned CUBHMA `MapModel.cs` bit packing (`collision << 10 | tile`) and the existing conservative RSE renderer. It re-decodes the exact selected cell and renders before/after images using a **two-byte virtual reader overlay**. Neither the input ROM nor the app's undo stack is modified. The API requires an explicit bank/map count, checks the expected original word, and rejects invalid coordinates, tile IDs, high bits, stale bytes and unsupported CUBE light/FRLG layouts.
+
+The high six bits are **raw collision/elevation bits, not verified passability**. Other map/bank ownership of shared blockmaps remains unknown. The preview does not authorize a semantic write, save/reopen, or a verified feature-family score. Genuine CUBE ROM+TOML provenance, cross-bank ownership, emulator behavior and Android hardware acceptance remain necessary before enabling editing.
