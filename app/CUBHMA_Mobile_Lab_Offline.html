@@ -160,7 +160,8 @@
   <div id="cube-map-catalog-list" class="anchor-list" aria-label="Read-only CUBE bank map catalog"></div>
   <div class="input-row" aria-label="Read-only CUBE cross-bank ownership census">
     <div class="input-wrap"><label for="cube-ownership-banks">Explicit CUBE bank:map-count pairs (up to 8 banks, 256 maps)</label><input id="cube-ownership-banks" type="text" value="0:1" placeholder="0:2,1:3" spellcheck="false"></div>
-    <button type="button" id="cube-ownership-scan" class="subtle-button" disabled>Audit cross-bank blockmap ownership</button>
+    <label class="input-wrap"><input id="cube-ownership-events" type="checkbox"> Include event groups and arrays</label>
+     <button type="button" id="cube-ownership-scan" class="subtle-button" disabled>Audit map and event ownership</button>
   </div>
   <output id="cube-ownership-status" class="palette-note" aria-live="polite">No cross-bank census. Supply explicit bank:count pairs; results never authorize writes.</output>
   <div id="cube-ownership-list" class="anchor-list" aria-label="Read-only CUBE cross-bank ownership overlaps"></div>
@@ -7556,7 +7557,8 @@ function asReader(source) {
 function overlaps(a,b) {
   return a.start < b.start+b.size && b.start < a.start+a.size;
 }
-function auditHmaCubeCrossBankOwnership(source,summary,{banks}={}) {
+function auditHmaCubeCrossBankOwnership(source,summary,{banks,includeEvents=false}={}) {
+  if(typeof includeEvents!=='boolean')throw new TypeError('includeEvents must be boolean');
   const rom=asReader(source);
   if(!Array.isArray(banks)||banks.length<1||banks.length>8)
     throw new RangeError('Provide 1–8 explicitly counted CUBE banks');
@@ -7571,6 +7573,8 @@ function auditHmaCubeCrossBankOwnership(source,summary,{banks}={}) {
     if(budget>256)throw new RangeError('CUBE census exceeds 256-map budget');
   }
   const maps=[],claims=[];
+  const eventIssues=[];
+  const widths={objects:24,warps:8,scripts:16,signposts:12};
   for(const {bankIndex,mapCount} of banks)for(let mapIndex=0;mapIndex<mapCount;mapIndex++){
     const id=bankIndex+':'+mapIndex;
     try{
@@ -7585,22 +7589,41 @@ function auditHmaCubeCrossBankOwnership(source,summary,{banks}={}) {
         ['layout',map.layout.address,28],
         ['blockmap',map.layout.blockmapOffset,map.layout.blockmapBytes]
       ])claims.push({id,kind,start,size});
+      if(includeEvents){
+        try{
+          const events=inspectHmaCubeMapEventWarps(rom,summary,{bankIndex,mapIndex,mapCount});
+          if(events.eventsOffset!==null){
+            claims.push({id,kind:'events-group',start:events.eventsOffset,size:20});
+            for(const [kind,width] of Object.entries(widths)){
+              if(events.counts[kind]>0)
+                claims.push({id,kind:'event-'+kind,start:events.offsets[kind],
+                  size:events.counts[kind]*width});
+            }
+          }
+        }catch(error){
+          eventIssues.push(Object.freeze({id,bankIndex,mapIndex,
+            status:'event-arrays-invalid-or-unsupported',
+            reason:error instanceof Error?error.message:'Unknown decoder error'}));
+        }
+      }
     }catch(_error){
       maps.push(Object.freeze({id,bankIndex,mapIndex,status:'invalid-or-unsupported'}));
     }
   }
-  const relationships=[];
+  const relationships=[],sameMapRelationships=[];
   for(let i=0;i<claims.length;i++)for(let j=i+1;j<claims.length;j++){
     const a=claims[i],b=claims[j];
-    if(a.id===b.id||!overlaps(a,b))continue;
+    if(!overlaps(a,b))continue;
     // Any overlap across different map records is important, even when
     // the records use different semantic kinds.
-    relationships.push(Object.freeze({
+    const finding=Object.freeze({
       first:a.id,second:b.id,firstKind:a.kind,secondKind:b.kind,
       sameStart:a.start===b.start,
       overlapStart:Math.max(a.start,b.start),
       overlapBytes:Math.min(a.start+a.size,b.start+b.size)-Math.max(a.start,b.start)
-    }));
+    });
+    if(a.id===b.id)sameMapRelationships.push(finding);
+    else relationships.push(finding);
   }
   const invalid=maps.filter(m=>m.status!=='decoded').length;
   const crossBank=relationships.filter(r=>r.first.split(':')[0]!==r.second.split(':')[0]);
@@ -7608,6 +7631,9 @@ function auditHmaCubeCrossBankOwnership(source,summary,{banks}={}) {
     requestedBanks:Object.freeze(banks.map(x=>Object.freeze({...x}))),
     requestedMaps:budget,decoded:budget-invalid,invalid,
     maps:Object.freeze(maps),relationships:Object.freeze(relationships),
+    includeEvents,eventClaimsInspected:includeEvents?claims.filter(c=>c.kind.startsWith('event')).length:0,
+    eventIssues:Object.freeze(eventIssues),
+    sameMapRelationships:Object.freeze(sameMapRelationships),
     crossBankRelationshipCount:crossBank.length,
     completeOwnershipProven:false,partialCoverage:true,
     writeAuthorized:false,readOnly:true,romAuthenticated:false,
@@ -9809,15 +9835,18 @@ $('cube-ownership-scan').addEventListener('click',()=>safeRun(()=>{
     const [bankIndex,mapCount]=part.split(':').map(Number);
     return {bankIndex,mapCount};
   });
-  const report=auditHmaCubeCrossBankOwnership(model,mapBankCustomSummary,{banks});
-  const snapshot={rom:model,summary:mapBankCustomSummary,banks,report};
+  const includeEvents=$('cube-ownership-events').checked;
+   const report=auditHmaCubeCrossBankOwnership(model,mapBankCustomSummary,{banks,includeEvents});
+  const snapshot={rom:model,summary:mapBankCustomSummary,banks,includeEvents,report};
   cubeOwnershipEvidence=snapshot;
   const list=$('cube-ownership-list');list.replaceChildren();
   $('cube-ownership-status').textContent=
     report.decoded+'/'+report.requestedMaps+' maps decoded across '+
     banks.length+' explicitly counted banks; '+report.crossBankRelationshipCount+
-    ' cross-bank overlap(s), '+report.invalid+' invalid. Partial census only; exclusive ownership and safe editing NOT proven.';
-  for(const relationship of report.relationships.slice(0,80)){
+    ' cross-bank overlap(s), '+report.sameMapRelationships.length+' within-map overlap(s), '+
+     report.eventIssues.length+' invalid event array(s), '+report.invalid+
+     ' invalid maps. Partial census only; exclusive ownership and safe editing NOT proven.';
+  for(const relationship of [...report.relationships,...report.sameMapRelationships].slice(0,80)){
     const button=document.createElement('button');button.type='button';
     button.className='subtle-button';
     button.textContent=relationship.first+' '+relationship.firstKind+' overlaps '+
@@ -9827,7 +9856,9 @@ $('cube-ownership-scan').addEventListener('click',()=>safeRun(()=>{
       if(cubeOwnershipEvidence!==snapshot||snapshot.rom!==model||
          snapshot.summary!==mapBankCustomSummary)
         throw Error('CUBE ownership census expired; scan again');
-      const fresh=auditHmaCubeCrossBankOwnership(model,mapBankCustomSummary,{banks});
+      if($('cube-ownership-events').checked!==snapshot.includeEvents)
+         throw Error('Event coverage setting changed; scan again');
+       const fresh=auditHmaCubeCrossBankOwnership(model,mapBankCustomSummary,{banks,includeEvents});
       if(JSON.stringify(fresh)!==JSON.stringify(snapshot.report))
         throw Error('CUBE ownership source bytes changed; scan again');
       const [bank,map]=relationship.first.split(':').map(Number);
@@ -9841,7 +9872,7 @@ $('cube-ownership-scan').addEventListener('click',()=>safeRun(()=>{
     }));
     list.append(button);
   }
-  if(report.relationships.length>80)
+  if(report.relationships.length+report.sameMapRelationships.length>80)
     list.append(semanticChild('p','Showing first 80 overlaps. Narrow explicit bank counts to inspect further.','palette-note'));
 }));
 
