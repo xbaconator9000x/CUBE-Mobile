@@ -50,7 +50,9 @@ export function inspectHmaCubeMapEventWarps(source,summary,options){
   if(header.eventsOffset===null)return Object.freeze({
     map,eventsOffset:null,counts:Object.freeze({objects:0,warps:0,scripts:0,signposts:0}),
     offsets:Object.freeze({objects:null,warps:null,scripts:null,signposts:null}),
-    warps:empty,readOnly:true,romAuthenticated:false,
+    warps:empty,objects:empty,scripts:empty,signposts:empty,
+    arrays:Object.freeze({objects:empty,warps:empty,scripts:empty,signposts:empty}),
+    readOnly:true,romAuthenticated:false,
     cubeLayoutAuthenticated:false,writeAuthorized:false
   });
   const eventsOffset=header.eventsOffset;
@@ -86,8 +88,41 @@ export function inspectHmaCubeMapEventWarps(source,summary,options){
       outsideDeclaredMap:x>=layout.width||y>=layout.height,
       specialTarget:targetMap===255||targetBank===255}));
   }
+  // These fixed-width fields match the pinned CUBE Emerald event array DSL.
+  // The object kind/padding field and script arguments are intentionally raw.
+  // Neither script pointers nor signpost arguments are followed or executed.
+  const outside=(x,y)=>x>=layout.width||y>=layout.height;
+  const objects=[];
+  if(offsets.objects!==null)for(let i=0;i<counts.objects;i++){
+    const at=offsets.objects+i*24,x=u16(rom,at+4),y=u16(rom,at+6);
+    objects.push(Object.freeze({index:i,offset:at,id:byte(rom,at),
+      graphics:byte(rom,at+1),kindField:u16(rom,at+2),x,y,
+      elevation:byte(rom,at+8),movement:byte(rom,at+9),
+      range:u16(rom,at+10),trainerType:u16(rom,at+12),
+      trainerRangeOrBerryId:u16(rom,at+14),scriptPointer:u32(rom,at+16),
+      scriptPointerSource:at+16,flag:u16(rom,at+20),
+      padding:u16(rom,at+22),outsideDeclaredMap:outside(x,y)}));
+  }
+  const scripts=[];
+  if(offsets.scripts!==null)for(let i=0;i<counts.scripts;i++){
+    const at=offsets.scripts+i*16,x=u16(rom,at),y=u16(rom,at+2);
+    scripts.push(Object.freeze({index:i,offset:at,x,y,elevation:u16(rom,at+4),
+      trigger:u16(rom,at+6),indexValue:u32(rom,at+8),
+      scriptPointer:u32(rom,at+12),scriptPointerSource:at+12,
+      outsideDeclaredMap:outside(x,y)}));
+  }
+  const signposts=[];
+  if(offsets.signposts!==null)for(let i=0;i<counts.signposts;i++){
+    const at=offsets.signposts+i*12,x=u16(rom,at),y=u16(rom,at+2);
+    signposts.push(Object.freeze({index:i,offset:at,x,y,elevation:byte(rom,at+4),
+      kind:byte(rom,at+5),unused:u16(rom,at+6),
+      rawArgument:u32(rom,at+8),outsideDeclaredMap:outside(x,y)}));
+  }
+  const arrays=Object.freeze({objects:Object.freeze(objects),warps:Object.freeze(warps),
+    scripts:Object.freeze(scripts),signposts:Object.freeze(signposts)});
   return Object.freeze({map,eventsOffset,counts:Object.freeze(counts),
-    offsets:Object.freeze(offsets),warps:Object.freeze(warps),
+    offsets:Object.freeze(offsets),warps:arrays.warps,objects:arrays.objects,
+    scripts:arrays.scripts,signposts:arrays.signposts,arrays,
     readOnly:true,romAuthenticated:false,cubeLayoutAuthenticated:false,
     walkabilityVerified:false,writeAuthorized:false});
 }
