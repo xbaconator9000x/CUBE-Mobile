@@ -53,7 +53,7 @@ import {inspectHmaCubeBankCatalog} from './hma-cube-bank-catalog.js';
 import {traceHmaCubeWarpArrival,auditHmaCubeWarpTopology} from './hma-cube-warp-arrival.js';
 import {traceHmaCubeConnectionDestination} from './hma-cube-connection-trace.js';
 import {auditHmaCubeCrossBankOwnership} from './hma-cube-cross-bank-ownership.js';
-import {previewHmaCubeCellBatch,planHmaCubeViewportFloodFill,planHmaCubeViewportStamp,planHmaCubeViewportReplace} from './hma-cube-cell-batch.js';
+import {previewHmaCubeCellBatch,planHmaCubeViewportFloodFill,planHmaCubeViewportStamp,planHmaCubeViewportReplace,verifyHmaCubeCellBatchDryRun} from './hma-cube-cell-batch.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
@@ -952,6 +952,7 @@ function drawCubeCellBatchQueue(){
     cubeCellBatchSnapshot.rom===model;
   if(!current&&cubeCellBatchQueue.length){clearCubeBatchQueue();return;}
   $('cube-map-batch-preview').disabled=!cubeCellBatchQueue.length;
+  $('cube-map-batch-dryrun').disabled=!cubeCellBatchQueue.length;
   $('cube-map-batch-clear').disabled=!cubeCellBatchQueue.length;
   $('cube-map-batch-status').textContent=cubeCellBatchQueue.length+
     '/32 CUBE cell proposals queued for virtual preview. No ROM writes or save authorization.';
@@ -979,6 +980,8 @@ function clearCubeBatchQueue(){
   $('cube-map-batch-stamp').disabled=true;
   $('cube-map-batch-replace').disabled=true;
   $('cube-map-batch-preview').disabled=true;
+  $('cube-map-batch-dryrun').disabled=true;
+  $('cube-map-dryrun-status').textContent='No copy-only transaction rehearsal performed. No ROM file will be written.';
   $('cube-map-batch-clear').disabled=true;
   $('cube-map-batch-list').replaceChildren();
   $('cube-map-batch-status').textContent='No queued CUBE changes. ROM remains unchanged.';
@@ -1429,6 +1432,21 @@ $('cube-map-batch-replace').addEventListener('click',()=>safeRun(()=>{
 }));
 $('cube-map-batch-clear').addEventListener('click',()=>safeRun(()=>{
   clearCubeBatchQueue();$('cube-map-preview-after').hidden=true;
+}));
+$('cube-map-batch-dryrun').addEventListener('click',()=>safeRun(()=>{
+  const snapshot=cubeCellBatchSnapshot;
+  if(!snapshot||snapshot!==cubeRenderEvidence||snapshot.rom!==model||
+     !cubeMapEvidence||cubeMapEvidence.options!==snapshot.options||
+     !cubeCellBatchQueue.length)
+    throw Error('CUBE cell queue expired; render and select again');
+  const result=verifyHmaCubeCellBatchDryRun(model,mapBankCustomSummary,{
+    ...snapshot.options,x:snapshot.x,y:snapshot.y,
+    viewportWidth:10,viewportHeight:8,changes:cubeCellBatchQueue
+  });
+  $('cube-map-dryrun-status').textContent='Copy-only rehearsal verified '+
+    result.changedCells+' cell(s), '+result.changedBytes+
+    ' changed byte(s), re-decode and rollback. No patched ROM exported. '+
+    'Authentic save/reopen, ownership and emulator acceptance remain unverified.';
 }));
 $('cube-map-batch-preview').addEventListener('click',()=>safeRun(()=>{
   const snapshot=cubeCellBatchSnapshot;
