@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 
+let syntheticNonce = 0;
 const script = readFileSync(new URL('../android/app/src/main/assets/export-bridge.js', import.meta.url), 'utf8');
 function harness(blob) {
   const messages = [];
@@ -18,7 +19,14 @@ function harness(blob) {
       }).catch(error => this.onerror(error));
     }
   }
-  const window = {CubeExport: {postMessage: value => messages.push(JSON.parse(value))}};
+  const window = {
+    crypto: {getRandomValues: words => {
+      words[0] = ++syntheticNonce;
+      words[1] = (syntheticNonce * 7919) >>> 0;
+      return words;
+    }},
+    CubeExport: {postMessage: value => messages.push(JSON.parse(value))}
+  };
   let cancelButton;
   const document = {
     body: {appendChild: button => { assert.equal(button, cancelButton); }},
@@ -171,4 +179,18 @@ test('Android export touch cancellation aborts only the active session', async (
   assert.equal(h.cancelButton.hidden, false);
   h.window.__cubeNativeCancel(second);
   assert.equal(h.cancelButton.hidden, true);
+});
+
+test('Android export IDs do not repeat across separate WebView page loads', async () => {
+  const first = harness(new Blob([Buffer.from([1])]));
+  await first.trigger();
+  const a = first.messages[0].session;
+  const second = harness(new Blob([Buffer.from([2])]));
+  await second.trigger();
+  const b = second.messages[0].session;
+  assert.match(a, /^[1-9][0-9]{15}$/);
+  assert.match(b, /^[1-9][0-9]{15}$/);
+  assert.notEqual(a, b);
+  second.window.__cubeNativeBegin(a);
+  assert.equal(second.messages.length, 1);
 });

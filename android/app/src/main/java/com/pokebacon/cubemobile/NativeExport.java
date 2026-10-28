@@ -32,6 +32,9 @@ final class NativeExport {
     private final Predicate<Uri> isImportedDocument;
     private boolean installed;
     private boolean pending;
+    // A cancelled picker may still return an Android activity result later.
+    // Never bind that stale result to a newer export session.
+    private final ExportPickerGate pickerGate = new ExportPickerGate();
     private String session;
     private long expected;
     private long written;
@@ -102,8 +105,11 @@ final class NativeExport {
     }
 
     private void start(JSONObject data) throws Exception {
-        if (pending || output != null) return;
         String id = data.getString("session");
+        if (pending || output != null || pickerGate.isInFlight()) {
+            callback("__cubeNativeCancel", id);
+            return;
+        }
         if (!id.matches("[1-9][0-9]{0,15}"))
             throw new IOException("Invalid export session");
         long size = data.getLong("size");
@@ -116,6 +122,10 @@ final class NativeExport {
         if (!mime.matches("[A-Za-z0-9.+-]+/[A-Za-z0-9.+-]+")) {
             mime = "application/octet-stream";
         }
+        if (!pickerGate.begin(id)) {
+            callback("__cubeNativeCancel", id);
+            return;
+        }
         pending = true;
         session = id;
         expected = size;
@@ -126,6 +136,7 @@ final class NativeExport {
         try {
             activity.startActivityForResult(intent, REQUEST);
         } catch (RuntimeException failure) {
+            pickerGate.consume();
             pending = false;
             session = null;
             callback("__cubeNativeCancel", id);
@@ -135,7 +146,11 @@ final class NativeExport {
     }
 
     void onResult(int resultCode, Intent data) {
-        if (!pending) return;
+        // Consume exactly the picker that launched this result, even when its
+        // JS session was aborted while the Android picker remained visible.
+        String launchedSession = pickerGate.consume();
+        if (launchedSession == null || !pending ||
+            !launchedSession.equals(session)) return;
         if (resultCode != Activity.RESULT_OK || data == null || data.getData() == null) {
             String id = session;
             pending = false;
