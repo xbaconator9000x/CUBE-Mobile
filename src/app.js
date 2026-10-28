@@ -947,6 +947,7 @@ function appendCubeBatchProposals(snapshot,additions){
   $('cube-map-preview-after').hidden=true;
 }
 function drawCubeCellBatchQueue(){
+  $('cube-map-dryrun-status').textContent='Queue changed; rerun copy-only verification. No ROM file will be written.';
   const list=$('cube-map-batch-list');list.replaceChildren();
   const current=cubeCellBatchSnapshot&&cubeCellBatchSnapshot===cubeRenderEvidence&&
     cubeCellBatchSnapshot.rom===model;
