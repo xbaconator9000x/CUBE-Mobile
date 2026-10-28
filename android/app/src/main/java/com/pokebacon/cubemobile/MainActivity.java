@@ -17,6 +17,8 @@ import android.webkit.WebViewClient;
 import android.widget.Toast;
 import androidx.webkit.WebViewAssetLoader;
 import java.io.ByteArrayInputStream;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Offline-only Android host for the generated, source-controlled CUBE web app.
@@ -30,6 +32,7 @@ public final class MainActivity extends Activity {
     private WebView webView;
     private ValueCallback<Uri[]> fileCallback;
     private NativeExport nativeExport;
+    private final Set<Uri> importedDocuments = new HashSet<>();
     private OnBackInvokedCallback modernBackCallback;
 
     @Override public void onCreate(Bundle state) {
@@ -37,7 +40,7 @@ public final class MainActivity extends Activity {
         WebView.setWebContentsDebuggingEnabled(false);
         webView = new WebView(this);
         setContentView(webView);
-        nativeExport = new NativeExport(this, webView);
+        nativeExport = new NativeExport(this, webView, importedDocuments::contains);
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
@@ -128,8 +131,13 @@ public final class MainActivity extends Activity {
         if (requestCode != PICK_FILE || fileCallback == null) return;
         ValueCallback<Uri[]> callback = fileCallback;
         fileCallback = null;
-        callback.onReceiveValue(WebChromeClient.FileChooserParams
-            .parseResult(resultCode, data));
+        Uri[] selected = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
+        if (selected != null) {
+            for (Uri uri : selected) {
+                if (uri != null) importedDocuments.add(uri);
+            }
+        }
+        callback.onReceiveValue(selected);
     }
 
     @Override public void onBackPressed() {
