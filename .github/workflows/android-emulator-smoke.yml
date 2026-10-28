@@ -1,0 +1,60 @@
+name: Android emulator offline smoke
+on:
+  pull_request:
+    paths:
+      - 'android/**'
+      - 'app/**'
+      - 'src/**'
+      - 'build-standalone.mjs'
+      - '.github/workflows/android-emulator-smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - 'app/**'
+      - 'src/**'
+      - 'build-standalone.mjs'
+      - '.github/workflows/android-emulator-smoke.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: emulator-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  emulator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify generated offline HTML
+        run: |
+          npm run build:standalone
+          git diff --exit-code -- app/CUBHMA_Mobile_Lab_Offline.html
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Require and enable KVM acceleration
+        run: |
+          test -e /dev/kvm || { echo 'KVM unavailable on this runner'; exit 1; }
+          sudo chmod a+rw /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
+      - name: Boot Android emulator and run real WebView smoke
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: cd android && gradle --no-daemon --stacktrace :app:connectedDebugAndroidTest

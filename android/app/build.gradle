@@ -10,6 +10,7 @@ android {
         targetSdk 35
         versionCode 1
         versionName '0.5.9'
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
     sourceSets {
         main {
@@ -20,6 +21,8 @@ android {
 dependencies {
     implementation 'androidx.webkit:webkit:1.12.1'
     testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test:runner:1.6.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
 }
 tasks.register('prepareCubeAssets', Copy) {
     from('../../app/CUBHMA_Mobile_Lab_Offline.html') {
