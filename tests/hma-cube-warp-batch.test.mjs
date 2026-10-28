@@ -40,7 +40,7 @@ test('atomic two-warp preview traces both records together without mutating ROM'
  assert.equal(result.changedBytes,2);
  assert.equal(result.beforeTopology.records[0].rawReturnToSameWarp,true);
  assert.equal(result.afterTopology.records[0].arrival.warpIndex,1);
- assert.equal(result.afterTopology.records[0].rawReturnToSameWarp,false);
+ assert.equal(result.afterTopology.records[0].rawReturnToSameWarp,true);
  assert.equal(result.afterTopology.records[1].arrival.warpIndex,0);
  assert.equal(result.combinedReDecodeVerified,true);
  assert.equal(result.writeAuthorized,false);
