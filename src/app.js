@@ -913,15 +913,18 @@ function clearCubeCatalog(message='No CUBE bank catalog inspected. Supply a veri
   clearCubeOwnership();
 }
 function cubeBatchProposalInputs(){
+  const mode=$('cube-map-apply-fields').value;
+  if(!['both','tile','high'].includes(mode))
+    throw new RangeError('Choose valid CUBE painting fields');
   const tileText=$('cube-map-proposed-tile').value;
   const highText=$('cube-map-proposed-high').value;
-  if(!/^\d+$/.test(tileText)||!/^\d+$/.test(highText))
-    throw new RangeError('Proposed tile and raw high bits must be unsigned integers');
   const tileId=Number(tileText),collision=Number(highText);
-  if(!Number.isSafeInteger(tileId)||tileId>1023||
-     !Number.isSafeInteger(collision)||collision>63)
-    throw new RangeError('CUBE tile/high-bit proposal outside allowed range');
-  return {tileId,collision};
+  if((mode!=='high'&&!/^\d+$/.test(tileText))||
+     (mode!=='tile'&&!/^\d+$/.test(highText))||
+     (mode!=='high'&&(!Number.isSafeInteger(tileId)||tileId>1023))||
+     (mode!=='tile'&&(!Number.isSafeInteger(collision)||collision>63)))
+    throw new RangeError('Selected CUBE painting fields must be unsigned integers in range');
+  return mode==='both'?{tileId,collision}:mode==='tile'?{tileId}:{collision};
 }
 function appendCubeBatchProposals(snapshot,additions){
   if(cubeCellBatchSnapshot&&cubeCellBatchSnapshot!==snapshot)
@@ -956,7 +959,7 @@ function drawCubeCellBatchQueue(){
     const remove=document.createElement('button');remove.type='button';
     remove.className='subtle-button';
     remove.textContent='Remove ('+change.x+','+change.y+') · tile '+
-      change.tileId+' · high bits '+change.collision;
+      (change.tileId??'unchanged')+' · high bits '+(change.collision??'unchanged');
     remove.addEventListener('click',()=>safeRun(()=>{
       if(!cubeCellBatchSnapshot||cubeCellBatchSnapshot!==cubeRenderEvidence||
          cubeCellBatchSnapshot.rom!==model)
@@ -1336,9 +1339,9 @@ $('cube-map-batch-add').addEventListener('click',()=>safeRun(()=>{
   if(!snapshot||snapshot!==cubeRenderEvidence||snapshot.rom!==model||
      !cubeMapEvidence||cubeMapEvidence.options!==snapshot.options)
     throw Error('Select a current rendered CUBE cell first');
-  const {tileId,collision}=cubeBatchProposalInputs();
+  const proposal=cubeBatchProposalInputs();
   appendCubeBatchProposals(snapshot,[{
-    x:selected.x,y:selected.y,tileId,collision,expectedRaw:selected.raw
+    x:selected.x,y:selected.y,...proposal,expectedRaw:selected.raw
   }]);
 }));
 $('cube-map-batch-brush').addEventListener('click',()=>safeRun(()=>{
@@ -1354,14 +1357,14 @@ $('cube-map-batch-brush').addEventListener('click',()=>safeRun(()=>{
   if(!Number.isSafeInteger(width)||!Number.isSafeInteger(height)||
      width<1||height<1||width>8||height>8||width*height>32)
     throw new RangeError('Brush must be 1–8 per axis and at most 32 cells');
-  const {tileId,collision}=cubeBatchProposalInputs();
+  const proposal=cubeBatchProposalInputs();
   const cells=JSON.parse(snapshot.cellsJson).flat();
   const changes=[];
   for(let dy=0;dy<height;dy++)for(let dx=0;dx<width;dx++){
     const x=selected.x+dx,y=selected.y+dy;
     const cell=cells.find(c=>c.x===x&&c.y===y);
     if(!cell)throw new RangeError('Brush extends outside the rendered viewport');
-    changes.push({x,y,tileId,collision,expectedRaw:cell.raw});
+    changes.push({x,y,...proposal,expectedRaw:cell.raw});
   }
   appendCubeBatchProposals(snapshot,changes);
 }));
@@ -1370,10 +1373,10 @@ $('cube-map-batch-flood').addEventListener('click',()=>safeRun(()=>{
   if(!snapshot||snapshot!==cubeRenderEvidence||snapshot.rom!==model||
      !cubeMapEvidence||cubeMapEvidence.options!==snapshot.options)
     throw Error('Select a current rendered CUBE cell first');
-  const {tileId,collision}=cubeBatchProposalInputs();
+  const proposal=cubeBatchProposalInputs();
   const matchMode=$('cube-map-flood-match').value;
   const plan=planHmaCubeViewportFloodFill({cells:JSON.parse(snapshot.cellsJson)},{
-    seedX:selected.x,seedY:selected.y,tileId,collision,matchMode
+    seedX:selected.x,seedY:selected.y,...proposal,matchMode
   });
   appendCubeBatchProposals(snapshot,plan.changes);
   $('cube-map-batch-status').textContent=plan.matchedCells+

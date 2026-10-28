@@ -1,3 +1,8 @@
+## Checkpoint — CUBE field-selective painting preview (28 October 2026)
+- [x] Add tile-only and raw collision/elevation-only queue modes for single-cell, rectangle and flood previews.
+- [x] Add six-high-bit flood matching, preserve per-cell original fields and test modular/offline UI.
+- [ ] Real-ROM and emulator/device acceptance plus safe transactional editing remain unverified; strict parity unchanged.
+
 ## Checkpoint — CUBE touch flood-fill preview (28 October 2026)
 - [x] Add bounded four-neighbor tile/exact-word flood fill for the rendered CUBE viewport, preserving original cell words.
 - [x] Integrate a touch control with atomic 32-cell queue preflight, explicit edge warning, offline HTML and regression tests.

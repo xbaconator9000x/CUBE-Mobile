@@ -143,11 +143,13 @@ export function planHmaCubeViewportFloodFill(image,{
      image.cells.length>32||!Array.isArray(image.cells[0])||
      !image.cells[0].length||image.cells[0].length>32)
     throw new RangeError('Expected a bounded rendered CUBE cell grid');
-  integer(tileId,0,1023,'Proposed tile ID');
-  integer(collision,0,63,'Proposed raw high bits');
+  if(tileId===undefined&&collision===undefined)
+    throw new RangeError('Specify a tile ID, raw high bits, or both');
+  if(tileId!==undefined)integer(tileId,0,1023,'Proposed tile ID');
+  if(collision!==undefined)integer(collision,0,63,'Proposed raw high bits');
   integer(maxCells,1,32,'Flood-fill cell limit');
-  if(matchMode!=='tile'&&matchMode!=='exact')
-    throw new RangeError('Flood match must be tile or exact');
+  if(matchMode!=='tile'&&matchMode!=='exact'&&matchMode!=='high')
+    throw new RangeError('Flood match must be tile, high or exact');
   const rows=image.cells,width=rows[0].length,height=rows.length;
   const originX=rows[0][0]?.x,originY=rows[0][0]?.y;
   integer(originX,0,1023,'Viewport X');
@@ -168,13 +170,15 @@ export function planHmaCubeViewportFloodFill(image,{
   integer(seedX,originX,originX+width-1,'Flood seed X');
   integer(seedY,originY,originY+height-1,'Flood seed Y');
   const seed=cells.get(seedX+':'+seedY);
-  const same=c=>matchMode==='exact'?c.raw===seed.raw:c.tileId===seed.tileId;
+  const same=c=>matchMode==='exact'?c.raw===seed.raw:
+    matchMode==='high'?c.collision===seed.collision:c.tileId===seed.tileId;
   const queue=[seed],visited=new Set([seedX+':'+seedY]),changes=[];
   let touchesViewportEdge=false;
   for(let head=0;head<queue.length;head++){
     const cell=queue[head];
-    changes.push(Object.freeze({x:cell.x,y:cell.y,tileId,collision,
-      expectedRaw:cell.raw}));
+    changes.push(Object.freeze({x:cell.x,y:cell.y,
+      ...(tileId===undefined?{}:{tileId}),
+      ...(collision===undefined?{}:{collision}),expectedRaw:cell.raw}));
     if(changes.length>maxCells)
       throw new RangeError('Flood fill exceeds 32-cell budget; no proposals queued');
     if(cell.x===originX||cell.y===originY||

@@ -58,3 +58,32 @@ test('touch UI and standalone include flood controls and fail-closed queue prefl
  }
  assert.match(builder,/planHmaCubeViewportFloodFill/);
 });
+
+test('high-bit matching and collision-only painting preserve individual metatile IDs',()=>{
+ const image=grid([1,1025,2,1026],2);
+ const plan=planHmaCubeViewportFloodFill(image,{seedX:4,seedY:7,
+  collision:19,matchMode:'high'});
+ assert.deepEqual(plan.changes.map(c=>[c.x,c.y,c.expectedRaw]),[
+  [4,7,1],[4,8,2]]);
+ assert.ok(plan.changes.every(c=>!Object.hasOwn(c,'tileId')&&c.collision===19));
+ const tileOnly=planHmaCubeViewportFloodFill(image,{
+  seedX:4,seedY:7,tileId:100,matchMode:'tile'});
+ assert.ok(tileOnly.changes.every(c=>!Object.hasOwn(c,'collision')));
+ assert.throws(()=>planHmaCubeViewportFloodFill(image,{
+  seedX:4,seedY:7,matchMode:'high'}),/Specify a tile ID/);
+});
+test('collision-only controls are available in both mobile builds',async()=>{
+ const read=p=>readFile(new URL('../'+p,import.meta.url),'utf8');
+ const [html,app,offline]=await Promise.all([
+  read('index.html'),read('src/app.js'),read('app/CUBHMA_Mobile_Lab_Offline.html')]);
+ for(const page of [html,offline]){
+  assert.match(page,/id="cube-map-apply-fields"/);
+  assert.match(page,/value="high">Collision\/elevation only/);
+  assert.match(page,/value="high">Same raw collision\/elevation bits/);
+ }
+ for(const source of [app,offline]){
+  assert.match(source,/mode==='tile'\?\{tileId\}:\{collision\}/);
+  assert.match(source,/changes\.push\(\{x,y,\.\.\.proposal,expectedRaw:cell\.raw\}\)/);
+  assert.match(source,/seedX:selected\.x,seedY:selected\.y,\.\.\.proposal,matchMode/);
+ }
+});
