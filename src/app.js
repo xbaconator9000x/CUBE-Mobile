@@ -51,7 +51,7 @@ import {renderHmaCubeMapViewport} from './hma-cube-map-render.js';
 import {previewHmaCubeBlockmapVisualChange} from './hma-cube-map-cell-preview.js';
 import {inspectHmaCubeBankCatalog} from './hma-cube-bank-catalog.js';
 import {traceHmaCubeWarpArrival,auditHmaCubeWarpTopology} from './hma-cube-warp-arrival.js';
-import {previewHmaCubeWarpRecordChange} from './hma-cube-warp-edit-preview.js';
+import {previewHmaCubeWarpRecordChange,verifyHmaCubeWarpRecordDryRun} from './hma-cube-warp-edit-preview.js';
 import {traceHmaCubeConnectionDestination} from './hma-cube-connection-trace.js';
 import {auditHmaCubeCrossBankOwnership} from './hma-cube-cross-bank-ownership.js';
 import {previewHmaCubeCellBatch,planHmaCubeViewportFloodFill,planHmaCubeViewportStamp,planHmaCubeViewportReplace,verifyHmaCubeCellBatchDryRun} from './hma-cube-cell-batch.js';
@@ -1567,6 +1567,8 @@ function clearCubeWarpEditPreview(){
   cubeWarpEditSelection=null;
   $('cube-warp-edit-load').disabled=true;
   $('cube-warp-edit-preview').disabled=true;
+  $('cube-warp-edit-dryrun').disabled=true;
+  $('cube-warp-edit-dryrun-status').textContent='No isolated warp rehearsal performed.';
   $('cube-warp-edit-status').textContent='Inspect CUBE warps, then load a record. This tool never writes ROM bytes.';
 }
 function clearCubeWarpTrace(){
@@ -1675,10 +1677,12 @@ $('cube-warp-edit-load').addEventListener('click',()=>safeRun(()=>{
   cubeWarpEditSelection={rom:model,summary:mapBankCustomSummary,
     sourceReport:snapshot.report,options:snapshot.options,warpIndex,expected};
   $('cube-warp-edit-preview').disabled=false;
+  $('cube-warp-edit-dryrun').disabled=true;
+  $('cube-warp-edit-dryrun-status').textContent='Loaded a new warp. Run a virtual preview before rehearsal.';
   $('cube-warp-edit-status').textContent='Warp #'+warpIndex+' loaded from 0x'+hex(record.offset)+
     '. Adjust raw fields and compare; no ROM changes will be saved.';
 }));
-$('cube-warp-edit-preview').addEventListener('click',()=>safeRun(()=>{
+function readCubeWarpEditProposal(){
   const selection=cubeWarpEditSelection;
   if(!selection||selection.rom!==model||selection.summary!==mapBankCustomSummary||
      cubeWarpEvidence?.report!==selection.sourceReport)
@@ -1700,9 +1704,13 @@ $('cube-warp-edit-preview').addEventListener('click',()=>safeRun(()=>{
     const [bankIndex,mapCount]=part.split(':').map(Number);
     return {bankIndex,mapCount};
   });
-  const result=previewHmaCubeWarpRecordChange(model,mapBankCustomSummary,{
-    ...selection.options,warpIndex:selection.warpIndex,
-    expected:selection.expected,proposed,targetBanks});
+  return {...selection.options,warpIndex:selection.warpIndex,
+    expected:selection.expected,proposed,targetBanks};
+}
+$('cube-warp-edit-preview').addEventListener('click',()=>safeRun(()=>{
+  const options=readCubeWarpEditProposal();
+  const result=previewHmaCubeWarpRecordChange(model,mapBankCustomSummary,options);
+  $('cube-warp-edit-dryrun').disabled=false;
   $('cube-warp-edit-status').textContent='Virtual warp #'+result.warpIndex+
     ' · changed: '+(result.changedFields.join(', ')||'none')+
     ' · before: '+result.beforeTrace.status+
@@ -1712,6 +1720,17 @@ $('cube-warp-edit-preview').addEventListener('click',()=>safeRun(()=>{
       ' · raw return: '+result.afterTrace.arrival.returnsToOrigin:'')+
     '. Other warps preserved: '+result.otherWarpsPreserved+
     '. Preview only: no ROM writing, no emulator or walkability verification.';
+}));
+$('cube-warp-edit-dryrun').addEventListener('click',()=>safeRun(()=>{
+  const options=readCubeWarpEditProposal();
+  const result=verifyHmaCubeWarpRecordDryRun(model,mapBankCustomSummary,options);
+  $('cube-warp-edit-dryrun-status').textContent='Isolated copy-only warp #'+result.warpIndex+
+    ' · changed bytes: '+result.changedBytes+
+    ' · raw re-decode: '+result.inMemoryReDecodeVerified+
+    ' · full rollback: '+result.inMemoryRollbackVerified+
+    ' · source unchanged: '+result.sourceBytesPreserved+
+    ' · after destination: '+result.afterTrace.status+
+    '. No ROM file written or exported; real save/reopen, ownership and emulator acceptance NOT verified.';
 }));
 $('cube-warp-audit').addEventListener('click',()=>safeRun(()=>{
   const snapshot=cubeWarpEvidence;

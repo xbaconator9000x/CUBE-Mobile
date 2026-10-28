@@ -10,14 +10,18 @@ test('CUBE warp record preflight is wired to modular and offline mobile interfac
   'cube-warp-edit-index','cube-warp-edit-load','cube-warp-edit-preview',
   'cube-warp-edit-x','cube-warp-edit-y','cube-warp-edit-elevation',
   'cube-warp-edit-warpId','cube-warp-edit-targetMap','cube-warp-edit-targetBank',
-  'cube-warp-edit-target-banks','cube-warp-edit-status'])
+  'cube-warp-edit-target-banks','cube-warp-edit-status',
+  'cube-warp-edit-dryrun','cube-warp-edit-dryrun-status'])
    assert.ok(page.includes('id="'+id+'"'),id);
  assert.match(app,/previewHmaCubeWarpRecordChange\(model,mapBankCustomSummary/);
  assert.match(app,/freshCubeWarpEditSource\(cubeWarpEvidence\)/);
  assert.match(app,/cubeWarpEditSelection=null/);
  assert.match(app,/Other warps preserved:/);
+ assert.match(app,/verifyHmaCubeWarpRecordDryRun\(model,mapBankCustomSummary,options\)/);
+ assert.match(app,/readCubeWarpEditProposal\(\)/);
+ assert.match(offline,/verifyHmaCubeWarpRecordDryRun/);
  assert.match(build,/stripHmaCubeWarpEditPreview/);
- assert.match(offline,/const previewHmaCubeWarpRecordChange=\(\(\)=>/);
+ assert.match(offline,/const \{previewHmaCubeWarpRecordChange,verifyHmaCubeWarpRecordDryRun\}=\(\(\)=>/);
  assert.match(offline,/function clearCubeWarpEditPreview\(/);
  assert.doesNotMatch(offline,/src\/app\.js/);
  assert.match(doc,/mobile and offline interfaces/);

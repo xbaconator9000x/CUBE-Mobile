@@ -165,8 +165,10 @@
   <div class="input-row">
     <div class="input-wrap"><label for="cube-warp-edit-target-banks">Optional explicit bank:map-count declarations</label><input id="cube-warp-edit-target-banks" type="text" placeholder="0:12,1:9" spellcheck="false"></div>
     <button type="button" id="cube-warp-edit-preview" class="subtle-button" disabled>Compare virtual warp change</button>
+    <button type="button" id="cube-warp-edit-dryrun" class="subtle-button" disabled>Verify isolated apply and rollback</button>
   </div>
   <output id="cube-warp-edit-status" class="palette-note" aria-live="polite">Inspect CUBE warps, then load a record. This tool never writes ROM bytes.</output>
+  <output id="cube-warp-edit-dryrun-status" class="palette-note" aria-live="polite">No isolated warp rehearsal performed.</output>
   <div class="input-row" aria-label="Bounded CUBE raw warp topology audit">
     <div class="input-wrap"><label for="cube-warp-audit-banks">Destination bank:map-count declarations</label><input id="cube-warp-audit-banks" type="text" value="0:1" placeholder="0:12,1:9" spellcheck="false"></div>
     <button type="button" id="cube-warp-audit" class="subtle-button" disabled>Audit all raw map warps (max 32)</button>
