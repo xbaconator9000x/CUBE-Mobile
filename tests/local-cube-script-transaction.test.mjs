@@ -95,3 +95,38 @@ test('invalid plans and malformed CLI options are rejected without file output',
   }
  });
 });
+
+test('optional explicit bank census reports script-pointer ownership without exporting bytes',async()=>{
+ await fixture(async({args,rom,bytes})=>{
+  const report=await inspectLocalCubeScriptTransaction([...args,'--banks','0:1']);
+  assert.equal(report.boundedOwnershipInspected,true);
+  assert.equal(report.declaredOwnershipMaps,1);
+  assert.equal(report.editedByteOwnershipConflicts,0);
+  assert.equal(report.mapScriptOwnershipIssueCount,0);
+  assert.equal(report.ownershipCensusIncomplete,false);
+  assert.equal(report.globalPointerOwnershipProven,false);
+  assert.deepEqual(await readFile(rom),Buffer.from(bytes));
+ });
+});
+test('shared event array across declared banks is reported as an edited-byte conflict',async()=>{
+ await fixture(async({args,rom,bytes})=>{
+  const modified=Buffer.from(bytes);
+  ptr(modified,0x14,0x120);ptr(modified,0x120,0x240);
+  ptr(modified,0x240,0x280);ptr(modified,0x244,0x600);
+  await writeFile(rom,modified);
+  const hash=createHash('sha256').update(modified).digest('hex');
+  const declared=args.map((v,i)=>i===5?hash:v).concat('--banks','0:1,1:1');
+  const report=await inspectLocalCubeScriptTransaction(declared);
+  assert.equal(report.declaredOwnershipMaps,2);
+  assert.ok(report.editedByteOwnershipConflicts>0);
+  assert.equal(report.globalPointerOwnershipProven,false);
+  assert.equal(report.romExported,false);
+  assert.deepEqual(await readFile(rom),modified);
+ });
+});
+test('malformed, incomplete and duplicate bank declarations fail before touching ROM',async()=>{
+ await fixture(async({args})=>{
+  for(const value of ['0:0','0:129','0:1,0:1','1:1','0:1,1:256','0:1,','0:1;1:1'])
+   assert.throws(()=>parseLocalCubeScriptTransactionArgs([...args,'--banks',value]),RangeError);
+ });
+});

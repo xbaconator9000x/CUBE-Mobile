@@ -12,17 +12,18 @@ import {pathToFileURL} from 'node:url';
 import {inspectHmaMapBankAnchorSources} from '../src/hma-map-bank-metadata.js';
 import {inspectHmaCubeScriptReferences,previewHmaCubeScriptRetargetBatch,
  verifyHmaCubeScriptRetargetDryRun} from '../src/hma-cube-script-retarget.js';
+import {auditHmaCubeEditOwnershipImpact} from '../src/hma-cube-edit-ownership-impact.js';
 
 const SHA=/^[0-9a-f]{64}$/i;
 const KEYS=['--rom','--metadata','--expected-sha256','--bank-index',
  '--map-index','--map-count','--plan'];
 export function parseLocalCubeScriptTransactionArgs(argv){
- if(!Array.isArray(argv)||argv.length!==KEYS.length*2)
+ if(!Array.isArray(argv)||![KEYS.length*2,(KEYS.length+1)*2].includes(argv.length))
   throw RangeError('Provide ROM, metadata, expected SHA-256, map selection and plan');
  const args={};
  for(let i=0;i<argv.length;i+=2){
   const key=argv[i],value=argv[i+1];
-  if(!KEYS.includes(key)||Object.hasOwn(args,key)||
+  if(![...KEYS,'--banks'].includes(key)||Object.hasOwn(args,key)||
      typeof value!=='string'||!value||value.includes('\0'))
    throw RangeError('Invalid or repeated local transaction argument');
   args[key]=value;
@@ -42,7 +43,26 @@ export function parseLocalCubeScriptTransactionArgs(argv){
  }
  if(Number(args['--map-index'])>=Number(args['--map-count']))
   throw RangeError('Map index exceeds explicit count');
+ if(args['--banks']!==undefined)parseDeclaredBanks(args['--banks'],
+  Number(args['--bank-index']),Number(args['--map-count']));
  return Object.freeze(args);
+}
+/** Exact bank:map-count pairs are user declarations, never inferred map ownership. */
+function parseDeclaredBanks(value,sourceBank,sourceCount){
+ if(typeof value!=='string'||!/^[0-9]+:[0-9]+(?:,[0-9]+:[0-9]+)*$/.test(value))
+  throw RangeError('Declare banks as comma-separated bank:map-count pairs');
+ const banks=value.split(',').map(pair=>{
+  const [bankIndex,mapCount]=pair.split(':').map(Number);
+  if(!Number.isSafeInteger(bankIndex)||bankIndex<0||bankIndex>255||
+     !Number.isSafeInteger(mapCount)||mapCount<1||mapCount>128)
+   throw RangeError('Declared bank index or map count outside bounds');
+  return {bankIndex,mapCount};
+ });
+ if(banks.length>8||new Set(banks.map(b=>b.bankIndex)).size!==banks.length||
+    banks.reduce((sum,b)=>sum+b.mapCount,0)>256||
+    !banks.some(b=>b.bankIndex===sourceBank&&b.mapCount===sourceCount))
+  throw RangeError('Ownership census must include exact source bank and remain bounded');
+ return banks;
 }
 async function boundedRead(path,max){
  const before=await stat(path);
@@ -90,6 +110,9 @@ export async function inspectLocalCubeScriptTransaction(argv){
  if(rehearsal.changedBytes!==plan.changedBytes||
     rehearsal.changedRecords!==plan.changedRecords)
   throw RangeError('Script transaction plan and rollback disagree');
+ const ownership=args['--banks']===undefined?null:auditHmaCubeEditOwnershipImpact(
+  rom,summary,{...options,scripts:changes,banks:parseDeclaredBanks(
+   args['--banks'],options.bankIndex,options.mapCount)});
  const reread=await boundedRead(args['--rom'],64*1024*1024);
  if(createHash('sha256').update(reread).digest('hex')!==digest)
   throw RangeError('Local ROM changed during script transaction');
@@ -103,12 +126,18 @@ export async function inspectLocalCubeScriptTransaction(argv){
   completeEventReDecodeVerified:rehearsal.completeEventReDecodeVerified,
   rollbackVerified:rehearsal.inMemoryRollbackVerified,
   sourcePreserved:rehearsal.sourceBytesPreserved,
+  boundedOwnershipInspected:ownership!==null,
+  declaredOwnershipMaps:ownership?.inspectedMaps??0,
+  editedByteOwnershipConflicts:ownership?.conflicts.length??null,
+  ownershipCensusIncomplete:ownership?.censusIncomplete??null,
+  mapScriptOwnershipIssueCount:ownership?.mapScriptIssueCount??null,
+  globalPointerOwnershipProven:false,
   romModified:false,romExported:false,patchExported:false,
   independentlyAuthenticated:false,scriptSemanticsVerified:false,
   exclusiveOwnershipProven:false,emulatorVerified:false,
   androidHardwareVerified:false,writeAuthorized:false,
   independentParityEvidence:false,
-  warning:'User-provided ROM hash and metadata are not independent CUBE authentication. This is copy-only script-reference rehearsal, not save/reopen or gameplay acceptance.'
+  warning:'User-provided ROM hash and metadata are not independent CUBE authentication. This is copy-only script-reference rehearsal and optional partial cross-bank ownership census, not save/reopen or gameplay acceptance.'
  });
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
