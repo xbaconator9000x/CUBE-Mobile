@@ -17,3 +17,7 @@ The bounded cross-bank census now optionally claims the five-byte, type-0-termin
 ## Mobile ownership inspector (29 October 2026)
 
 The touch-first cross-bank ownership inspector now **always** includes bounded map-script table and conditional table claims, even when the optional event/connection toggles are off. It displays invalid map-script table counts separately, and its stale-result click guard rechecks the same coverage before navigating. The combined editing ownership report also surfaces map-script failures. The offline HTML is regenerated from the same source. No inferred bank map counts, global pointer exclusivity, ROM authentication or write authorization are claimed.
+
+## Same-map structural aliases (29 October 2026)
+
+The bounded census now separately reports `sameMapStructuralOverlapCount` and `sameMapStructuralAmbiguityDetected` when two independently decoded structures of the **same** map claim overlapping ROM bytes. The changed-byte ownership impact report treats any such ambiguity as an incomplete census, even if the particular proposed edit does not intersect the ambiguous bytes. A synthetic event-warp/map-script-table alias regression demonstrates why structurally plausible decoders cannot establish exclusive ownership. These are diagnostics, not evidence of a globally complete pointer graph or authorization to save edited ROMs.

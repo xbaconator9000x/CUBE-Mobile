@@ -438,7 +438,8 @@ export function bindHmaCubeBatchEditors({getContext,getSelectedCell,safeRun}){
    r.eventIssueCount+' invalid event array(s), '+r.connectionIssueCount+
    ' invalid connection array(s), '+r.mapScriptIssueCount+
    ' invalid map-script table(s), '+r.invalidMaps+
-   ' invalid map(s). '+(r.changedBytesTouchSharedClaims?
+   ' invalid map(s), '+r.sameMapStructuralOverlapCount+
+   ' same-map structural overlap(s). '+(r.changedBytesTouchSharedClaims?
     'SHARED MAP CLAIM DETECTED. ':'')+
    (r.censusIncomplete?'Census incomplete. ':'')+
    'Partial bank census only; global aliases, ROM identity and safe writing NOT proven.';

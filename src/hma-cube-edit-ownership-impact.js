@@ -124,7 +124,8 @@ export function auditHmaCubeEditOwnershipImpact(source,summary,options={}) {
  }
  const sourceDecoded=census.maps.some(m=>m.id===sourceId&&m.status==='decoded');
  const incomplete=census.invalid>0||census.eventIssues.length>0||
-  census.connectionIssues.length>0||census.mapScriptIssues.length>0||!sourceDecoded;
+  census.connectionIssues.length>0||census.mapScriptIssues.length>0||
+  census.sameMapStructuralAmbiguityDetected||!sourceDecoded;
  return Object.freeze({
   sourceMap:sourceId,changedBytes:changes.size,
   inspectedMaps:census.requestedMaps,decodedMaps:census.decoded,
@@ -132,6 +133,7 @@ export function auditHmaCubeEditOwnershipImpact(source,summary,options={}) {
   connectionIssueCount:census.connectionIssues.length,
   mapScriptIssueCount:census.mapScriptIssues.length,
   mapScriptClaimsInspected:census.mapScriptClaimsInspected,
+  sameMapStructuralOverlapCount:census.sameMapStructuralOverlapCount,
   conflicts:Object.freeze(conflicts),
   changedBytesTouchSharedClaims:conflicts.length>0,
   censusIncomplete:incomplete,
