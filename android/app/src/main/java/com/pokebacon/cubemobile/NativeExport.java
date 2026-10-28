@@ -30,6 +30,7 @@ final class NativeExport {
     private final WebView webView;
     private boolean installed;
     private boolean pending;
+    private String session;
     private long expected;
     private long written;
     private int nextIndex;
@@ -54,18 +55,29 @@ final class NativeExport {
                     message.getData() == null || message.getData().length() > 100000) {
                     return;
                 }
+                String incoming = null;
+                String kind = "";
                 try {
                     JSONObject data = new JSONObject(message.getData());
-                    String kind = data.optString("kind", "");
-                    switch (kind) {
-                        case "start": start(data); break;
-                        case "chunk": chunk(data); break;
-                        case "finish": finish(); break;
-                        case "abort": abort("Export cancelled; partial document removed"); break;
-                        default: break;
+                    incoming = data.optString("session", "");
+                    kind = data.optString("kind", "");
+                    if ("start".equals(kind)) {
+                        start(data);
+                    } else if (pending && session != null && session.equals(incoming)) {
+                        switch (kind) {
+                            case "chunk": chunk(data); break;
+                            case "finish": finish(); break;
+                            case "abort": abort("Export cancelled; partial document removed"); break;
+                            default: break;
+                        }
                     }
+                    // Delayed messages from completed/cancelled exports are ignored.
                 } catch (Exception failure) {
-                    abort("Export failed; incomplete document removed");
+                    if (pending && incoming != null && incoming.equals(session)) {
+                        abort("Export failed; incomplete document removed");
+                    } else if ("start".equals(kind) && !pending && incoming != null) {
+                        callback("__cubeNativeCancel", incoming);
+                    }
                 }
             });
     }
@@ -78,8 +90,18 @@ final class NativeExport {
         }
     }
 
+    private void callback(String method, String id) {
+        if (id != null) {
+            webView.evaluateJavascript("window." + method + "&&window." + method +
+                "(" + JSONObject.quote(id) + ")", null);
+        }
+    }
+
     private void start(JSONObject data) throws Exception {
         if (pending || output != null) return;
+        String id = data.getString("session");
+        if (!id.matches("[1-9][0-9]{0,15}"))
+            throw new IOException("Invalid export session");
         long size = data.getLong("size");
         if (size < 0 || size > MAX_BYTES) throw new IOException("Export size limit");
         String name = data.optString("name", "cube-export.bin")
@@ -91,6 +113,7 @@ final class NativeExport {
             mime = "application/octet-stream";
         }
         pending = true;
+        session = id;
         expected = size;
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -100,7 +123,8 @@ final class NativeExport {
             activity.startActivityForResult(intent, REQUEST);
         } catch (RuntimeException failure) {
             pending = false;
-            webView.evaluateJavascript("window.__cubeNativeCancel&&window.__cubeNativeCancel()", null);
+            session = null;
+            callback("__cubeNativeCancel", id);
             Toast.makeText(activity, "No document save picker available",
                 Toast.LENGTH_LONG).show();
         }
@@ -109,8 +133,10 @@ final class NativeExport {
     void onResult(int resultCode, Intent data) {
         if (!pending) return;
         if (resultCode != Activity.RESULT_OK || data == null || data.getData() == null) {
+            String id = session;
             pending = false;
-            webView.evaluateJavascript("window.__cubeNativeCancel&&window.__cubeNativeCancel()", null);
+            session = null;
+            callback("__cubeNativeCancel", id);
             return;
         }
         destination = data.getData();
@@ -120,7 +146,7 @@ final class NativeExport {
             writingDigest = MessageDigest.getInstance("SHA-256");
             written = 0;
             nextIndex = 0;
-            webView.evaluateJavascript("window.__cubeNativeBegin&&window.__cubeNativeBegin()", null);
+            callback("__cubeNativeBegin", session);
         } catch (Exception failure) {
             abort("Unable to create export document");
         }
@@ -141,7 +167,7 @@ final class NativeExport {
         written += bytes.length;
         int acknowledged = nextIndex++;
         webView.evaluateJavascript("window.__cubeNativeAck&&window.__cubeNativeAck(" +
-            acknowledged + ")", null);
+            JSONObject.quote(session) + "," + acknowledged + ")", null);
     }
 
     private void finish() throws Exception {
@@ -168,10 +194,14 @@ final class NativeExport {
         destination = null;
         pending = false;
         writingDigest = null;
+        String completed = session;
+        session = null;
+        callback("__cubeNativeComplete", completed);
         Toast.makeText(activity, "Export saved and verified", Toast.LENGTH_SHORT).show();
     }
 
     void abort(String message) {
+        String cancelled = session;
         try { if (output != null) output.close(); } catch (IOException ignored) { }
         output = null;
         if (destination != null) {
@@ -180,8 +210,9 @@ final class NativeExport {
         }
         destination = null;
         pending = false;
+        session = null;
         writingDigest = null;
-        webView.evaluateJavascript("window.__cubeNativeCancel&&window.__cubeNativeCancel()", null);
+        callback("__cubeNativeCancel", cancelled);
         Toast.makeText(activity, message, Toast.LENGTH_LONG).show();
     }
 

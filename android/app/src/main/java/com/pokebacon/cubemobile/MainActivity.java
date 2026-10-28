@@ -55,8 +55,9 @@ public final class MainActivity extends Activity {
         webView.setWebViewClient(new WebViewClient() {
             @Override public void onPageStarted(WebView view, String url,
                 android.graphics.Bitmap favicon) {
-                if (!url.startsWith(APP_URL) && nativeExport != null)
-                    nativeExport.close();
+                // A reload destroys the JS session state even at the same URL.
+                // Cancel the native session rather than accepting stale chunks.
+                if (nativeExport != null) nativeExport.close();
             }
             @Override public void onPageFinished(WebView view, String url) {
                 if (APP_URL.equals(url)) nativeExport.inject();

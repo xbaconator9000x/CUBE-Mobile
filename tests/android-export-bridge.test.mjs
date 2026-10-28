@@ -52,7 +52,7 @@ test('Android export bridge streams 48KiB chunks only after ACK and preserves by
   assert.equal(h.messages.length, 1);
   assert.equal(h.messages[0].kind, 'start');
   assert.equal(h.messages[0].size, original.length);
-  h.window.__cubeNativeBegin();
+  h.window.__cubeNativeBegin(h.messages[0].session);
   const received = [];
   for (let index = 0; index < 3; index++) {
     await until(() => h.messages.some(x => x.kind === 'chunk' && x.index === index));
@@ -62,7 +62,7 @@ test('Android export bridge streams 48KiB chunks only after ACK and preserves by
     const bytes = Buffer.from(item.data, 'base64');
     assert.ok(bytes.length > 0 && bytes.length <= 48 * 1024);
     received.push(bytes);
-    h.window.__cubeNativeAck(index);
+    h.window.__cubeNativeAck(h.messages[0].session, index);
   }
   await until(() => h.messages.some(x => x.kind === 'finish'));
   assert.deepEqual(Buffer.concat(received), original);
@@ -82,11 +82,52 @@ test('Android export bridge refuses blobs larger than 128MiB before native start
 test('Android export bridge cancellation drops pending chunks', async () => {
   const h = harness(new Blob([Buffer.alloc(100000)]));
   await h.trigger();
-  h.window.__cubeNativeBegin();
+  h.window.__cubeNativeBegin(h.messages[0].session);
   await until(() => h.messages.some(x => x.kind === 'chunk'));
-  h.window.__cubeNativeCancel();
+  h.window.__cubeNativeCancel(h.messages[0].session);
   const before = h.messages.length;
-  h.window.__cubeNativeAck(0);
+  h.window.__cubeNativeAck(h.messages[0].session, 0);
   await new Promise(resolve => setTimeout(resolve, 10));
   assert.equal(h.messages.length, before);
+});
+
+test('Android export bridge rejects delayed callbacks from an earlier session', async () => {
+  const h = harness(new Blob([Buffer.alloc(100000)]));
+  await h.trigger();
+  const first = h.messages[0].session;
+  h.window.__cubeNativeCancel(first);
+  await h.trigger();
+  const second = h.messages.findLast(x => x.kind === 'start').session;
+  assert.notEqual(first, second);
+  const before = h.messages.length;
+  h.window.__cubeNativeBegin(first);
+  h.window.__cubeNativeAck(first, 0);
+  h.window.__cubeNativeComplete(first);
+  h.window.__cubeNativeCancel(first);
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(h.messages.length, before);
+  h.window.__cubeNativeBegin(second);
+  await until(() => h.messages.some(x => x.kind === 'chunk' && x.session === second));
+  h.window.__cubeNativeAck(first, 0);
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(h.messages.filter(x => x.kind === 'chunk' && x.session === second).length, 1);
+  h.window.__cubeNativeAck(second, 0);
+  await until(() => h.messages.filter(x => x.kind === 'chunk' && x.session === second).length === 2);
+});
+
+test('Android export bridge retains session until native readback completes', async () => {
+  const h = harness(new Blob([Buffer.alloc(3)]));
+  await h.trigger();
+  const first = h.messages[0].session;
+  h.window.__cubeNativeBegin(first);
+  await until(() => h.messages.some(x => x.kind === 'chunk'));
+  h.window.__cubeNativeAck(first, 0);
+  await until(() => h.messages.some(x => x.kind === 'finish'));
+  assert.equal(h.messages.filter(x => x.kind === 'finish')[0].session, first);
+  await assert.rejects(h.trigger(), /Finish or cancel the current export first/);
+  assert.equal(h.messages.filter(x => x.kind === 'start').length, 1);
+  h.window.__cubeNativeComplete(first);
+  await h.trigger();
+  assert.equal(h.messages.filter(x => x.kind === 'start').length, 2);
+  assert.notEqual(h.messages.findLast(x => x.kind === 'start').session, first);
 });

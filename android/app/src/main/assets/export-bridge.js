@@ -1,5 +1,7 @@
 /* Android-only bridge for user-triggered blob: downloads.
  * Backpressure: one <=48 KiB chunk per native acknowledgment.
+ * Every native callback is scoped to a unique export session to prevent
+ * delayed callbacks from advancing or cancelling a later export.
  * The native side requires an explicit ACTION_CREATE_DOCUMENT selection.
  */
 (() => {
@@ -8,16 +10,24 @@
   window.__cubeNativeExportInstalled = true;
   const MAX = 128 * 1024 * 1024, CHUNK = 48 * 1024;
   let blob = null, offset = 0, index = 0, waiting = false, chunkLength = 0;
+  let sequence = 0, session = null, preparing = false;
   const post = data => window.CubeExport.postMessage(JSON.stringify(data));
   const reset = () => {
     blob = null; offset = 0; index = 0; waiting = false; chunkLength = 0;
+    session = null; preparing = false;
   };
-  window.__cubeNativeCancel = reset;
+  window.__cubeNativeCancel = id => {
+    if (id === session) reset();
+  };
+  window.__cubeNativeComplete = id => {
+    if (id === session) reset();
+  };
   async function pump() {
-    if (!blob || waiting) return;
+    if (!blob || waiting || !session) return;
+    const active = session;
     if (offset === blob.size) {
-      post({kind: 'finish'});
-      reset();
+      waiting = true; // Native readback must finish before a new export starts.
+      post({kind: 'finish', session: active});
       return;
     }
     const current = blob;
@@ -28,26 +38,26 @@
       reader.onerror = () => reject(new Error('Unable to read export chunk'));
       reader.readAsDataURL(part);
     });
-    if (blob !== current || waiting) return;
+    if (blob !== current || session !== active || waiting) return;
     chunkLength = part.size;
     waiting = true;
-    post({kind: 'chunk', index, data: base64});
+    post({kind: 'chunk', session: active, index, data: base64});
   }
-  window.__cubeNativeBegin = () => {
-    pump().catch(() => {
-      post({kind: 'abort'});
-      reset();
-    });
+  const fail = id => {
+    if (id !== session) return;
+    post({kind: 'abort', session: id});
+    reset();
   };
-  window.__cubeNativeAck = acknowledged => {
-    if (!blob || !waiting || acknowledged !== index) return;
+  window.__cubeNativeBegin = id => {
+    if (id !== session) return;
+    pump().catch(() => fail(id));
+  };
+  window.__cubeNativeAck = (id, acknowledged) => {
+    if (id !== session || !blob || !waiting || acknowledged !== index) return;
     offset += chunkLength;
     index++;
     waiting = false;
-    pump().catch(() => {
-      post({kind: 'abort'});
-      reset();
-    });
+    pump().catch(() => fail(id));
   };
   document.addEventListener('click', async event => {
     const target = event.target instanceof Element
@@ -55,10 +65,11 @@
     if (!target || !target.href.startsWith('blob:')) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    if (blob) {
+    if (blob || preparing) {
       alert('Finish or cancel the current export first.');
       return;
     }
+    preparing = true;
     try {
       const response = await fetch(target.href);
       if (!response.ok) throw new Error('Blob download unavailable');
@@ -66,7 +77,9 @@
       if (value.size > MAX) throw new Error('Export exceeds 128 MiB limit');
       blob = value;
       offset = 0; index = 0; waiting = false;
-      post({kind: 'start', name: target.download || 'cube-export.bin',
+      session = String(++sequence);
+      preparing = false;
+      post({kind: 'start', session, name: target.download || 'cube-export.bin',
         mime: value.type || 'application/octet-stream', size: value.size});
     } catch (failure) {
       reset();
