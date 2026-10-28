@@ -30,7 +30,7 @@ The read-only vanilla atlas can now review up to 16 declared maps per tap for ou
 
 The declared vanilla map atlas now offers a read-only coordinate integrity review for warps, objects, triggers and signposts. It highlights out-of-blockmap records and shared coordinates, with raw block-cell bytes and touch-to-hex provenance. Shared cells can be intentional; no CUBE layout or walkability is authenticated. See [coordinate checkpoint](docs/VANILLA_EVENT_COORDINATE_AUDIT.md).
 
-**Private development repository for a full mobile port of CUBHMA (Cradi's Unofficial Build of Hex Maniac Advance), targeting CUBE-aware Pokémon Emerald editing and the other ROM families supported by upstream.**
+**Public development repository for a full mobile port of CUBHMA (Cradi's Unofficial Build of Hex Maniac Advance), targeting CUBE-aware Pokémon Emerald editing and the other ROM families supported by upstream.**
 
 > **Status: v0.5.9 — early foundation, NOT a complete port.** The working code today is an offline ROM inspection / patching workbench and a limited read-only CUBHMA TOML named-anchor inspector. The desktop editor's semantic engine, map/collision/event editors, scripts, sprites, trainers, Pokémon, sound and CUBE upgrades are **not yet ported**.
 
@@ -133,6 +133,10 @@ The read-only Blockmaps viewport now supports large touch pan controls and optio
 - CRC-bound JSON sidecar project edits.
 
 The versioned runnable checkpoint is [app/CUBHMA_Mobile_Lab_Offline.html](app/CUBHMA_Mobile_Lab_Offline.html). This app remains local-first and does **not** contain game ROMs.
+
+## Android debug APK (development)
+
+The Android host packages the exact generated offline HTML into a local-only WebViewAssetLoader app. It supports user-selected ROM/TOML imports, Android Back navigation and SAF document exports with bounded chunk transfer and readback verification. This is a debug APK shell, not full CUBE/CUBHMA parity or verified semantic ROM saving. The public GitHub Actions **Build Android debug APK** workflow produces an installable artifact when its checks pass. See [Android build and limitations](docs/ANDROID_OFFLINE_SHELL.md).
 
 ## Development
 
