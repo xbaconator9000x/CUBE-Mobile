@@ -333,3 +333,72 @@ export function planHmaCubeViewportReplace(image,{
     readOnly:true,previewOnly:true,writeAuthorized:false,
     walkabilityVerified:false,romAuthenticated:false});
 }
+
+/**
+ * Reversible copy-only transaction rehearsal. Applies validated raw cell
+ * deltas to an isolated in-memory ROM snapshot, decodes the resulting map,
+ * checks every changed byte and reverses the deltas. No patched ROM or
+ * patch bytes escape this function; no file is saved or write authorized.
+ *
+ * This is NOT a genuine CUBE save/reopen or emulator acceptance test.
+ */
+export function verifyHmaCubeCellBatchDryRun(source,summary,options={}){
+ const rom=reader(source);
+ if(rom.length<1||rom.length>64*1024*1024)
+  throw new RangeError('Copy-only dry run requires a ROM of 1–64 MiB');
+ const preview=previewHmaCubeCellBatch(rom,summary,options);
+ const original=new Uint8Array(rom.length);
+ for(let i=0;i<original.length;i++)original[i]=byte(rom,i);
+ const freshBefore=renderHmaCubeMapViewport(original,summary,{
+  bankIndex:options.bankIndex,mapIndex:options.mapIndex,mapCount:options.mapCount,
+  x:preview.x,y:preview.y,viewportWidth:preview.viewportWidth,
+  viewportHeight:preview.viewportHeight
+ });
+ if(JSON.stringify(freshBefore.cells)!==JSON.stringify(preview.beforeImage.cells)||
+    JSON.stringify(freshBefore.attributes)!==JSON.stringify(preview.beforeImage.attributes)||
+    freshBefore.pixels.length!==preview.beforeImage.pixels.length||
+    !freshBefore.pixels.every((value,i)=>value===preview.beforeImage.pixels[i]))
+  throw new RangeError('Source changed during copy-only transaction rehearsal');
+ const staged=original.slice(),expected=new Map();
+ for(const record of preview.changes){
+  const at=record.byteOffset;
+  if((staged[at]|staged[at+1]<<8)!==record.before.raw)
+   throw new RangeError('Original cell changed during transaction rehearsal');
+  const raw=record.after.raw;
+  staged[at]=raw&255;staged[at+1]=raw>>>8;
+  expected.set(at,raw&255);expected.set(at+1,raw>>>8);
+ }
+ let changedBytes=0;
+ for(let i=0;i<staged.length;i++){
+  if(staged[i]!==original[i]){
+   if(!expected.has(i)||expected.get(i)!==staged[i])
+    throw new RangeError('Transaction touched an unplanned ROM byte');
+   changedBytes++;
+  }
+ }
+ const reopened=renderHmaCubeMapViewport(staged,summary,{
+  bankIndex:options.bankIndex,mapIndex:options.mapIndex,mapCount:options.mapCount,
+  x:preview.x,y:preview.y,viewportWidth:preview.viewportWidth,
+  viewportHeight:preview.viewportHeight
+ });
+ if(JSON.stringify(reopened.cells)!==JSON.stringify(preview.afterImage.cells)||
+    JSON.stringify(reopened.attributes)!==JSON.stringify(preview.afterImage.attributes)||
+    reopened.pixels.length!==preview.afterImage.pixels.length||
+    !reopened.pixels.every((value,i)=>value===preview.afterImage.pixels[i]))
+  throw new RangeError('Re-decoded transaction differs from virtual preview');
+ for(const record of preview.changes){
+  staged[record.byteOffset]=record.before.bytes[0];
+  staged[record.byteOffset+1]=record.before.bytes[1];
+ }
+ for(let i=0;i<staged.length;i++)
+  if(staged[i]!==original[i])
+   throw new RangeError('Copy-only transaction rollback failed');
+ return Object.freeze({
+  changedCells:preview.changedCells,changedBytes,
+  inMemoryReDecodeVerified:true,inMemoryRollbackVerified:true,
+  sourceBytesExported:false,patchedRomExported:false,
+  authenticSaveReopenVerified:false,romAuthenticated:false,
+  exclusiveOwnershipProven:false,writeAuthorized:false,
+  readOnly:true,copyOnly:true
+ });
+}
