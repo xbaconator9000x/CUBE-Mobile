@@ -41,6 +41,7 @@ final class NativeExport {
     private String session;
     private long expected;
     private long written;
+    private boolean writeAttempted;
     private int nextIndex;
     private Uri destination;
     private OutputStream output;
@@ -174,12 +175,25 @@ final class NativeExport {
             abort("Export refused: destination is an imported document");
             return;
         }
+        // ACTION_CREATE_DOCUMENT should create an empty document, but some
+        // providers may return an existing alias. Refuse nonempty or unreadable
+        // targets before opening a truncating output stream.
+        try (InputStream probe = activity.getContentResolver().openInputStream(chosen)) {
+            if (!ExportDestinationPreflight.isEmpty(probe)) {
+                abort("Export refused: destination is not an empty new document");
+                return;
+            }
+        } catch (Exception failure) {
+            abort("Export refused: cannot verify an empty destination");
+            return;
+        }
         destination = chosen;
         try {
             output = activity.getContentResolver().openOutputStream(destination, "w");
             if (output == null) throw new IOException("No output stream");
             writingDigest = MessageDigest.getInstance("SHA-256");
             written = 0;
+            writeAttempted = false;
             nextIndex = 0;
             callback("__cubeNativeBegin", session);
         } catch (Exception failure) {
@@ -199,6 +213,7 @@ final class NativeExport {
             throw new IOException("Invalid export chunk");
         if (!ExportChunkIntegrity.verify(bytes, data.getString("sha256")))
             throw new IOException("Export chunk digest differs from source Blob");
+        writeAttempted = true; // A provider may partially write before throwing.
         output.write(bytes);
         writingDigest.update(bytes);
         written += bytes.length;
@@ -264,8 +279,11 @@ final class NativeExport {
         try { if (output != null) output.close(); } catch (IOException ignored) { }
         output = null;
         boolean hadDestination = destination != null;
+        boolean mayContainOurBytes = writeAttempted || written > 0;
         boolean removed = false;
-        if (hadDestination) {
+        // Do not delete a provider document we merely opened but never wrote;
+        // it could be a pre-existing zero-byte alias despite the picker intent.
+        if (hadDestination && mayContainOurBytes) {
             try {
                 removed = activity.getContentResolver().delete(destination, null, null) > 0;
             } catch (Exception ignored) {
@@ -276,8 +294,10 @@ final class NativeExport {
         pending = false;
         session = null;
         writingDigest = null;
+        writeAttempted = false;
         callback("__cubeNativeCancel", cancelled);
         String notice = !hadDestination ? message :
+            !mayContainOurBytes ? message + "; empty document may remain" :
             removed ? message + "; incomplete document deleted" :
             message + "; partial document may remain, please delete it";
         Toast.makeText(activity, notice, Toast.LENGTH_LONG).show();
