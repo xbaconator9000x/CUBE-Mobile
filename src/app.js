@@ -77,9 +77,31 @@ function toast(message,bad=false){const t=$('toast');t.textContent=message;t.cla
 function safeRun(fn){try{const result=fn();if(result?.catch) result.catch(err=>toast(err.message||String(err),true));}catch(err){toast(err.message||String(err),true);}}
 function confirmAction(title,description){return new Promise(resolve=>{const d=$('confirm-dialog');$('confirm-title').textContent=title;$('confirm-text').textContent=description;d.showModal();d.addEventListener('close',()=>resolve(d.returnValue==='yes'),{once:true});});}
 function ensureModel(){if(!model)throw Error('Open a GBA ROM first');return model;}
+function validatedCubeSelectedCell(){
+ const selection=cubeRenderSelection,snapshot=selection?.snapshot;
+ if(!selection||!snapshot||snapshot!==cubeRenderEvidence||
+    snapshot.rom!==model||!cubeMapEvidence||
+    snapshot.options.bankIndex!==cubeMapEvidence.options.bankIndex||
+    snapshot.options.mapIndex!==cubeMapEvidence.options.mapIndex||
+    snapshot.options.mapCount!==cubeMapEvidence.options.mapCount)
+  throw Error('Rendered CUBE selection expired; inspect and render again');
+ const fresh=renderHmaCubeMapViewport(ensureModel(),mapBankCustomSummary,{
+  ...snapshot.options,x:snapshot.x,y:snapshot.y,viewportWidth:10,viewportHeight:8
+ });
+ const cell=fresh.cells.flat().find(c=>c.x===selection.x&&c.y===selection.y);
+ if(!cell||cell.byteOffset!==selection.cellOffset||cell.raw!==selection.raw||
+    JSON.stringify(fresh.map)!==JSON.stringify(snapshot.map)||
+    JSON.stringify(fresh.cells)!==snapshot.cellsJson||
+    JSON.stringify(fresh.attributes)!==snapshot.attributesJson||
+    fresh.pixels.length!==snapshot.pixels.length||
+    !fresh.pixels.every((n,i)=>n===snapshot.pixels[i]))
+  throw Error('Rendered CUBE cell bytes or pixels changed; render again');
+ return Object.freeze({x:cell.x,y:cell.y});
+}
 const cubeBatchEditors=bindHmaCubeBatchEditors({
  getContext:()=>({rom:model,summary:mapBankCustomSummary,snapshot:cubeWarpEvidence,
   cellQueue:cubeCellBatchQueue,cellSnapshot:cubeCellBatchSnapshot,cellEvidence:cubeRenderEvidence}),
+ getSelectedCell:validatedCubeSelectedCell,
  safeRun
 });
 let cubeBatchReadySnapshot=null;
