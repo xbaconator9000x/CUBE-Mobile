@@ -1,3 +1,9 @@
+## Checkpoint — metadata-declared CUBE bank pointer table (28 October 2026)
+- [x] Parse bounded fixed outer `[maps<...>]N` counts from imported HMA TOML, grounded in pinned upstream CUBHMA MapModel.cs and CUBE Emerald's 34 declared slots.
+- [x] Inspect every raw declared pointer word, warn on duplicate/misaligned/self-referencing targets and preserve exact source offsets; no map counts or layout semantics inferred.
+- [x] Add touchscreen and standalone offline pointer-table explorer with stale-byte revalidation, synthetic and upstream-metadata tests and ROM immutability.
+- [ ] Authenticate genuine CUBE ROM+metadata identity, custom bank/layout decoding, safe save/reopen and emulator/Android acceptance before strict parity credit. See [mobile checkpoint](docs/MOBILE_HMA_DECLARED_BANK_TABLE.md).
+
 ## Checkpoint — bounded raw map-bank pointer window (28 October 2026)
 - [x] Inspect 1–32 raw little-endian words at an unambiguous TOML-declared map-bank anchor with exact ROM offsets, conventional pointer-shaped counts and fail-closed bounds.
 - [x] Expose a 16-word mobile/offline touchscreen explorer with source/target hex navigation, stale-byte revalidation and ROM/metadata reset invalidation.
