@@ -133,6 +133,8 @@ export function auditHmaCubeCrossBankOwnership(source,summary,{banks,includeEven
       claims.filter(c=>c.kind.startsWith('map-scripts-')).length:0,
     mapScriptIssues:Object.freeze(mapScriptIssues),
     sameMapRelationships:Object.freeze(sameMapRelationships),
+    sameMapStructuralOverlapCount:sameMapRelationships.length,
+    sameMapStructuralAmbiguityDetected:sameMapRelationships.length>0,
     crossBankRelationshipCount:crossBank.length,
     completeOwnershipProven:false,partialCoverage:true,
     writeAuthorized:false,readOnly:true,romAuthenticated:false,
