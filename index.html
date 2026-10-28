@@ -91,6 +91,13 @@
     <button type="button" id="cube-map-up" class="subtle-button" disabled>Up 8</button>
     <button type="button" id="cube-map-down" class="subtle-button" disabled>Down 8</button>
   </div>
+  <div class="input-row">
+    <button type="button" id="cube-map-render" class="subtle-button" disabled>Render supported CUBE Emerald RSE metatiles (read only)</button>
+    <button type="button" id="cube-map-render-jump" class="subtle-button" disabled>Open selected rendered cell in hex</button>
+  </div>
+  <output id="cube-map-render-status" class="palette-note" aria-live="polite">CUBE custom lighting/FRLG variants are not rendered. No ROM authenticity or passability is inferred.</output>
+  <div style="overflow-x:auto"><canvas id="cube-map-render-canvas" hidden aria-label="Read-only CUBE Emerald rendered metatile preview" style="max-width:none;image-rendering:pixelated"></canvas></div>
+  <output id="cube-map-render-selection" class="palette-note" aria-live="polite">Tap a rendered CUBE cell to inspect its raw blockmap and attribute offsets.</output>
   <div class="input-row"><button type="button" id="cube-map-warps" class="subtle-button" disabled>Inspect CUBE custom event/warp records (read only)</button></div>
   <output id="cube-warps-status" class="palette-note" aria-live="polite">Inspect a custom CUBE map before reading its raw event arrays.</output>
   <div id="cube-warps-list" class="anchor-list" aria-label="Unverified CUBE event and warp records"></div>
