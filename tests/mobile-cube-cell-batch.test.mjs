@@ -17,6 +17,19 @@ test('CUBE multi-cell preview queue is wired into modular and offline apps',asyn
   assert.match(source,/partial census cannot prove exclusivity/);
  }
  assert.match(build,/stripHmaCubeCellBatch/);
- assert.match(offline,/const \{previewHmaCubeCellBatch,planHmaCubeViewportFloodFill,planHmaCubeViewportStamp,planHmaCubeViewportReplace\}=\(\(\)=>/);
+ assert.match(offline,/const \{previewHmaCubeCellBatch,planHmaCubeViewportFloodFill,planHmaCubeViewportStamp,planHmaCubeViewportReplace,verifyHmaCubeCellBatchDryRun\}=\(\(\)=>/);
  assert.doesNotMatch(offline,/src\/app\.js/);
+});
+
+test('CUBE copy-only dry-run is available offline and invalidates on queue changes',async()=>{
+ const [html,app,offline]=await Promise.all([
+  read('index.html'),read('src/app.js'),read('app/CUBHMA_Mobile_Lab_Offline.html')]);
+ for(const page of [html,offline])
+  for(const id of ['cube-map-batch-dryrun','cube-map-dryrun-status'])
+   assert.ok(page.includes('id="'+id+'"'),id);
+ for(const source of [app,offline]){
+  assert.match(source,/verifyHmaCubeCellBatchDryRun\(model,mapBankCustomSummary/);
+  assert.match(source,/Queue changed; rerun copy-only verification/);
+  assert.match(source,/No patched ROM exported/);
+ }
 });
