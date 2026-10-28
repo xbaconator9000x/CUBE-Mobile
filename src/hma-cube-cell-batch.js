@@ -129,3 +129,67 @@ export function previewHmaCubeCellBatch(source,summary,{
     walkabilityVerified:false,exclusiveOwnershipProven:false
   });
 }
+
+/**
+ * Four-neighbor flood fill of a bounded, already rendered CUBE viewport.
+ * A tile-only match deliberately ignores raw high bits; exact mode matches
+ * the full 16-bit blockmap word. Neither mode infers walkability.
+ * No ROM access, no writes, no silent partial fill on the 32-cell limit.
+ */
+export function planHmaCubeViewportFloodFill(image,{
+  seedX,seedY,tileId,collision,matchMode='tile',maxCells=32
+}={}){
+  if(!image||!Array.isArray(image.cells)||!image.cells.length||
+     image.cells.length>32||!Array.isArray(image.cells[0])||
+     !image.cells[0].length||image.cells[0].length>32)
+    throw new RangeError('Expected a bounded rendered CUBE cell grid');
+  integer(tileId,0,1023,'Proposed tile ID');
+  integer(collision,0,63,'Proposed raw high bits');
+  integer(maxCells,1,32,'Flood-fill cell limit');
+  if(matchMode!=='tile'&&matchMode!=='exact')
+    throw new RangeError('Flood match must be tile or exact');
+  const rows=image.cells,width=rows[0].length,height=rows.length;
+  const originX=rows[0][0]?.x,originY=rows[0][0]?.y;
+  integer(originX,0,1023,'Viewport X');
+  integer(originY,0,1023,'Viewport Y');
+  const cells=new Map();
+  for(let y=0;y<height;y++){
+    if(!Array.isArray(rows[y])||rows[y].length!==width)
+      throw new RangeError('Flood-fill grid is not rectangular');
+    for(let x=0;x<width;x++){
+      const c=rows[y][x];
+      if(!c||c.x!==originX+x||c.y!==originY+y||
+         !Number.isSafeInteger(c.raw)||c.raw<0||c.raw>65535||
+         c.tileId!==(c.raw&1023)||c.collision!==(c.raw>>>10))
+        throw new RangeError('Flood-fill grid has invalid or stale cells');
+      cells.set(c.x+':'+c.y,c);
+    }
+  }
+  integer(seedX,originX,originX+width-1,'Flood seed X');
+  integer(seedY,originY,originY+height-1,'Flood seed Y');
+  const seed=cells.get(seedX+':'+seedY);
+  const same=c=>matchMode==='exact'?c.raw===seed.raw:c.tileId===seed.tileId;
+  const queue=[seed],visited=new Set([seedX+':'+seedY]),changes=[];
+  let touchesViewportEdge=false;
+  for(let head=0;head<queue.length;head++){
+    const cell=queue[head];
+    changes.push(Object.freeze({x:cell.x,y:cell.y,tileId,collision,
+      expectedRaw:cell.raw}));
+    if(changes.length>maxCells)
+      throw new RangeError('Flood fill exceeds 32-cell budget; no proposals queued');
+    if(cell.x===originX||cell.y===originY||
+       cell.x===originX+width-1||cell.y===originY+height-1)
+      touchesViewportEdge=true;
+    for(const [dx,dy] of [[0,-1],[-1,0],[1,0],[0,1]]){
+      const nx=cell.x+dx,ny=cell.y+dy,key=nx+':'+ny;
+      if(visited.has(key))continue;
+      visited.add(key);
+      const next=cells.get(key);
+      if(next&&same(next))queue.push(next);
+    }
+  }
+  return Object.freeze({changes:Object.freeze(changes),
+    matchedCells:changes.length,matchMode,touchesViewportEdge,
+    viewportOnly:true,readOnly:true,previewOnly:true,writeAuthorized:false,
+    walkabilityVerified:false});
+}
