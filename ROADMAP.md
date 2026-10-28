@@ -1,3 +1,8 @@
+## Checkpoint — local CUBE RSE render smoke (28 October 2026)
+- [x] Add opt-in SHA-256-matched local 10×8 CUBE Emerald RSE render compatibility check, with aggregate-only output and fail-closed unsupported modes.
+- [x] Synthetic ROM immutability, input rejection and no-byte-disclosure tests.
+- [ ] Obtain genuine CUBE ROM and matching metadata plus emulator/Android/save-reopen acceptance. Strict parity unchanged.
+
 ## Checkpoint — CUBE rectangular paint preflight (28 October 2026)
 - [x] Queue a bounded 1–8 × 1–8 rectangular brush (maximum 32 cells) from a rendered CUBE map cell, preserving expected originals for every cell.
 - [x] Revalidate the full combined queue before accepting a brush; preview-only and no ROM mutation, with modular/offline UI coverage.
