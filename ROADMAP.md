@@ -1,3 +1,9 @@
+## Checkpoint — custom CUBE structural map and warp inspection (28 October 2026)
+- [x] Decode pinned CUBE Emerald custom 28-byte map header and layout from a metadata-declared bank pointer and explicitly supplied per-bank map count, without guessing dynamic lengths.
+- [x] Add bounded mobile/offline raw map-cell and custom warp/event inspection, stale-byte validation, exact ROM source navigation and synthetic regression coverage.
+- [x] Extend local SHA-256-gated CUBE smoke with optional aggregate custom map/event/warp diagnostics; no ROM data or addresses exported.
+- [ ] Independently authenticate genuine CUBE ROM and TOML provenance; test actual save/reopen, emulator and Android device before strict parity credit. No semantic writes authorized.
+
 ## Checkpoint — manifest-gated CUBE raw bank evidence (28 October 2026)
 - [x] Connect exact ordered local ROM/TOML identity smoke to bounded metadata-declared raw bank pointer inspection via opt-in `--target-words 1–16`.
 - [x] Refuse bank inspection on byte mismatch, ambiguous metadata or unsafe pointer budgets; return only aggregate evidence and explicit no-authentication/no-write flags.
