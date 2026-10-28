@@ -917,6 +917,7 @@ function drawCubeMapEvidence(){
     cubeWarpEvidence=null;cubeConnectionEvidence=null;
     status.textContent='Custom map structure changed or expired. Inspect again before navigating.';
     drawCubeWarpEvidence();
+    drawCubeConnectionEvidence();
     return;
   }
   $('cube-map-warps').disabled=false;
@@ -987,6 +988,8 @@ function drawCubeMapEvidence(){
     ' NOT verified passability or rendered tiles. Tap to inspect source bytes.','palette-note'));
   for(const row of grid.cells){
     const line=document.createElement('div');line.className='input-row';
+    line.style.display='grid';line.style.gridTemplateColumns='repeat('+grid.columns+',minmax(3rem,1fr))';
+    line.style.overflowX='auto';line.style.gap='2px';
     for(const cell of row){
       const button=document.createElement('button');button.type='button';
       button.className='subtle-button';
@@ -1123,7 +1126,7 @@ $('cube-map-warps').addEventListener('click',()=>safeRun(()=>{
     throw Error('Selected CUBE map changed; inspect again');
   const report=inspectHmaCubeMapEventWarps(model,mapBankCustomSummary,options);
   cubeWarpEvidence={options,report};
-  drawCubeWarpEvidence();
+  drawCubeMapEvidence();
 }));
 
 function drawCubeConnectionEvidence(){
