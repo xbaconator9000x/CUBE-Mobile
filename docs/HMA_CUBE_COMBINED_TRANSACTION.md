@@ -8,6 +8,6 @@ The function accepts 1–32 proposals per kind, at least one nonempty kind, and 
 
 ## Next integration and acceptance gates
 
-This module is a core transaction primitive and is **not yet exposed as a combined touchscreen control**. The separate mobile warp/event queues and map-cell queue remain copy-only. Future integration should coordinate their queue snapshots and show a single cross-kind review before any save-as capability.
+The mobile and offline UI now expose **Verify combined cell, warp and event rollback**. It combines the current map-cell queue (when its rendered snapshot matches the inspected CUBE map) with the warp and event queues, rejecting stale or mismatched map/ROM selections. At least one warp or event must be queued to enable this action. It remains copy-only; a persisted save-as workflow is not enabled.
 
 Before semantic ROM writing is considered, independently establish exact CUBE ROM/TOML provenance, complete ownership across every bank and alias, transactional persistence and reopen, emulator behavior, Android hardware testing, and the six-evidence feature acceptance gate. Synthetic fixtures are internal correctness tests, not proof of authentic parity.
