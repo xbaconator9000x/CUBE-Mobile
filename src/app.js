@@ -900,6 +900,7 @@ function clearCubeRenderedMap(message='CUBE render invalidated; render again.'){
   $('cube-map-render-canvas').hidden=true;
   $('cube-map-render-jump').disabled=true;
   $('cube-map-render-status').textContent=message;
+  $('cube-map-overlay-legend').textContent='No CUBE raw overlay selected.';
   $('cube-map-render-selection').textContent='Tap a rendered CUBE cell to inspect raw offsets.';
 }
 function drawCubeMapEvidence(){
@@ -1076,10 +1077,31 @@ $('cube-map-render').addEventListener('click',()=>safeRun(()=>{
   canvas.width=rendered.width;canvas.height=rendered.height;
   const image=ctx.createImageData(rendered.width,rendered.height);
   image.data.set(rendered.pixels);ctx.putImageData(image,0,0);
+  const overlayMode=$('cube-map-overlay').value;
+  const legend=$('cube-map-overlay-legend');legend.replaceChildren();
+  if(overlayMode!=='none'){
+    const overlay=buildVanillaRawMapOverlay(rendered,{mode:overlayMode,maxLegend:12});
+    for(const cell of overlay.cells){
+      ctx.fillStyle='rgba('+cell.rgb.join(',')+',0.45)';
+      ctx.fillRect(cell.column*16,cell.row*16,16,16);
+    }
+    legend.append(semanticChild('span',overlay.field+' raw values ('+
+      overlay.distinctValues+' distinct, '+(overlay.legendTruncated?'legend truncated':'all shown')+
+      '): ','palette-note'));
+    for(const item of overlay.legend){
+      const chip=document.createElement('span');
+      chip.textContent=item.value+' ('+item.count+')';
+      chip.style.display='inline-block';chip.style.margin='2px';
+      chip.style.padding='3px 5px';chip.style.borderRadius='3px';
+      chip.style.background='rgb('+item.rgb.join(',')+')';
+      chip.style.color='#10131c';chip.style.fontWeight='bold';
+      legend.append(chip);
+    }
+  }else legend.textContent='No CUBE raw overlay selected.';
   canvas.style.width=(rendered.width*2)+'px';
   canvas.style.height=(rendered.height*2)+'px';
   canvas.hidden=false;
-  cubeRenderEvidence={rom:model,options,x,y,map:rendered.map,
+  cubeRenderEvidence={rom:model,options,x,y,overlayMode,map:rendered.map,
     pixels:rendered.pixels.slice(),cellsJson:JSON.stringify(rendered.cells),
     attributesJson:JSON.stringify(rendered.attributes)};
   cubeRenderSelection=null;$('cube-map-render-jump').disabled=true;
@@ -1087,10 +1109,14 @@ $('cube-map-render').addEventListener('click',()=>safeRun(()=>{
     rendered.rows+' CUBE RSE metatiles (16 × 16 pixels each). Unsupported custom light palettes and FRLG layouts are refused. ROM/layout and walkability remain unverified.';
   $('cube-map-render-selection').textContent='Tap a rendered cell to inspect raw source offsets.';
 }));
+$('cube-map-overlay').addEventListener('change',()=>{
+  clearCubeRenderedMap('Raw overlay changed; render the CUBE map again.');
+});
 $('cube-map-render-canvas').addEventListener('click',event=>safeRun(()=>{
   const snapshot=cubeRenderEvidence;
   if(!snapshot||snapshot.rom!==model||!cubeMapEvidence||
-     snapshot.options!==cubeMapEvidence.options)
+     snapshot.options!==cubeMapEvidence.options||
+     snapshot.overlayMode!==$('cube-map-overlay').value)
     throw Error('CUBE rendered map expired; render again');
   const fresh=renderHmaCubeMapViewport(model,mapBankCustomSummary,{
     ...snapshot.options,x:snapshot.x,y:snapshot.y,viewportWidth:10,viewportHeight:8});
