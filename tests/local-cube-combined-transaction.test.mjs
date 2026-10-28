@@ -50,6 +50,8 @@ async function fixture(run){
   ptr(bytes,0x830,0xb000);ptr(bytes,0x86c,0xb010);
   u16(bytes,0x824,1);u16(bytes,0x826,0);
   u16(bytes,0x800,0);u16(bytes,0x802,0);
+  // A script-operand-like unaligned pointer into the decoded object record.
+  u32(bytes,0xc01,0x08000820);
   await writeFile(rom,bytes);await writeFile(metadata,toml);await writeFile(plan,JSON.stringify(edit));
   const hash=createHash('sha256').update(bytes).digest('hex');
   const args=['--rom',rom,'--metadata',metadata,'--expected-sha256',hash,
@@ -68,6 +70,9 @@ test('five kinds re-decode and roll back on disk without exporting edited ROM',a
   assert.equal(r.ownershipConflicts,0);
   assert.ok(r.globalPointerCensus.scannedAlignedWords>0);
   assert.ok(r.globalPointerCensus.canonicalPointerCandidates>=4);
+  assert.ok(r.globalPointerCensus.unalignedCanonicalPointerCandidates>=1);
+  assert.equal(r.globalPointerCensus.allByteWindowsScanned,true);
+  assert.equal(r.globalPointerCensus.unalignedPointersInspected,true);
   assert.equal(r.globalPointerCensus.globalOwnershipProven,false);
   assert.equal(r.globalPointerCensus.writeAuthorized,false);
   assert.equal(r.writeAuthorized,false);
