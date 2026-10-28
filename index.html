@@ -116,6 +116,13 @@
   <div class="input-row"><button type="button" id="cube-map-warps" class="subtle-button" disabled>Inspect CUBE custom event/warp records (read only)</button></div>
   <output id="cube-warps-status" class="palette-note" aria-live="polite">Inspect a custom CUBE map before reading its raw event arrays.</output>
   <div id="cube-warps-list" class="anchor-list" aria-label="Unverified CUBE event and warp records"></div>
+  <div class="input-row" aria-label="Read-only CUBE warp arrival trace">
+    <div class="input-wrap"><label for="cube-warp-trace-index">Source warp index</label><input id="cube-warp-trace-index" type="number" min="0" max="254" value="0"></div>
+    <div class="input-wrap"><label for="cube-target-map-count">Maps in destination bank (explicit)</label><input id="cube-target-map-count" type="number" min="1" max="1024" value="1"></div>
+    <button type="button" id="cube-warp-trace" class="subtle-button" disabled>Trace raw CUBE warp arrival</button>
+    <button type="button" id="cube-warp-trace-open" class="subtle-button" disabled>Inspect raw destination map</button>
+  </div>
+  <output id="cube-warp-trace-status" class="palette-note" aria-live="polite">Inspect CUBE warps, then supply an explicit destination-bank map count.</output>
   <div class="input-row"><button type="button" id="cube-map-connections" class="subtle-button" disabled>Inspect CUBE custom map connections (read only)</button></div>
   <output id="cube-connections-status" class="palette-note" aria-live="polite">Inspect a custom CUBE map before reading its connections.</output>
   <div id="cube-connections-list" class="anchor-list" aria-label="Unverified CUBE connection records"></div>
