@@ -149,6 +149,15 @@
   <div class="input-row"><button type="button" id="map-bank-target-scan" class="subtle-button" disabled>Inspect raw bank target windows</button></div>
   <output id="map-bank-target-status" class="palette-note" aria-live="polite">No second-hop raw target windows inspected. No map counts or CUBE structures inferred.</output>
   <div id="map-bank-target-list" class="anchor-list"></div>
+  <div class="input-row">
+    <div class="input-wrap"><label for="cube-bank-index">CUBE bank index (0-based)</label><input id="cube-bank-index" type="number" min="0" max="255" value="0"></div>
+    <div class="input-wrap"><label for="cube-map-count">Maps in selected bank (explicit, not discovered)</label><input id="cube-map-count" type="number" min="1" max="1024" value="1"></div>
+    <div class="input-wrap"><label for="cube-map-index">Map index (0-based)</label><input id="cube-map-index" type="number" min="0" max="1023" value="0"></div>
+  </div>
+  <div class="input-row"><button type="button" id="cube-map-inspect" class="subtle-button" disabled>Inspect declared CUBE custom map (read only)</button></div>
+  <output id="cube-map-status" class="palette-note" aria-live="polite">Requires pinned CUBE custom map format and explicit nested map count; no ROM authenticity or write permissions.</output>
+  <div id="cube-map-details" class="anchor-list" aria-label="Unverified custom CUBE map header, layout and raw cells"></div>
+
   <p class="palette-note">Metadata format hints are not proof of CUBE compatibility, collision semantics or safe ROM editing.</p>
  </div>
  <div class="toolbar-card"><div class="input-wrap"><label for="anchor-find">Search named anchors</label><input id="anchor-find" placeholder="e.g. pokemon.stats, maps, trainers, sound…" spellcheck="false"></div><div class="input-wrap"><label for="anchor-group">Category</label><select id="anchor-group"><option value="all">All categories</option></select></div></div>
@@ -5923,7 +5932,7 @@ function auditVanillaAtlasScriptOperandAliases(source,atlas,{
  });
 }
 
-const summarizeHmaMapBankSources=(()=>{
+const {summarizeHmaMapBankSources,inspectHmaMapBankAnchorSources}=(()=>{
 /**
  * Conservative read-only HMA map format hierarchy extractor.
  * Ported from pinned kcradi/CUBHMA MapModel.cs Format.ExtractPointerContent
@@ -6233,7 +6242,7 @@ function summarizeHmaMapBankSources(sources,{romSize=Infinity}={}){
   });
 }
 
-return summarizeHmaMapBankSources;
+return {summarizeHmaMapBankSources,inspectHmaMapBankAnchorSources};
 })();
 /**
  * Read-only, four-byte raw evidence at a TOML-declared map-bank anchor.
@@ -6468,11 +6477,139 @@ function inspectHmaDeclaredBankTargetWindows(rom,summary,{
   });
 }
 
+/**
+ * Read-only, source-grounded CUBE Emerald map structure inspection.
+ * Pinned: kcradi/CUBHMA 3044393183e01af2ae1e907fb37e4a75eda6a8dc,
+ * MapModel.cs and QuickEditItems/cube_emerald.toml.
+ * Nested map counts are dynamic: an explicit bounded count is mandatory.
+ * Recognized metadata is not independent ROM/build authentication.
+ */
+const T=String.fromCharCode(96);
+const BLOCKDATA='[isCompressed. isSecondary. lightPalettes. customLightColor. tileset<'+T+'lzt4'+T+'> pal<'+T+'ucp4:0123456789ABCDEF'+T+'> blockset<> attributes<> animation<>]1';
+const LAYOUT='[width:: height:: borderblock<[border:|h]4> blockmap<'+T+'blm'+T+'> blockdata1<'+BLOCKDATA+'> blockdata2<'+BLOCKDATA+'> isFrlg. borderWidth. borderHeight. unused.]1';
+const HEADER_TAIL=' music:songnames layoutID:data.maps.layouts+1 regionSectionID.data.maps.names weather.weathertypes mapType.maptypes floorNumber.|z nightMusic:songnames flags.|t|allowBiking.|allowEscaping.|allowRunning.|showMapName.|writeSpecialVarIsEffect.|cave.|unused: battleType.mapbattlescenes]1';
+
+function reader(source){
+  if(source instanceof Uint8Array)return {length:source.length,read:i=>source[i]};
+  if(source&&Number.isSafeInteger(source.length)&&source.length>=0&&typeof source.read==='function')return source;
+  throw new TypeError('Expected ROM byte array or bounded staged reader');
+}
+function span(rom,offset,size,label,align=4){
+  if(!Number.isSafeInteger(offset)||offset<0||offset%align!==0||
+     !Number.isSafeInteger(size)||size<1||offset>rom.length-size)
+    throw new RangeError(label+' is unaligned or outside ROM');
+}
+function u8(rom,i){
+  const n=rom.read(i);
+  if(!Number.isInteger(n)||n<0||n>255)throw new RangeError('Invalid staged ROM byte');
+  return n;
+}
+function u16(rom,i){return u8(rom,i)|(u8(rom,i+1)<<8);}
+function u32(rom,i){return (u16(rom,i)|(u16(rom,i+2)<<16))>>>0;}
+function pointer(rom,raw,label,{nullable=false,align=4}={}){
+  if(nullable&&(raw===0||raw===0xFFFFFFFF))return null;
+  if(raw<0x08000000||raw>=0x0A000000)
+    throw new RangeError(label+' is not a conventional GBA ROM pointer');
+  const target=raw-0x08000000;
+  span(rom,target,1,label,align);
+  return target;
+}
+function overlaps(a,as,b,bs){return a<b+bs&&b<a+as;}
+function disjoint(a,as,b,bs,label){
+  if(a!==null&&b!==null&&overlaps(a,as,b,bs))
+    throw new RangeError(label+' overlaps another map structure');
+}
+function checkFormat(summary){
+  if(summary?.status!=='custom-candidate'||summary.uniqueDeclarationCount!==1)
+    throw new RangeError('An unambiguous custom CUBE metadata declaration is required');
+  const hierarchy=summary.hierarchy,sections=hierarchy?.sections;
+  if(!hierarchy||!sections||sections.layout!==LAYOUT||
+     typeof sections.events!=='string'||typeof sections.connections!=='string'||
+     !sections.events.startsWith('[objectCount. warpCount. scriptCount. signpostCount.')||
+     !sections.connections.startsWith('[count:: connections<'))
+    throw new RangeError('Unsupported CUBE custom map layout declaration');
+  const expected='[layout<'+sections.layout+'> events<'+sections.events+
+    '> mapscripts<[type. pointer<>]!00> connections<'+sections.connections+'>'+HEADER_TAIL;
+  if(hierarchy.mapFormat!==expected)
+    throw new RangeError('Unsupported CUBE map header field order');
+}
+/**
+ * Resolve one explicit bank/map into a 28-byte custom header and layout.
+ * No inferred map counts, walkability, ROM authenticity or editing.
+ */
+function inspectHmaCubeMapEntry(source,summary,{bankIndex,mapIndex,mapCount}={}){
+  const rom=reader(source);
+  checkFormat(summary);
+  if(!Number.isSafeInteger(mapCount)||mapCount<1||mapCount>1024||
+     !Number.isSafeInteger(mapIndex)||mapIndex<0||mapIndex>=mapCount)
+    throw new RangeError('Explicit map count/index outside 1–1024 budget');
+  const table=inspectHmaDeclaredBankPointerTable(rom,summary);
+  if(!Number.isSafeInteger(bankIndex)||bankIndex<0||bankIndex>=table.declaredBankCount)
+    throw new RangeError('Bank index outside metadata-declared table');
+  const bank=table.rows[bankIndex];
+  if(bank.targetOffset===null||bank.unaligned||bank.pointsInsideTable)
+    throw new RangeError('Selected bank pointer is not a safe in-ROM target');
+  const bankOffset=bank.targetOffset,bankBytes=mapCount*4;
+  span(rom,bankOffset,bankBytes,'Explicit bank map pointer array');
+  disjoint(bankOffset,bankBytes,table.anchorOffset,table.tableByteLength,'Bank pointer array');
+  const mapPointerSource=bankOffset+mapIndex*4;
+  const mapPointer=u32(rom,mapPointerSource);
+  const headerOffset=pointer(rom,mapPointer,'CUBE map header');
+  span(rom,headerOffset,28,'CUBE map header');
+  disjoint(headerOffset,28,bankOffset,bankBytes,'Map header');
+  disjoint(headerOffset,28,table.anchorOffset,table.tableByteLength,'Map header');
+  const layoutPointer=u32(rom,headerOffset);
+  const layoutOffset=pointer(rom,layoutPointer,'CUBE layout');
+  span(rom,layoutOffset,28,'CUBE layout');
+  disjoint(layoutOffset,28,headerOffset,28,'Map layout');
+  disjoint(layoutOffset,28,bankOffset,bankBytes,'Map layout');
+  disjoint(layoutOffset,28,table.anchorOffset,table.tableByteLength,'Map layout');
+  const eventsPointer=u32(rom,headerOffset+4),scriptsPointer=u32(rom,headerOffset+8),
+    connectionsPointer=u32(rom,headerOffset+12);
+  const eventsOffset=pointer(rom,eventsPointer,'Events',{nullable:true});
+  const scriptsOffset=pointer(rom,scriptsPointer,'Map scripts',{nullable:true});
+  const connectionsOffset=pointer(rom,connectionsPointer,'Connections',{nullable:true});
+  const width=u32(rom,layoutOffset),height=u32(rom,layoutOffset+4);
+  if(width<1||height<1||width>1024||height>1024)
+    throw new RangeError('CUBE layout dimensions outside bounded viewport');
+  const borderPointer=u32(rom,layoutOffset+8),blockmapPointer=u32(rom,layoutOffset+12),
+    primaryPointer=u32(rom,layoutOffset+16),secondaryPointer=u32(rom,layoutOffset+20);
+  const borderOffset=pointer(rom,borderPointer,'Border blocks',{align:2});
+  const blockmapOffset=pointer(rom,blockmapPointer,'Blockmap',{align:2});
+  const primaryOffset=pointer(rom,primaryPointer,'Primary blockset');
+  const secondaryOffset=pointer(rom,secondaryPointer,'Secondary blockset');
+  const blockmapBytes=width*height*2;
+  span(rom,blockmapOffset,blockmapBytes,'Complete CUBE blockmap',2);
+  for(const [other,size,label] of [
+    [table.anchorOffset,table.tableByteLength,'bank table'],
+    [bankOffset,bankBytes,'bank map pointer array'],
+    [headerOffset,28,'map header'],
+    [layoutOffset,28,'map layout']])
+    disjoint(blockmapOffset,blockmapBytes,other,size,'Blockmap versus '+label);
+  const layout=Object.freeze({address:layoutOffset,width,height,blockmapOffset,
+    blockmapPointer,blockmapBytes,borderOffset,borderPointer,primaryOffset,primaryPointer,
+    secondaryOffset,secondaryPointer,isFrlg:u8(rom,layoutOffset+24),
+    borderWidth:u8(rom,layoutOffset+25),borderHeight:u8(rom,layoutOffset+26),
+    unused:u8(rom,layoutOffset+27)});
+  const header=Object.freeze({address:headerOffset,layoutOffset,layoutPointer,
+    eventsOffset,eventsPointer,scriptsOffset,scriptsPointer,
+    connectionsOffset,connectionsPointer,music:u16(rom,headerOffset+16),
+    layoutId:u16(rom,headerOffset+18),regionSectionId:u8(rom,headerOffset+20),
+    weather:u8(rom,headerOffset+21),mapType:u8(rom,headerOffset+22),
+    floorNumber:u8(rom,headerOffset+23),nightMusic:u16(rom,headerOffset+24),
+    flags:u8(rom,headerOffset+26),battleType:u8(rom,headerOffset+27)});
+  return Object.freeze({bankIndex,mapIndex,mapCount,declaredBankCount:table.declaredBankCount,
+    bankPointerSource:bank.sourceOffset,bankOffset,mapPointerSource,mapPointer,
+    header,layout,readOnly:true,metadataFormatRecognized:true,
+    romAuthenticated:false,cubeLayoutAuthenticated:false,
+    walkabilityVerified:false,writeAuthorized:false});
+}
+
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let pcsReference=null,pcsReferenceName='';
 let fingerprintResult=null,fingerprintAbort=null;
-let metadataFingerprints=[],metadataImportSerial=0,mapBankMetadataReport=null,mapBankRawPointerEvidence=null,mapBankRawWindowEvidence=null,mapBankDeclaredEvidence=null,mapBankTargetEvidence=null;
+let metadataFingerprints=[],metadataImportSerial=0,mapBankMetadataReport=null,mapBankRawPointerEvidence=null,mapBankRawWindowEvidence=null,mapBankDeclaredEvidence=null,mapBankTargetEvidence=null,mapBankCustomSummary=null,cubeMapEvidence=null;
 let inspectedWarpMap=null,selectedWarpPreview=null,selectedEventPreview=null,inspectedEventMap=null,inspectedMapAtlas=null,atlasBatchStart=0,atlasCoordinateBatchStart=0,atlasScriptAliasStart=0,atlasScriptCrossPageStart=0,atlasIncomingStart=0,atlasIncomingTarget=null;
 let activeRenderedMap=null,selectedRenderedHit=null;
 let mapReviewQueue=[],mapReviewRom=null,lastMapPreviews={cell:null,warp:null,event:null};
@@ -6832,7 +6969,7 @@ if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostn
 // engine, game fingerprints and pointer allocator have been ported and tested.
 let displayedAnchors=[], selectedInspection=null;
 const encodeHex=bytes=>Array.from(bytes).map((b,i)=>hex(b,2)+(i%16===15?'\n':' ')).join('').trim();
-function metadataReset(){metadataImportSerial++;metadataFingerprints=[];clearWarpInspection('Metadata reset; inspect warps again.');clearMapChangeReview();clearConnectionInspection('Metadata reset; inspect connections again.');clearMapGrid('Metadata reset; inspect map again.');metadata=[];metadataSources=[];mapBankMetadataReport=null;mapBankRawPointerEvidence=null;mapBankRawWindowEvidence=null;mapBankDeclaredEvidence=null;mapBankTargetEvidence=null;metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
+function metadataReset(){metadataImportSerial++;metadataFingerprints=[];clearWarpInspection('Metadata reset; inspect warps again.');clearMapChangeReview();clearConnectionInspection('Metadata reset; inspect connections again.');clearMapGrid('Metadata reset; inspect map again.');metadata=[];metadataSources=[];mapBankMetadataReport=null;mapBankRawPointerEvidence=null;mapBankRawWindowEvidence=null;mapBankDeclaredEvidence=null;mapBankTargetEvidence=null;mapBankCustomSummary=null;cubeMapEvidence=null;metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
 function snapshotMatchedWords(words=metadataMatchedWords){
   if(!model)return [];
   return words.map(word=>{
@@ -6864,6 +7001,7 @@ function metadataCommit(sources){
   // Custom CUBE/project TOML remains manually importable but is never authenticated by header alone.
   const metadataCheck=checkHmaMetadataSources(sources,model);
   const nextMapBankReport=summarizeHmaMapBankSources(sources,{romSize:model.length});
+  const nextMapBankCustomSummary=inspectHmaMapBankAnchorSources(sources,{romSize:model.length});
   // Preserve contradictory named declarations instead of silently replacing
   // them; the semantic resolver will exclude conflicting names from typed reads.
   const merged=collectHmaNamedAnchors(sources,{romSize:model.length});
@@ -6891,7 +7029,7 @@ function metadataCommit(sources){
   metadataWordSnapshot=nextWordSnapshot;
   metadata=nextMetadata;metadataResolution=nextResolution;
   metadataSources=sources.map(({name})=>name);metadataLayoutKind=metadataCheck.layout.kind;
-  mapBankMetadataReport=nextMapBankReport;mapBankRawPointerEvidence=null;mapBankRawWindowEvidence=null;mapBankDeclaredEvidence=null;mapBankTargetEvidence=null;
+  mapBankMetadataReport=nextMapBankReport;mapBankRawPointerEvidence=null;mapBankRawWindowEvidence=null;mapBankDeclaredEvidence=null;mapBankTargetEvidence=null;mapBankCustomSummary=nextMapBankCustomSummary;cubeMapEvidence=null;
   metadataFingerprints=nextFingerprints;
   clearWarpInspection('Metadata changed; re-inspect vanilla warps.');
   clearConnectionInspection('Metadata changed; re-inspect vanilla connections.');
@@ -7256,6 +7394,7 @@ function drawMapBankMetadataReport(){
   $('map-bank-raw-window-scan').disabled=true;
   $('map-bank-declared-scan').disabled=true;
   $('map-bank-target-scan').disabled=true;
+  $('cube-map-inspect').disabled=true;
   if(!report){
     status.textContent='Import TOML metadata to inspect the CUBHMA data.maps.banks declaration. No ROM layout is authenticated.';
     list.append(semanticChild('p','No map-bank metadata inspected.','palette-note'));
@@ -7263,6 +7402,7 @@ function drawMapBankMetadataReport(){
     drawMapBankRawWindowEvidence();
     drawMapBankDeclaredEvidence();
     drawMapBankTargetEvidence();
+    drawCubeMapEvidence();
     return;
   }
   const labels={
@@ -7303,11 +7443,107 @@ function drawMapBankMetadataReport(){
     report.declaredBankCount<1||report.declaredBankCount>256||
     report.declarations[0].address>model.length-report.declaredBankCount*4;
   $('map-bank-target-scan').disabled=$('map-bank-declared-scan').disabled;
+  $('cube-map-inspect').disabled=$('map-bank-declared-scan').disabled||report.status!=='custom-candidate';
   drawMapBankRawPointerEvidence();
   drawMapBankRawWindowEvidence();
   drawMapBankDeclaredEvidence();
   drawMapBankTargetEvidence();
+  drawCubeMapEvidence();
 }
+
+function drawCubeMapEvidence(){
+  const status=$('cube-map-status'),details=$('cube-map-details');
+  details.replaceChildren();
+  const snapshot=cubeMapEvidence;
+  if(!snapshot){
+    status.textContent='Select a CUBE bank/map and supply its explicit map count. The ROM and custom layout remain unverified.';
+    return;
+  }
+  let fresh;
+  try{
+    fresh=inspectHmaCubeMapEntry(ensureModel(),mapBankCustomSummary,snapshot.options);
+    if(JSON.stringify(fresh)!==JSON.stringify(snapshot.report))
+      throw Error('CUBE map structure changed');
+  }catch(_err){
+    cubeMapEvidence=null;
+    status.textContent='Custom map structure changed or expired. Inspect again before navigating.';
+    return;
+  }
+  const h=fresh.header,l=fresh.layout;
+  status.textContent='CUBE custom-format candidate: bank '+fresh.bankIndex+
+    ', map '+fresh.mapIndex+' · '+l.width+' × '+l.height+
+    ' raw cells · region '+h.regionSectionId+' · weather '+h.weather+
+    '. Format recognized, ROM NOT authenticated; no editing or walkability inference.';
+  function jumpButton(label,offset){
+    const button=document.createElement('button');button.type='button';
+    button.className='subtle-button';button.textContent=label+' · 0x'+hex(offset);
+    button.addEventListener('click',()=>safeRun(()=>{
+      if(cubeMapEvidence!==snapshot)throw Error('CUBE map inspection expired');
+      const now=inspectHmaCubeMapEntry(ensureModel(),mapBankCustomSummary,snapshot.options);
+      if(JSON.stringify(now)!==JSON.stringify(snapshot.report))
+        throw Error('Custom map structure changed; inspect again');
+      setPageForOffset(offset);gotoTab('hex');
+    }));
+    details.append(button);
+  }
+  jumpButton('Map pointer',fresh.mapPointerSource);
+  jumpButton('Map header',h.address);
+  jumpButton('Custom layout',l.address);
+  jumpButton('Raw blockmap',l.blockmapOffset);
+  if(h.eventsOffset!==null)jumpButton('Event group (unparsed)',h.eventsOffset);
+  const open=document.createElement('button');open.type='button';open.className='subtle-button';
+  open.textContent='Open raw blockmap viewport (not rendered)';
+  open.addEventListener('click',()=>safeRun(()=>{
+    if(cubeMapEvidence!==snapshot)throw Error('CUBE map inspection expired');
+    const now=inspectHmaCubeMapEntry(ensureModel(),mapBankCustomSummary,snapshot.options);
+    if(JSON.stringify(now)!==JSON.stringify(snapshot.report))
+      throw Error('Custom map structure changed; inspect again');
+    $('map-offset').value=hex(now.layout.blockmapOffset);
+    $('map-width').value=String(now.layout.width);
+    $('map-height').value=String(now.layout.height);
+    $('map-x').value='0';$('map-y').value='0';
+    gotoTab('maps');$('map-inspect').click();
+  }));
+  details.append(open);
+  const grid=inspectBlockMap(model,{address:l.blockmapOffset,width:l.width,height:l.height,
+    viewportWidth:Math.min(8,l.width),viewportHeight:Math.min(6,l.height)});
+  details.append(semanticChild('p','Top-left '+grid.columns+' × '+grid.rows+
+    ' cells: tile ID / raw high six bits (NOT passability). Tap to inspect exact bytes.','palette-note'));
+  for(const row of grid.cells){
+    const line=document.createElement('div');line.className='input-row';
+    for(const cell of row){
+      const button=document.createElement('button');button.type='button';
+      button.className='subtle-button';
+      button.textContent=cell.tileId+'/'+cell.collision;
+      button.title='('+cell.x+','+cell.y+') at 0x'+hex(cell.byteOffset);
+      button.addEventListener('click',()=>safeRun(()=>{
+        if(cubeMapEvidence!==snapshot)throw Error('CUBE map inspection expired');
+        const now=inspectHmaCubeMapEntry(ensureModel(),mapBankCustomSummary,snapshot.options);
+        if(JSON.stringify(now)!==JSON.stringify(snapshot.report))
+          throw Error('Custom map structure changed; inspect again');
+        const current=inspectBlockMap(model,{address:now.layout.blockmapOffset,
+          width:now.layout.width,height:now.layout.height,x:cell.x,y:cell.y,
+          viewportWidth:1,viewportHeight:1}).cells[0][0];
+        if(current.raw!==cell.raw)throw Error('Raw cell changed; inspect again');
+        setPageForOffset(current.byteOffset);gotoTab('hex');
+      }));
+      line.append(button);
+    }
+    details.append(line);
+  }
+}
+$('cube-map-inspect').addEventListener('click',()=>safeRun(()=>{
+  ensureModel();
+  const options={bankIndex:Number($('cube-bank-index').value),
+    mapIndex:Number($('cube-map-index').value),
+    mapCount:Number($('cube-map-count').value)};
+  if(!['cube-bank-index','cube-map-index','cube-map-count'].every(id=>/^[0-9]+$/.test($(id).value)))
+    throw Error('Explicit integer bank/map indexes and map count required');
+  const report=inspectHmaCubeMapEntry(model,mapBankCustomSummary,options);
+  cubeMapEvidence={options,report};
+  drawCubeMapEvidence();
+}));
+
 function drawAnchors(){
   drawMetadataFingerprintStatus();
   drawMapBankMetadataReport();
