@@ -7,3 +7,7 @@ The caller supplies the selected bank/map with an explicit map count, a warp ind
 The result compares raw before/after arrival resolution, distinguishing missing destination-bank declarations, special targets, invalid map indexes and resolved raw warp indexes. A resolved raw arrival **does not prove actual game traversal**, collision/passability, correct script behavior, exclusive ownership or emulator compatibility.
 
 The mobile and offline interfaces now expose a raw warp field loader and a virtual before/after destination comparison, with stale-source revalidation before each preview. The UI **cannot write, export or patch a ROM**. It is a validation building block for a future ownership-checked, authenticated transaction editor. The synthetic fixture tests check stale-byte rejection, raw destination changes and unchanged source bytes. Real CUBE ROM/TOML, emulator, Android and save/reopen acceptance are still missing, so strict verified parity remains unchanged.
+
+## Reversible in-memory warp rehearsal
+
+`verifyHmaCubeWarpRecordDryRun` creates a bounded 1–64 MiB isolated ROM snapshot, checks the source for changes during copying, applies only the selected eight-byte warp record, re-decodes the record and raw destination trace, checks all other bytes, rolls back, and confirms the original ROM remains untouched. This is **not** a file save/reopen, authenticated ROM test, ownership proof or authorization to export patched ROM bytes.
