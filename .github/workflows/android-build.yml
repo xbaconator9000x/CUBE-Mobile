@@ -19,6 +19,10 @@ jobs:
         run: |
           npm run build:standalone
           git diff --exit-code -- app/CUBHMA_Mobile_Lab_Offline.html
+      - name: Validate Android export bridge protocol
+        run: |
+          node --check android/app/src/main/assets/export-bridge.js
+          node --test tests/android-export-bridge.test.mjs
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
