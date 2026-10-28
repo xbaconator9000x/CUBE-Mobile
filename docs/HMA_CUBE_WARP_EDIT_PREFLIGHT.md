@@ -11,3 +11,7 @@ The mobile and offline interfaces now expose a raw warp field loader and a virtu
 ## Reversible in-memory warp rehearsal
 
 `verifyHmaCubeWarpRecordDryRun` creates a bounded 1–64 MiB isolated ROM snapshot, checks the source for changes during copying, applies only the selected eight-byte warp record, re-decodes the record and raw destination trace, checks all other bytes, rolls back, and confirms the original ROM remains untouched. This is **not** a file save/reopen, authenticated ROM test, ownership proof or authorization to export patched ROM bytes.
+
+## Mobile/offline copy-only rehearsal
+
+After loading a raw CUBE warp and reviewing the virtual destination comparison, the **Verify isolated apply and rollback** button reruns all input/source checks and rehearses the change against a private in-memory copy. The status reports changed bytes, raw re-decode, full rollback and unchanged source. The button never writes or exports a ROM and cannot prove genuine CUBE game compatibility, real file save/reopen or Android hardware acceptance.
