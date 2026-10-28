@@ -43,12 +43,14 @@ import {inspectHmaMapBankRawPointer} from './hma-map-bank-raw-pointer.js';
 import {inspectHmaMapBankRawWindow} from './hma-map-bank-raw-window.js';
 import {inspectHmaDeclaredBankPointerTable} from './hma-map-bank-declared-table.js';
 import {inspectHmaDeclaredBankTargetWindows} from './hma-map-bank-target-windows.js';
+import {inspectHmaMapBankAnchorSources} from './hma-map-bank-metadata.js';
+import {inspectHmaCubeMapEntry} from './hma-cube-map-discovery.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let pcsReference=null,pcsReferenceName='';
 let fingerprintResult=null,fingerprintAbort=null;
-let metadataFingerprints=[],metadataImportSerial=0,mapBankMetadataReport=null,mapBankRawPointerEvidence=null,mapBankRawWindowEvidence=null,mapBankDeclaredEvidence=null,mapBankTargetEvidence=null;
+let metadataFingerprints=[],metadataImportSerial=0,mapBankMetadataReport=null,mapBankRawPointerEvidence=null,mapBankRawWindowEvidence=null,mapBankDeclaredEvidence=null,mapBankTargetEvidence=null,mapBankCustomSummary=null,cubeMapEvidence=null;
 let inspectedWarpMap=null,selectedWarpPreview=null,selectedEventPreview=null,inspectedEventMap=null,inspectedMapAtlas=null,atlasBatchStart=0,atlasCoordinateBatchStart=0,atlasScriptAliasStart=0,atlasScriptCrossPageStart=0,atlasIncomingStart=0,atlasIncomingTarget=null;
 let activeRenderedMap=null,selectedRenderedHit=null;
 let mapReviewQueue=[],mapReviewRom=null,lastMapPreviews={cell:null,warp:null,event:null};
@@ -408,7 +410,7 @@ if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostn
 // engine, game fingerprints and pointer allocator have been ported and tested.
 let displayedAnchors=[], selectedInspection=null;
 const encodeHex=bytes=>Array.from(bytes).map((b,i)=>hex(b,2)+(i%16===15?'\n':' ')).join('').trim();
-function metadataReset(){metadataImportSerial++;metadataFingerprints=[];clearWarpInspection('Metadata reset; inspect warps again.');clearMapChangeReview();clearConnectionInspection('Metadata reset; inspect connections again.');clearMapGrid('Metadata reset; inspect map again.');metadata=[];metadataSources=[];mapBankMetadataReport=null;mapBankRawPointerEvidence=null;mapBankRawWindowEvidence=null;mapBankDeclaredEvidence=null;mapBankTargetEvidence=null;metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
+function metadataReset(){metadataImportSerial++;metadataFingerprints=[];clearWarpInspection('Metadata reset; inspect warps again.');clearMapChangeReview();clearConnectionInspection('Metadata reset; inspect connections again.');clearMapGrid('Metadata reset; inspect map again.');metadata=[];metadataSources=[];mapBankMetadataReport=null;mapBankRawPointerEvidence=null;mapBankRawWindowEvidence=null;mapBankDeclaredEvidence=null;mapBankTargetEvidence=null;mapBankCustomSummary=null;cubeMapEvidence=null;metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
 function snapshotMatchedWords(words=metadataMatchedWords){
   if(!model)return [];
   return words.map(word=>{
@@ -440,6 +442,7 @@ function metadataCommit(sources){
   // Custom CUBE/project TOML remains manually importable but is never authenticated by header alone.
   const metadataCheck=checkHmaMetadataSources(sources,model);
   const nextMapBankReport=summarizeHmaMapBankSources(sources,{romSize:model.length});
+  const nextMapBankCustomSummary=inspectHmaMapBankAnchorSources(sources,{romSize:model.length});
   // Preserve contradictory named declarations instead of silently replacing
   // them; the semantic resolver will exclude conflicting names from typed reads.
   const merged=collectHmaNamedAnchors(sources,{romSize:model.length});
@@ -467,7 +470,7 @@ function metadataCommit(sources){
   metadataWordSnapshot=nextWordSnapshot;
   metadata=nextMetadata;metadataResolution=nextResolution;
   metadataSources=sources.map(({name})=>name);metadataLayoutKind=metadataCheck.layout.kind;
-  mapBankMetadataReport=nextMapBankReport;mapBankRawPointerEvidence=null;mapBankRawWindowEvidence=null;mapBankDeclaredEvidence=null;mapBankTargetEvidence=null;
+  mapBankMetadataReport=nextMapBankReport;mapBankRawPointerEvidence=null;mapBankRawWindowEvidence=null;mapBankDeclaredEvidence=null;mapBankTargetEvidence=null;mapBankCustomSummary=nextMapBankCustomSummary;cubeMapEvidence=null;
   metadataFingerprints=nextFingerprints;
   clearWarpInspection('Metadata changed; re-inspect vanilla warps.');
   clearConnectionInspection('Metadata changed; re-inspect vanilla connections.');
@@ -832,6 +835,7 @@ function drawMapBankMetadataReport(){
   $('map-bank-raw-window-scan').disabled=true;
   $('map-bank-declared-scan').disabled=true;
   $('map-bank-target-scan').disabled=true;
+  $('cube-map-inspect').disabled=true;
   if(!report){
     status.textContent='Import TOML metadata to inspect the CUBHMA data.maps.banks declaration. No ROM layout is authenticated.';
     list.append(semanticChild('p','No map-bank metadata inspected.','palette-note'));
@@ -839,6 +843,7 @@ function drawMapBankMetadataReport(){
     drawMapBankRawWindowEvidence();
     drawMapBankDeclaredEvidence();
     drawMapBankTargetEvidence();
+    drawCubeMapEvidence();
     return;
   }
   const labels={
@@ -879,11 +884,107 @@ function drawMapBankMetadataReport(){
     report.declaredBankCount<1||report.declaredBankCount>256||
     report.declarations[0].address>model.length-report.declaredBankCount*4;
   $('map-bank-target-scan').disabled=$('map-bank-declared-scan').disabled;
+  $('cube-map-inspect').disabled=$('map-bank-declared-scan').disabled||report.status!=='custom-candidate';
   drawMapBankRawPointerEvidence();
   drawMapBankRawWindowEvidence();
   drawMapBankDeclaredEvidence();
   drawMapBankTargetEvidence();
+  drawCubeMapEvidence();
 }
+
+function drawCubeMapEvidence(){
+  const status=$('cube-map-status'),details=$('cube-map-details');
+  details.replaceChildren();
+  const snapshot=cubeMapEvidence;
+  if(!snapshot){
+    status.textContent='Select a CUBE bank/map and supply its explicit map count. The ROM and custom layout remain unverified.';
+    return;
+  }
+  let fresh;
+  try{
+    fresh=inspectHmaCubeMapEntry(ensureModel(),mapBankCustomSummary,snapshot.options);
+    if(JSON.stringify(fresh)!==JSON.stringify(snapshot.report))
+      throw Error('CUBE map structure changed');
+  }catch(_err){
+    cubeMapEvidence=null;
+    status.textContent='Custom map structure changed or expired. Inspect again before navigating.';
+    return;
+  }
+  const h=fresh.header,l=fresh.layout;
+  status.textContent='CUBE custom-format candidate: bank '+fresh.bankIndex+
+    ', map '+fresh.mapIndex+' · '+l.width+' × '+l.height+
+    ' raw cells · region '+h.regionSectionId+' · weather '+h.weather+
+    '. Format recognized, ROM NOT authenticated; no editing or walkability inference.';
+  function jumpButton(label,offset){
+    const button=document.createElement('button');button.type='button';
+    button.className='subtle-button';button.textContent=label+' · 0x'+hex(offset);
+    button.addEventListener('click',()=>safeRun(()=>{
+      if(cubeMapEvidence!==snapshot)throw Error('CUBE map inspection expired');
+      const now=inspectHmaCubeMapEntry(ensureModel(),mapBankCustomSummary,snapshot.options);
+      if(JSON.stringify(now)!==JSON.stringify(snapshot.report))
+        throw Error('Custom map structure changed; inspect again');
+      setPageForOffset(offset);gotoTab('hex');
+    }));
+    details.append(button);
+  }
+  jumpButton('Map pointer',fresh.mapPointerSource);
+  jumpButton('Map header',h.address);
+  jumpButton('Custom layout',l.address);
+  jumpButton('Raw blockmap',l.blockmapOffset);
+  if(h.eventsOffset!==null)jumpButton('Event group (unparsed)',h.eventsOffset);
+  const open=document.createElement('button');open.type='button';open.className='subtle-button';
+  open.textContent='Open raw blockmap viewport (not rendered)';
+  open.addEventListener('click',()=>safeRun(()=>{
+    if(cubeMapEvidence!==snapshot)throw Error('CUBE map inspection expired');
+    const now=inspectHmaCubeMapEntry(ensureModel(),mapBankCustomSummary,snapshot.options);
+    if(JSON.stringify(now)!==JSON.stringify(snapshot.report))
+      throw Error('Custom map structure changed; inspect again');
+    $('map-offset').value=hex(now.layout.blockmapOffset);
+    $('map-width').value=String(now.layout.width);
+    $('map-height').value=String(now.layout.height);
+    $('map-x').value='0';$('map-y').value='0';
+    gotoTab('maps');$('map-inspect').click();
+  }));
+  details.append(open);
+  const grid=inspectBlockMap(model,{address:l.blockmapOffset,width:l.width,height:l.height,
+    viewportWidth:Math.min(8,l.width),viewportHeight:Math.min(6,l.height)});
+  details.append(semanticChild('p','Top-left '+grid.columns+' × '+grid.rows+
+    ' cells: tile ID / raw high six bits (NOT passability). Tap to inspect exact bytes.','palette-note'));
+  for(const row of grid.cells){
+    const line=document.createElement('div');line.className='input-row';
+    for(const cell of row){
+      const button=document.createElement('button');button.type='button';
+      button.className='subtle-button';
+      button.textContent=cell.tileId+'/'+cell.collision;
+      button.title='('+cell.x+','+cell.y+') at 0x'+hex(cell.byteOffset);
+      button.addEventListener('click',()=>safeRun(()=>{
+        if(cubeMapEvidence!==snapshot)throw Error('CUBE map inspection expired');
+        const now=inspectHmaCubeMapEntry(ensureModel(),mapBankCustomSummary,snapshot.options);
+        if(JSON.stringify(now)!==JSON.stringify(snapshot.report))
+          throw Error('Custom map structure changed; inspect again');
+        const current=inspectBlockMap(model,{address:now.layout.blockmapOffset,
+          width:now.layout.width,height:now.layout.height,x:cell.x,y:cell.y,
+          viewportWidth:1,viewportHeight:1}).cells[0][0];
+        if(current.raw!==cell.raw)throw Error('Raw cell changed; inspect again');
+        setPageForOffset(current.byteOffset);gotoTab('hex');
+      }));
+      line.append(button);
+    }
+    details.append(line);
+  }
+}
+$('cube-map-inspect').addEventListener('click',()=>safeRun(()=>{
+  ensureModel();
+  const options={bankIndex:Number($('cube-bank-index').value),
+    mapIndex:Number($('cube-map-index').value),
+    mapCount:Number($('cube-map-count').value)};
+  if(!['cube-bank-index','cube-map-index','cube-map-count'].every(id=>/^[0-9]+$/.test($(id).value)))
+    throw Error('Explicit integer bank/map indexes and map count required');
+  const report=inspectHmaCubeMapEntry(model,mapBankCustomSummary,options);
+  cubeMapEvidence={options,report};
+  drawCubeMapEvidence();
+}));
+
 function drawAnchors(){
   drawMetadataFingerprintStatus();
   drawMapBankMetadataReport();
