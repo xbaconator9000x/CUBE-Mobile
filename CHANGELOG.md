@@ -1,3 +1,10 @@
+## 28 October 2026 — CUBE custom map and warp structural inspection
+
+- Implemented source-pinned CUBE Emerald 28-byte map header/layout decoding from explicit metadata-declared bank and manually bounded nested map count.
+- Added read-only mobile/offline raw blockmap viewport, map header/layout hex navigation, custom event-array validation and warp coordinate review with stale-byte checks.
+- Extended local SHA-256-gated CUBE smoke with opt-in aggregate custom map/event/warp evidence; added synthetic pointer/overlap/immutability tests.
+- No ROM assets or semantic-writing permissions; strict independently verified CUBE parity remains 0/30.
+
 ## Unreleased — opt-in local ROM raw warp graph smoke (28 October 2026)
 - Extend the SHA-256-matched local-only smoke tool with optional aggregate raw directed warp/connection counts and structural reachability, without exporting raw edge offsets or ROM bytes.
 - Add synthetic two-map and malformed manifest regressions. No gameplay/CUBE compatibility claims or parity credit.

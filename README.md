@@ -4,6 +4,14 @@ This is a test.
 
 ---
 
+## Development checkpoint — CUBE Emerald custom map structures and raw warps
+
+The **Named Data** screen now supports explicit CUBE bank/map selection with a required per-bank map count, decoding the pinned CUBHMA custom 28-byte map header and layout into a bounded raw-cell viewport. It also offers read-only custom event-group/warp inspection, including source-byte navigation, out-of-map coordinate warnings and special-target hints. The standalone offline HTML contains both workflows.
+
+The local SHA-256-gated CUBE bank smoke optionally reports aggregate custom map dimensions, raw-cell counts and event/warp counts. It never exports ROM bytes or paths. See [custom map discovery](docs/HMA_CUBE_CUSTOM_MAP_DISCOVERY.md), [custom warps](docs/HMA_CUBE_CUSTOM_EVENT_WARPS.md), and [local smoke](docs/LOCAL_CUBE_BANK_SMOKE.md).
+
+**No verified CUBE ROM or metadata manifest has been curated.** These are metadata-shaped, read-only structural inspections with explicit map counts, not automatic map discovery, authenticated collision/passability, safe editing or emulator/Android acceptance. Strict parity remains **0/30 (0%)**.
+
 ## Development checkpoint — shared map pointer ownership hints
 
 The declared vanilla atlas can now identify maps sharing exact header, layout or blockmap pointers, with bank/map references and source pointer offsets for touch-to-hex inspection. Aliases may be intentional and are not proof of safe ownership or CUBE layout compatibility. See [alias checkpoint](docs/VANILLA_ATLAS_POINTER_ALIASES.md).
