@@ -28,7 +28,7 @@ function declaredBanks(text){
   throw new RangeError('Invalid or duplicate bank counts');
  return banks;
 }
-export function bindHmaCubeBatchEditors({getContext,safeRun}){
+export function bindHmaCubeBatchEditors({getContext,getSelectedCell,safeRun}){
  const $=id=>document.getElementById(id);
  let warpQueue=[],eventQueue=[],warpSelection=null,eventSelection=null;
  let warpSnapshot=null,eventSnapshot=null,warpBanks=null,enabled=false;
@@ -38,6 +38,7 @@ export function bindHmaCubeBatchEditors({getContext,safeRun}){
   warpQueue=[];eventQueue=[];warpSelection=null;eventSelection=null;
   warpSnapshot=null;eventSnapshot=null;warpBanks=null;
   $('cube-batch-combined-verify').disabled=true;
+  for(const kind of names)$('cube-batch-'+kind+'-use-cell').disabled=true;
   $('cube-batch-combined-status').textContent='No cross-kind rehearsal performed.';
   for(const kind of names){
    $('cube-batch-'+kind+'-list').replaceChildren();
@@ -99,6 +100,21 @@ export function bindHmaCubeBatchEditors({getContext,safeRun}){
   }
  }
  function on(id,fn){$(id).addEventListener('click',()=>safeRun(fn));}
+ function fillFromRenderedCell(kind){
+  const selection=kind==='warp'?warpSelection:eventSelection;
+  if(!selection)throw Error('Load a '+kind+' before selecting a destination cell');
+  current(selection.snapshot);
+  if(typeof getSelectedCell!=='function')throw Error('Rendered map selection unavailable');
+  const hit=getSelectedCell();
+  if(!hit||!Number.isSafeInteger(hit.x)||!Number.isSafeInteger(hit.y))
+   throw Error('Tap a valid rendered CUBE map cell first');
+  $('cube-batch-'+kind+'-x').value=String(hit.x);
+  $('cube-batch-'+kind+'-y').value=String(hit.y);
+  status(kind,'Proposed '+kind+' position set to rendered cell ('+hit.x+','+hit.y+
+   '). Queue and verify explicitly; ROM unchanged.');
+ }
+ on('cube-batch-warp-use-cell',()=>fillFromRenderedCell('warp'));
+ on('cube-batch-event-use-cell',()=>fillFromRenderedCell('event'));
  on('cube-batch-warp-load',()=>{
   const ctx=getContext(),{fresh}=current(ctx?.snapshot);
   const warpIndex=unsigned($('cube-batch-warp-index').value,65535,'Warp index');
@@ -110,6 +126,7 @@ export function bindHmaCubeBatchEditors({getContext,safeRun}){
   if(!$('cube-batch-warp-banks').value.trim())
    $('cube-batch-warp-banks').value=ctx.snapshot.options.bankIndex+':'+ctx.snapshot.options.mapCount;
   $('cube-batch-warp-queue').disabled=false;
+  $('cube-batch-warp-use-cell').disabled=false;
   status('warp','Loaded warp #'+warpIndex+'. Edit raw fields and queue; ROM unchanged.');
  });
  on('cube-batch-warp-queue',()=>{
@@ -153,6 +170,7 @@ export function bindHmaCubeBatchEditors({getContext,safeRun}){
    expected:Object.fromEntries(positionFields.map(key=>[key,record[key]]))};
   for(const key of positionFields)$('cube-batch-event-'+key).value=String(record[key]);
   $('cube-batch-event-queue').disabled=false;
+  $('cube-batch-event-use-cell').disabled=false;
   status('event','Loaded '+kind+' #'+index+'. Only position fields are editable.');
  });
  on('cube-batch-event-queue',()=>{
