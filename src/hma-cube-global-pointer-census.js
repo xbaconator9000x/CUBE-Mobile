@@ -1,3 +1,9 @@
+import {previewHmaCubeCellBatch} from './hma-cube-cell-batch.js';
+import {previewHmaCubeWarpBatch} from './hma-cube-warp-batch.js';
+import {previewHmaCubeEventPositionBatch} from './hma-cube-event-batch.js';
+import {previewHmaCubeConnectionBatch} from './hma-cube-connection-edit.js';
+import {previewHmaCubeScriptRetargetBatch} from './hma-cube-script-retarget.js';
+
 /**
  * Conservative, read-only whole-ROM GBA pointer-candidate census.
  * It detects aligned 32-bit words that could reference source-grounded
@@ -83,4 +89,55 @@ export function auditHmaCubeGlobalPointerCandidates(source, ranges) {
     writeAuthorized: false,
     readOnly: true
   });
+}
+
+/**
+ * Local-only adapter: derive target ranges from the same source-grounded
+ * five-kind preview records used by combined CUBE transaction verification.
+ * Does not expose raw ranges to the local acceptance JSON report.
+ */
+export function auditHmaCubeGlobalEditPointerCandidates(source,summary,{
+ bankIndex,mapIndex,mapCount,cells=[],warps=[],events=[],connections=[],scripts=[],
+ banks,targetBanks,x=0,y=0,viewportWidth=10,viewportHeight=8
+}={}){
+ const opts={bankIndex,mapIndex,mapCount},ranges=[];
+ if(cells.length){
+  const plan=previewHmaCubeCellBatch(source,summary,{
+   ...opts,changes:cells,banks,x,y,viewportWidth,viewportHeight
+  });
+  for(const r of plan.changes)ranges.push({start:r.byteOffset,length:2});
+ }
+ if(warps.length){
+  const plan=previewHmaCubeWarpBatch(source,summary,{
+   ...opts,changes:warps,targetBanks
+  });
+  for(const r of plan.changes)ranges.push({start:r.sourceOffset,length:8});
+ }
+ if(events.length){
+  const plan=previewHmaCubeEventPositionBatch(source,summary,{
+   ...opts,changes:events
+  });
+  const widths={objects:24,scripts:16,signposts:12};
+  for(const r of plan.changes){
+   if(!widths[r.kind])throw new RangeError('Unsupported CUBE event record kind');
+   ranges.push({start:r.sourceOffset,length:widths[r.kind]});
+  }
+ }
+ if(connections.length){
+  const plan=previewHmaCubeConnectionBatch(source,summary,{
+   ...opts,changes:connections,targetBanks
+  });
+  for(const r of plan.changes)ranges.push({start:r.sourceOffset,length:12});
+ }
+ if(scripts.length){
+  const plan=previewHmaCubeScriptRetargetBatch(source,summary,{
+   ...opts,changes:scripts
+  });
+  for(const r of plan.changes){
+   const back=r.kind==='objects'?16:r.kind==='scripts'?12:8;
+   const width=r.kind==='objects'?24:r.kind==='scripts'?16:12;
+   ranges.push({start:r.sourceOffset-back,length:width});
+  }
+ }
+ return auditHmaCubeGlobalPointerCandidates(source,ranges);
 }
