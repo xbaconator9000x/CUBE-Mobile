@@ -72,6 +72,8 @@ test('five kinds re-decode and roll back on disk without exporting edited ROM',a
   assert.ok(r.globalPointerCensus.canonicalPointerCandidates>=4);
   assert.ok(r.globalPointerCensus.unalignedCanonicalPointerCandidates>=1);
   assert.equal(r.globalPointerCensus.allByteWindowsScanned,true);
+  assert.ok(r.globalPointerCensus.decodedParentArrayAnchors>=3);
+  assert.ok(r.globalPointerCensus.distinctParentArrayCandidateSourceWords>=3);
   assert.equal(r.globalPointerCensus.unalignedPointersInspected,true);
   assert.equal(r.globalPointerCensus.globalOwnershipProven,false);
   assert.equal(r.globalPointerCensus.writeAuthorized,false);
