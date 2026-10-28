@@ -1,3 +1,8 @@
+## Checkpoint — CUBE touch pattern stamp preview (28 October 2026)
+- [x] Copy bounded 1–8 × 1–8 rendered source regions to target cells with original-snapshot overlap semantics.
+- [x] Support tile-only, raw high-bit-only and both-field stamps with stale-checked atomic queue integration and offline UI.
+- [ ] Genuine ROM/metadata and emulator/Android save-reopen acceptance remain outstanding; no semantic writing or strict parity credit.
+
 ## Checkpoint — CUBE field-selective painting preview (28 October 2026)
 - [x] Add tile-only and raw collision/elevation-only queue modes for single-cell, rectangle and flood previews.
 - [x] Add six-high-bit flood matching, preserve per-cell original fields and test modular/offline UI.

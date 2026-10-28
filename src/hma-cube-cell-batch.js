@@ -197,3 +197,57 @@ export function planHmaCubeViewportFloodFill(image,{
     viewportOnly:true,readOnly:true,previewOnly:true,writeAuthorized:false,
     walkabilityVerified:false});
 }
+
+/**
+ * Copy a bounded rectangular pattern from one rendered CUBE viewport region
+ * to another without touching ROM bytes. Overlapping source/destination
+ * rectangles always sample the original snapshot, never prior proposals.
+ */
+export function planHmaCubeViewportStamp(image,{
+  sourceX,sourceY,targetX,targetY,width=1,height=1,fields='both',maxCells=32
+}={}){
+  if(!image||!Array.isArray(image.cells)||!image.cells.length||
+     image.cells.length>32||!Array.isArray(image.cells[0])||
+     !image.cells[0].length||image.cells[0].length>32)
+    throw new RangeError('Expected bounded CUBE viewport cells');
+  const rows=image.cells,columns=rows[0].length,lines=rows.length;
+  const left=rows[0][0]?.x,top=rows[0][0]?.y;
+  integer(left,0,1023,'Viewport X');integer(top,0,1023,'Viewport Y');
+  integer(width,1,8,'Stamp width');integer(height,1,8,'Stamp height');
+  integer(maxCells,1,32,'Stamp cell limit');
+  if(width*height>maxCells)
+    throw new RangeError('Pattern stamp exceeds 32-cell budget');
+  if(!['both','tile','high'].includes(fields))
+    throw new RangeError('Invalid stamp paint fields');
+  for(let y=0;y<lines;y++){
+    if(!Array.isArray(rows[y])||rows[y].length!==columns)
+      throw new RangeError('Pattern source grid is not rectangular');
+    for(let x=0;x<columns;x++){
+      const c=rows[y][x];
+      if(!c||c.x!==left+x||c.y!==top+y||
+         !Number.isSafeInteger(c.raw)||c.raw<0||c.raw>65535||
+         c.tileId!==(c.raw&1023)||c.collision!==(c.raw>>>10))
+        throw new RangeError('Pattern source contains invalid or stale cells');
+    }
+  }
+  for(const [x,y,name] of [
+    [sourceX,sourceY,'Source'],[targetX,targetY,'Destination']]){
+    integer(x,left,left+columns-width,name+' X');
+    integer(y,top,top+lines-height,name+' Y');
+  }
+  const changes=[];
+  for(let dy=0;dy<height;dy++)for(let dx=0;dx<width;dx++){
+    const source=rows[sourceY-top+dy][sourceX-left+dx];
+    const target=rows[targetY-top+dy][targetX-left+dx];
+    changes.push(Object.freeze({x:target.x,y:target.y,
+      ...(fields==='high'?{}:{tileId:source.tileId}),
+      ...(fields==='tile'?{}:{collision:source.collision}),
+      expectedRaw:target.raw}));
+  }
+  const overlaps=sourceX<targetX+width&&targetX<sourceX+width&&
+    sourceY<targetY+height&&targetY<sourceY+height;
+  return Object.freeze({changes:Object.freeze(changes),width,height,fields,
+    copiedCells:changes.length,sourceOverlapsDestination:overlaps,
+    readOnly:true,previewOnly:true,writeAuthorized:false,
+    romAuthenticated:false,walkabilityVerified:false});
+}

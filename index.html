@@ -125,6 +125,11 @@
     <button type="button" id="cube-map-batch-brush" class="subtle-button" disabled>Queue rectangle from selected cell</button>
     <div class="input-wrap"><label for="cube-map-flood-match">Flood matching</label><select id="cube-map-flood-match"><option value="tile">Same metatile ID</option><option value="exact">Same tile and raw high bits</option><option value="high">Same raw collision/elevation bits</option></select></div>
     <button type="button" id="cube-map-batch-flood" class="subtle-button" disabled>Flood fill from selected cell (max 32)</button>
+    <div class="input-wrap"><label for="cube-map-stamp-target-x">Stamp target X</label><input id="cube-map-stamp-target-x" type="number" min="0" value="0"></div>
+    <div class="input-wrap"><label for="cube-map-stamp-target-y">Stamp target Y</label><input id="cube-map-stamp-target-y" type="number" min="0" value="0"></div>
+    <div class="input-wrap"><label for="cube-map-stamp-width">Stamp width (1–8)</label><input id="cube-map-stamp-width" type="number" min="1" max="8" value="2"></div>
+    <div class="input-wrap"><label for="cube-map-stamp-height">Stamp height (1–8)</label><input id="cube-map-stamp-height" type="number" min="1" max="8" value="2"></div>
+    <button type="button" id="cube-map-batch-stamp" class="subtle-button" disabled>Copy selected pattern to target (max 32)</button>
     <button type="button" id="cube-map-batch-preview" class="subtle-button" disabled>Preview queued changes</button>
     <button type="button" id="cube-map-batch-clear" class="subtle-button" disabled>Clear queue</button>
   </div>
