@@ -4,6 +4,12 @@ This is a test.
 
 ---
 
+## Development checkpoint — CUBE RSE rendered maps and spatial event inspection
+
+The custom CUBE Emerald map viewer now supports a touch-pannable raw grid, complete raw event and connection inspection, and an opt-in rendered 16×16 metatile canvas for the conservative RSE-compatible blockset subset. Tap rendered cells to inspect exact ROM offsets; raw six-bit and behavior overlays are categorical only. Unsupported custom lighting/FRLG rendering fails closed. See [rendering and overlays](docs/HMA_CUBE_CUSTOM_MAP_RENDER.md).
+
+This is still **not independently authenticated CUBE ROM compatibility or safe editing**. Strict parity remains **0/30**, pending genuine ROM/metadata, emulator, Android and save/reopen acceptance.
+
 ## Development checkpoint — CUBE Emerald custom map structures and raw warps
 
 The **Named Data** screen now supports explicit CUBE bank/map selection with a required per-bank map count, decoding the pinned CUBHMA custom 28-byte map header and layout into a bounded raw-cell viewport. It also offers read-only custom event-group/warp inspection, including source-byte navigation, out-of-map coordinate warnings and special-target hints. The standalone offline HTML contains both workflows.
