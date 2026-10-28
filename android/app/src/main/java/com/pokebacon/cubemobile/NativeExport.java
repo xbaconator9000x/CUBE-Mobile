@@ -14,6 +14,7 @@ import java.io.OutputStream;
 import java.io.IOException;
 import java.security.MessageDigest;
 import java.util.Collections;
+import java.util.function.Predicate;
 import org.json.JSONObject;
 
 /**
@@ -28,6 +29,7 @@ final class NativeExport {
     private static final String ORIGIN = "https://appassets.androidplatform.net";
     private final Activity activity;
     private final WebView webView;
+    private final Predicate<Uri> isImportedDocument;
     private boolean installed;
     private boolean pending;
     private String session;
@@ -38,9 +40,11 @@ final class NativeExport {
     private OutputStream output;
     private MessageDigest writingDigest;
 
-    NativeExport(Activity activity, WebView webView) {
+    NativeExport(Activity activity, WebView webView,
+        Predicate<Uri> isImportedDocument) {
         this.activity = activity;
         this.webView = webView;
+        this.isImportedDocument = isImportedDocument;
     }
 
     void install() {
@@ -67,14 +71,14 @@ final class NativeExport {
                         switch (kind) {
                             case "chunk": chunk(data); break;
                             case "finish": finish(); break;
-                            case "abort": abort("Export cancelled; partial document removed"); break;
+                            case "abort": abort("Export cancelled"); break;
                             default: break;
                         }
                     }
                     // Delayed messages from completed/cancelled exports are ignored.
                 } catch (Exception failure) {
                     if (pending && incoming != null && incoming.equals(session)) {
-                        abort("Export failed; incomplete document removed");
+                        abort("Export failed");
                     } else if ("start".equals(kind) && !pending && incoming != null) {
                         callback("__cubeNativeCancel", incoming);
                     }
@@ -139,7 +143,15 @@ final class NativeExport {
             callback("__cubeNativeCancel", id);
             return;
         }
-        destination = data.getData();
+        // ACTION_CREATE_DOCUMENT is expected to create a fresh document, but
+        // never trust a provider to return a different URI from an input ROM.
+        // Refuse exact matches before opening/truncating or deleting anything.
+        Uri chosen = data.getData();
+        if (isImportedDocument.test(chosen)) {
+            abort("Export refused: destination is an imported document");
+            return;
+        }
+        destination = chosen;
         try {
             output = activity.getContentResolver().openOutputStream(destination, "w");
             if (output == null) throw new IOException("No output stream");
@@ -204,16 +216,24 @@ final class NativeExport {
         String cancelled = session;
         try { if (output != null) output.close(); } catch (IOException ignored) { }
         output = null;
-        if (destination != null) {
-            try { activity.getContentResolver().delete(destination, null, null); }
-            catch (Exception ignored) { }
+        boolean hadDestination = destination != null;
+        boolean removed = false;
+        if (hadDestination) {
+            try {
+                removed = activity.getContentResolver().delete(destination, null, null) > 0;
+            } catch (Exception ignored) {
+                // The provider may reject deletion; never report false rollback.
+            }
         }
         destination = null;
         pending = false;
         session = null;
         writingDigest = null;
         callback("__cubeNativeCancel", cancelled);
-        Toast.makeText(activity, message, Toast.LENGTH_LONG).show();
+        String notice = !hadDestination ? message :
+            removed ? message + "; incomplete document deleted" :
+            message + "; partial document may remain, please delete it";
+        Toast.makeText(activity, notice, Toast.LENGTH_LONG).show();
     }
 
     void close() {
