@@ -28,7 +28,7 @@ test('rejects missing, duplicated, and falsely evidenced feature work',()=>{
  assert.throws(()=>evaluateEngineeringWork(missing,inventory),/30 audited/i);
  const duplicate=clone();duplicate.families[1].id=duplicate.families[0].id;
  assert.throws(()=>evaluateEngineeringWork(duplicate,inventory),/duplicate/i);
- const invented=clone();invented.families.find(f=>f.id==='scripts').completion.mid=.2;
+ const invented=clone();invented.families.find(f=>f.id==='scripts').completion={low:0,mid:.2,high:.3};
  assert.throws(()=>evaluateEngineeringWork(invented,inventory),/Absent feature/i);
  const wrong=clone();wrong.families[0].upstreamPath='src/HexManiac.Core/fake.cs';
  assert.throws(()=>evaluateEngineeringWork(wrong,inventory),/source\/evidence/i);
