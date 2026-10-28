@@ -1,3 +1,8 @@
+## Checkpoint — opt-in local CUBE bank-table smoke (28 October 2026)
+- [x] SHA-256-match a user-supplied local ROM before inspecting an unambiguous imported CUBHMA map-bank TOML declaration.
+- [x] Report aggregate declared raw pointer slot diagnostics only, without ROM bytes, paths, offsets or pointer values; synthetic CLI and immutability tests.
+- [ ] Obtain independently authenticated CUBE ROM/metadata provenance and genuine emulator/Android/save-reopen acceptance. User-supplied SHA-256 is not independent authentication. See [local smoke checkpoint](docs/LOCAL_CUBE_BANK_SMOKE.md).
+
 ## Checkpoint — metadata-declared CUBE bank pointer table (28 October 2026)
 - [x] Parse bounded fixed outer `[maps<...>]N` counts from imported HMA TOML, grounded in pinned upstream CUBHMA MapModel.cs and CUBE Emerald's 34 declared slots.
 - [x] Inspect every raw declared pointer word, warn on duplicate/misaligned/self-referencing targets and preserve exact source offsets; no map counts or layout semantics inferred.
