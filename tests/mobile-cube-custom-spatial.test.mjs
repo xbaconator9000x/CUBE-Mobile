@@ -11,7 +11,7 @@ test('CUBE spatial grid, touch panning and complete event inspector are bundled 
  for(const page of [html,offline])for(const id of ids)
   assert.match(page,new RegExp('id="'+id+'"'));
  assert.match(app,/inspectBlockMap\(model,\{address:l\.blockmapOffset,width:l\.width,height:l\.height,/);
- assert.match(app,/originX,originY/);
+ assert.match(app,/x:originX,y:originY/);
  assert.match(app,/markerAt\(cell\.x,cell\.y\)/);
  assert.match(app,/Object\.entries\(fresh\.arrays\)/);
  assert.match(app,/scriptPointerSource/);
