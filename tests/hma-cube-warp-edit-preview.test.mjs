@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {inspectHmaMapBankAnchorSources} from '../src/hma-map-bank-metadata.js';
 import {inspectHmaCubeMapEventWarps} from '../src/hma-cube-map-events.js';
-import {previewHmaCubeWarpRecordChange} from '../src/hma-cube-warp-edit-preview.js';
+import {previewHmaCubeWarpRecordChange,verifyHmaCubeWarpRecordDryRun} from '../src/hma-cube-warp-edit-preview.js';
 
 function u16(b,i,v){b[i]=v&255;b[i+1]=v>>>8;}
 function u32(b,i,v){u16(b,i,v&65535);u16(b,i+2,v>>>16);}
@@ -74,4 +74,45 @@ test('invalid staged source bytes cannot pass warp preflight',async()=>{
  assert.throws(()=>previewHmaCubeWarpRecordChange(source,summary,{
   ...options,warpIndex:0,expected,proposed:{targetBank:0}
  }),RangeError);
+});
+
+test('copy-only CUBE warp transaction re-decodes, traces and rolls back exact bytes',async()=>{
+ const {bytes,summary}=await fixture(),copy=bytes.slice();
+ const original=inspectHmaCubeMapEventWarps(bytes,summary,options).warps[0];
+ const expected={x:original.x,y:original.y,elevation:original.elevation,
+  warpId:original.warpId,targetMap:original.targetMap,targetBank:original.targetBank};
+ const result=verifyHmaCubeWarpRecordDryRun(bytes,summary,{
+  ...options,warpIndex:0,expected,proposed:{warpId:0,targetMap:0,targetBank:0},
+  targetBanks:[{bankIndex:0,mapCount:1}]
+ });
+ assert.equal(result.inMemoryReDecodeVerified,true);
+ assert.equal(result.inMemoryRollbackVerified,true);
+ assert.equal(result.unrelatedBytesPreserved,true);
+ assert.equal(result.afterTrace.status,'resolved-raw');
+ assert.equal(result.afterTrace.arrival.returnsToOrigin,true);
+ assert.equal(result.changedBytes,3);
+ assert.equal(result.writeAuthorized,false);
+ assert.equal(result.patchedRomExported,false);
+ assert.deepEqual(bytes,copy);
+});
+test('copy-only CUBE warp rehearsal refuses invalid source and stale warp fields',async()=>{
+ const {bytes,summary}=await fixture();
+ const warp=inspectHmaCubeMapEventWarps(bytes,summary,options).warps[0];
+ const expected={x:warp.x,y:warp.y,elevation:warp.elevation,warpId:warp.warpId,
+  targetMap:warp.targetMap,targetBank:warp.targetBank};
+ assert.throws(()=>verifyHmaCubeWarpRecordDryRun(bytes,summary,{
+  ...options,warpIndex:0,expected:{...expected,targetBank:99},
+  proposed:{targetBank:0}
+ }),/changed/i);
+ assert.throws(()=>verifyHmaCubeWarpRecordDryRun({
+  length:64*1024*1024+1,read:()=>0
+ },summary,{...options,warpIndex:0,expected,proposed:{targetBank:0}}),/64 MiB/);
+ let calls=0;
+ const unstable={length:bytes.length,read:i=>{
+  if(i===0x707&&++calls>1)return (bytes[i]+1)&255;
+  return bytes[i];
+ }};
+ assert.throws(()=>verifyHmaCubeWarpRecordDryRun(unstable,summary,{
+  ...options,warpIndex:0,expected,proposed:{targetBank:0}
+ }),/Source changed while copying/);
 });

@@ -114,3 +114,66 @@ export function previewHmaCubeWarpRecordChange(source,summary,{
   authenticSaveReopenVerified:false
  });
 }
+
+/**
+ * Copy-only reversible transaction rehearsal. Copies the bounded ROM into
+ * isolated memory, applies only the preflighted eight-byte warp record,
+ * re-decodes and compares raw destination evidence, then rolls back.
+ * This never exports bytes, writes a source ROM, or grants write authority.
+ */
+export function verifyHmaCubeWarpRecordDryRun(source,summary,options={}){
+ const rom=reader(source);
+ if(rom.length<1||rom.length>64*1024*1024)
+  throw new RangeError('Warp copy-only rehearsal requires 1–64 MiB');
+ const original=new Uint8Array(rom.length);
+ for(let i=0;i<rom.length;i++)original[i]=byte(rom,i);
+ for(let i=0;i<rom.length;i++)if(byte(rom,i)!==original[i])
+  throw new RangeError('Source changed while copying ROM snapshot');
+ const preview=previewHmaCubeWarpRecordChange(original,summary,options);
+ const staged=original.slice(),at=preview.sourceOffset;
+ const before=[preview.before.x&255,preview.before.x>>>8,
+  preview.before.y&255,preview.before.y>>>8,preview.before.elevation,
+  preview.before.warpId,preview.before.targetMap,preview.before.targetBank];
+ const after=[preview.after.x&255,preview.after.x>>>8,
+  preview.after.y&255,preview.after.y>>>8,preview.after.elevation,
+  preview.after.warpId,preview.after.targetMap,preview.after.targetBank];
+ for(let i=0;i<8;i++){
+  if(staged[at+i]!==before[i])
+   throw new RangeError('Warp source changed before isolated apply');
+  staged[at+i]=after[i];
+ }
+ let changedBytes=0;
+ for(let i=0;i<staged.length;i++)if(staged[i]!==original[i]){
+  if(i<at||i>=at+8||staged[i]!==after[i-at])
+   throw new RangeError('Isolated warp transaction changed an unplanned byte');
+  changedBytes++;
+ }
+ const decoded=inspectHmaCubeMapEventWarps(staged,summary,{
+  bankIndex:options.bankIndex,mapIndex:options.mapIndex,mapCount:options.mapCount
+ });
+ const next=decoded.warps[options.warpIndex];
+ if(!next||next.offset!==at||!same(next,preview.after))
+  throw new RangeError('Isolated warp transaction failed raw re-decode');
+ const replay=previewHmaCubeWarpRecordChange(staged,summary,{
+  ...options,expected:preview.after,proposed:preview.after
+ });
+ if(!same(replay.before,preview.after)||
+    JSON.stringify(replay.beforeTrace)!==JSON.stringify(preview.afterTrace)||
+    !replay.otherWarpsPreserved)
+  throw new RangeError('Isolated warp destination trace differs from virtual preview');
+ for(let i=0;i<8;i++)staged[at+i]=before[i];
+ for(let i=0;i<staged.length;i++)if(staged[i]!==original[i])
+  throw new RangeError('Isolated warp transaction rollback failed');
+ for(let i=0;i<rom.length;i++)if(byte(rom,i)!==original[i])
+  throw new RangeError('Source ROM changed during copy-only rehearsal');
+ return Object.freeze({
+  sourceOffset:at,warpIndex:options.warpIndex,changedBytes,
+  inMemoryReDecodeVerified:true,inMemoryRollbackVerified:true,
+  sourceBytesPreserved:true,unrelatedBytesPreserved:true,
+  beforeTrace:preview.beforeTrace,afterTrace:preview.afterTrace,
+  sourceBytesExported:false,patchedRomExported:false,
+  authenticSaveReopenVerified:false,romAuthenticated:false,
+  exclusiveOwnershipProven:false,writeAuthorized:false,
+  readOnly:true,copyOnly:true
+ });
+}
