@@ -194,6 +194,13 @@
     <div class="input-wrap"><label for="cube-map-proposed-high">Proposed raw collision/elevation (0–63)</label><input id="cube-map-proposed-high" type="number" min="0" max="63" value="0"></div>
     <button type="button" id="cube-map-cell-preview" class="subtle-button" disabled>Preview selected CUBE cell (no save)</button>
   </div>
+  <div class="input-row" aria-label="Read-only CUBE multi-cell proposal queue">
+    <button type="button" id="cube-map-batch-add" class="subtle-button" disabled>Queue selected cell (preview only)</button>
+    <button type="button" id="cube-map-batch-preview" class="subtle-button" disabled>Preview queued changes</button>
+    <button type="button" id="cube-map-batch-clear" class="subtle-button" disabled>Clear queue</button>
+  </div>
+  <output id="cube-map-batch-status" class="palette-note" aria-live="polite">No queued CUBE changes. ROM remains unchanged.</output>
+  <div id="cube-map-batch-list" class="anchor-list" aria-label="Read-only queued CUBE cell proposals"></div>
   <output id="cube-map-preview-status" class="palette-note" aria-live="polite">Select a rendered cell to preview a proposed change. No ROM writes.</output>
   <div style="overflow-x:auto"><canvas id="cube-map-preview-after" hidden aria-label="Read-only proposed CUBE metatile canvas" style="max-width:none;image-rendering:pixelated"></canvas></div>
   <div class="input-row"><button type="button" id="cube-map-warps" class="subtle-button" disabled>Inspect CUBE custom event/warp records (read only)</button></div>
@@ -7269,6 +7276,137 @@ function auditHmaCubeCrossBankOwnership(source,summary,{banks}={}) {
 
 return auditHmaCubeCrossBankOwnership;
 })();
+const previewHmaCubeCellBatch=(()=>{
+/**
+ * Multi-cell, read-only CUBE Emerald visual preflight.
+ * Source: pinned kcradi/CUBHMA MapModel.cs BlockCell encoding and
+ * cube_emerald.toml map/layout definitions. No semantic ROM writes.
+ */
+function reader(source) {
+  if (source instanceof Uint8Array) return {length:source.length,read:i=>source[i]};
+  if (source && Number.isSafeInteger(source.length) && source.length>=0 &&
+      typeof source.read==='function') return source;
+  throw new TypeError('Expected a bounded read-only ROM accessor');
+}
+function integer(value, min, max, name) {
+  if (!Number.isSafeInteger(value) || value<min || value>max)
+    throw new RangeError(name+' must be an integer from '+min+' to '+max);
+}
+function byte(rom,offset) {
+  if (!Number.isSafeInteger(offset)||offset<0||offset>=rom.length)
+    throw new RangeError('ROM byte outside bounds');
+  const value=rom.read(offset);
+  if (!Number.isInteger(value)||value<0||value>255)
+    throw new RangeError('ROM accessor returned invalid byte');
+  return value;
+}
+function word(rom,offset) {return byte(rom,offset)|(byte(rom,offset+1)<<8);}
+function decoded(raw) {
+  return Object.freeze({raw,tileId:raw&1023,collision:raw>>>10,
+    bytes:Object.freeze([raw&255,raw>>>8])});
+}
+/**
+ * Atomically preflight 1-32 typed proposals against exact expected original
+ * words. Re-renders the entire bounded viewport using a virtual read overlay,
+ * not the writable ROM model. Duplicate cells and stale bytes fail closed.
+ *
+ * Optional ownership census is advisory only: even a zero-overlap census
+ * cannot prove all banks have been enumerated or authorize ROM writes.
+ */
+function previewHmaCubeCellBatch(source,summary,{
+  bankIndex,mapIndex,mapCount,changes,
+  x=0,y=0,viewportWidth=10,viewportHeight=8,banks
+}={}) {
+  const rom=reader(source);
+  const map=inspectHmaCubeMapEntry(rom,summary,{bankIndex,mapIndex,mapCount});
+  if (!Array.isArray(changes)||changes.length<1||changes.length>32)
+    throw new RangeError('Provide 1–32 CUBE cell changes');
+  integer(x,0,map.layout.width-1,'Viewport X');
+  integer(y,0,map.layout.height-1,'Viewport Y');
+  integer(viewportWidth,1,32,'Viewport width');
+  integer(viewportHeight,1,32,'Viewport height');
+  const right=Math.min(map.layout.width,x+viewportWidth);
+  const bottom=Math.min(map.layout.height,y+viewportHeight);
+  const overlays=new Map(),seen=new Set(),records=[];
+  for (const change of changes) {
+    if (!change||typeof change!=='object')
+      throw new TypeError('Each change must be an object');
+    integer(change.x,0,map.layout.width-1,'Cell X');
+    integer(change.y,0,map.layout.height-1,'Cell Y');
+    if (change.x<x||change.x>=right||change.y<y||change.y>=bottom)
+      throw new RangeError('All proposed cells must fit the preview viewport');
+    if (change.tileId===undefined&&change.collision===undefined)
+      throw new RangeError('Cell proposal must change a tile ID or raw high bits');
+    if (change.tileId!==undefined) integer(change.tileId,0,1023,'Tile ID');
+    if (change.collision!==undefined) integer(change.collision,0,63,'Raw high bits');
+    integer(change.expectedRaw,0,65535,'Expected original cell word');
+    const offset=map.layout.blockmapOffset+
+      (change.y*map.layout.width+change.x)*2;
+    if (seen.has(offset)) throw new RangeError('Duplicate cell proposal');
+    seen.add(offset);
+    const old=word(rom,offset);
+    if (old!==change.expectedRaw)
+      throw new RangeError('Cell changed since selection; inspect again');
+    const next=((change.collision??(old>>>10))<<10)|
+      (change.tileId??(old&1023));
+    overlays.set(offset,next&255);
+    overlays.set(offset+1,next>>>8);
+    records.push(Object.freeze({x:change.x,y:change.y,byteOffset:offset,
+      before:decoded(old),after:decoded(next),changed:old!==next}));
+  }
+  const staged=Object.freeze({length:rom.length,read:i=>
+    overlays.has(i)?overlays.get(i):byte(rom,i)});
+  const options={bankIndex,mapIndex,mapCount,x,y,viewportWidth,viewportHeight};
+  const beforeImage=renderHmaCubeMapViewport(rom,summary,options);
+  const afterImage=renderHmaCubeMapViewport(staged,summary,options);
+  if (beforeImage.width!==afterImage.width||
+      beforeImage.height!==afterImage.height||
+      beforeImage.blockmapOffset!==afterImage.blockmapOffset||
+      JSON.stringify(beforeImage.map)!==JSON.stringify(afterImage.map))
+    throw new RangeError('CUBE map structure changed during virtual preview');
+  for (const record of records) {
+    const cell=grid=>grid.cells.flat().find(c=>c.x===record.x&&c.y===record.y);
+    if (cell(beforeImage)?.raw!==record.before.raw||
+        cell(afterImage)?.raw!==record.after.raw)
+      throw new RangeError('Virtual cell re-decode failed');
+  }
+  let changedPixels=0;
+  for(let i=0;i<beforeImage.pixels.length;i+=4)
+    if(beforeImage.pixels[i]!==afterImage.pixels[i]||
+       beforeImage.pixels[i+1]!==afterImage.pixels[i+1]||
+       beforeImage.pixels[i+2]!==afterImage.pixels[i+2]||
+       beforeImage.pixels[i+3]!==afterImage.pixels[i+3])changedPixels++;
+  let ownership=null;
+  if (banks!==undefined) {
+    const census=auditHmaCubeCrossBankOwnership(rom,summary,{banks});
+    if (!banks.some(b=>b.bankIndex===bankIndex&&b.mapCount===mapCount))
+      throw new RangeError('Ownership census must include the selected bank/count');
+    const id=bankIndex+':'+mapIndex;
+    const owner=census.maps.find(m=>m.id===id);
+    if (owner?.status!=='decoded'||
+        owner.blockmapOffset!==map.layout.blockmapOffset||
+        owner.blockmapBytes!==map.layout.blockmapBytes)
+      throw new RangeError('Selected map missing from ownership census');
+    const relationships=census.relationships.filter(r=>
+      (r.first===id||r.second===id)&&
+      (r.firstKind==='blockmap'||r.secondKind==='blockmap'));
+    ownership=Object.freeze({requestedMaps:census.requestedMaps,
+      invalidMaps:census.invalid,overlapCount:relationships.length,
+      overlaps:Object.freeze(relationships),partialCoverage:true,
+      exclusiveOwnershipProven:false});
+  }
+  return Object.freeze({
+    bankIndex,mapIndex,mapCount,x,y,viewportWidth,viewportHeight,
+    changes:Object.freeze(records),changedCells:records.filter(c=>c.changed).length,
+    changedPixels,beforeImage,afterImage,ownership,
+    readOnly:true,previewOnly:true,writeAuthorized:false,
+    romAuthenticated:false,cubeLayoutAuthenticated:false,
+    walkabilityVerified:false,exclusiveOwnershipProven:false
+  });
+}
+
+return previewHmaCubeCellBatch;
+})();
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let pcsReference=null,pcsReferenceName='';
@@ -7277,6 +7415,7 @@ let metadataFingerprints=[],metadataImportSerial=0,mapBankMetadataReport=null,ma
 let inspectedWarpMap=null,selectedWarpPreview=null,selectedEventPreview=null,inspectedEventMap=null,inspectedMapAtlas=null,atlasBatchStart=0,atlasCoordinateBatchStart=0,atlasScriptAliasStart=0,atlasScriptCrossPageStart=0,atlasIncomingStart=0,atlasIncomingTarget=null;
 let activeRenderedMap=null,selectedRenderedHit=null;
 let cubeCatalogEvidence=null,cubeWarpTraceEvidence=null,cubeConnectionTraceEvidence=null,cubeOwnershipEvidence=null;
+let cubeCellBatchQueue=[],cubeCellBatchSnapshot=null;
 let mapReviewQueue=[],mapReviewRom=null,lastMapPreviews={cell:null,warp:null,event:null};
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
 const PER_PAGE=128;
@@ -8125,8 +8264,42 @@ function clearCubeCatalog(message='No CUBE bank catalog inspected. Supply a veri
   clearCubeWarpTrace();
   clearCubeOwnership();
 }
+function drawCubeCellBatchQueue(){
+  const list=$('cube-map-batch-list');list.replaceChildren();
+  const current=cubeCellBatchSnapshot&&cubeCellBatchSnapshot===cubeRenderEvidence&&
+    cubeCellBatchSnapshot.rom===model;
+  if(!current&&cubeCellBatchQueue.length){clearCubeBatchQueue();return;}
+  $('cube-map-batch-preview').disabled=!cubeCellBatchQueue.length;
+  $('cube-map-batch-clear').disabled=!cubeCellBatchQueue.length;
+  $('cube-map-batch-status').textContent=cubeCellBatchQueue.length+
+    '/32 CUBE cell proposals queued for virtual preview. No ROM writes or save authorization.';
+  for(const change of cubeCellBatchQueue){
+    const remove=document.createElement('button');remove.type='button';
+    remove.className='subtle-button';
+    remove.textContent='Remove ('+change.x+','+change.y+') · tile '+
+      change.tileId+' · high bits '+change.collision;
+    remove.addEventListener('click',()=>safeRun(()=>{
+      if(!cubeCellBatchSnapshot||cubeCellBatchSnapshot!==cubeRenderEvidence||
+         cubeCellBatchSnapshot.rom!==model)
+        throw Error('Queued CUBE preview expired; render again');
+      cubeCellBatchQueue=cubeCellBatchQueue.filter(c=>c.x!==change.x||c.y!==change.y);
+      drawCubeCellBatchQueue();
+      $('cube-map-preview-after').hidden=true;
+    }));
+    list.append(remove);
+  }
+}
+function clearCubeBatchQueue(){
+  cubeCellBatchQueue=[];cubeCellBatchSnapshot=null;
+  $('cube-map-batch-add').disabled=true;
+  $('cube-map-batch-preview').disabled=true;
+  $('cube-map-batch-clear').disabled=true;
+  $('cube-map-batch-list').replaceChildren();
+  $('cube-map-batch-status').textContent='No queued CUBE changes. ROM remains unchanged.';
+}
 function clearCubeRenderedMap(message='CUBE render invalidated; render again.'){
   cubeRenderEvidence=null;cubeRenderSelection=null;cubeCellPreview=null;
+  clearCubeBatchQueue();
   $('cube-map-cell-preview').disabled=true;
   $('cube-map-preview-after').hidden=true;
   $('cube-map-preview-status').textContent='Select a rendered cell to preview a proposed change. No ROM writes.';
@@ -8430,6 +8603,7 @@ $('cube-map-render').addEventListener('click',()=>safeRun(()=>{
     pixels:rendered.pixels.slice(),cellsJson:JSON.stringify(rendered.cells),
     attributesJson:JSON.stringify(rendered.attributes)};
   cubeRenderSelection=null;cubeCellPreview=null;$('cube-map-cell-preview').disabled=true;
+  clearCubeBatchQueue();
   $('cube-map-preview-after').hidden=true;
   $('cube-map-preview-status').textContent='Tap a rendered cell to propose a visual-only change.';
   $('cube-map-render-jump').disabled=true;
@@ -8462,6 +8636,7 @@ $('cube-map-render-canvas').addEventListener('click',event=>safeRun(()=>{
   if(!hit)return;
   cubeRenderSelection={snapshot,cellOffset:hit.cell.byteOffset,x:hit.cell.x,y:hit.cell.y,raw:hit.cell.raw};
   cubeCellPreview=null;$('cube-map-preview-after').hidden=true;
+  $('cube-map-batch-add').disabled=false;
   $('cube-map-preview-status').textContent='Selected cell is ready for a read-only visual proposal.';
   $('cube-map-proposed-tile').value=String(hit.cell.tileId);
   $('cube-map-proposed-high').value=String(hit.cell.collision);
@@ -8472,6 +8647,75 @@ $('cube-map-render-canvas').addEventListener('click',event=>safeRun(()=>{
     ' · behavior 0x'+hex(hit.attribute.behavior,2)+' · layer '+hit.attribute.layer+
     ' · blockmap 0x'+hex(hit.cell.byteOffset)+' · attributes 0x'+
     hex(hit.attribute.attributeOffset)+'. Not verified walkability.';
+}));
+$('cube-map-batch-add').addEventListener('click',()=>safeRun(()=>{
+  const selected=cubeRenderSelection,snapshot=selected?.snapshot;
+  if(!snapshot||snapshot!==cubeRenderEvidence||snapshot.rom!==model||
+     !cubeMapEvidence||cubeMapEvidence.options!==snapshot.options)
+    throw Error('Select a current rendered CUBE cell first');
+  const tileText=$('cube-map-proposed-tile').value;
+  const highText=$('cube-map-proposed-high').value;
+  if(!/^\d+$/.test(tileText)||!/^\d+$/.test(highText))
+    throw new RangeError('Proposed tile and raw high bits must be unsigned integers');
+  const tileId=Number(tileText),collision=Number(highText);
+  if(!Number.isSafeInteger(tileId)||tileId>1023||
+     !Number.isSafeInteger(collision)||collision>63)
+    throw new RangeError('CUBE tile/high-bit proposal outside allowed range');
+  if(cubeCellBatchSnapshot&&cubeCellBatchSnapshot!==snapshot)
+    throw Error('Queued proposals belong to an earlier map rendering');
+  const proposal={x:selected.x,y:selected.y,tileId,collision,expectedRaw:selected.raw};
+  const next=cubeCellBatchQueue.filter(c=>c.x!==selected.x||c.y!==selected.y);
+  if(next.length>=32)throw new RangeError('Maximum 32 queued CUBE cells');
+  next.push(proposal);
+  // Revalidate all expected original words, rendering, and proposed values
+  // before accepting a new queue item; this never changes staged ROM bytes.
+  const result=previewHmaCubeCellBatch(model,mapBankCustomSummary,{
+    ...snapshot.options,x:snapshot.x,y:snapshot.y,viewportWidth:10,viewportHeight:8,
+    changes:next
+  });
+  if(JSON.stringify(result.beforeImage.map)!==JSON.stringify(snapshot.map)||
+     JSON.stringify(result.beforeImage.cells)!==snapshot.cellsJson||
+     JSON.stringify(result.beforeImage.attributes)!==snapshot.attributesJson||
+     result.beforeImage.pixels.length!==snapshot.pixels.length||
+     !result.beforeImage.pixels.every((value,i)=>value===snapshot.pixels[i]))
+    throw Error('CUBE map rendering changed; render again');
+  cubeCellBatchSnapshot=snapshot;cubeCellBatchQueue=next;
+  drawCubeCellBatchQueue();
+}));
+$('cube-map-batch-clear').addEventListener('click',()=>safeRun(()=>{
+  clearCubeBatchQueue();$('cube-map-preview-after').hidden=true;
+}));
+$('cube-map-batch-preview').addEventListener('click',()=>safeRun(()=>{
+  const snapshot=cubeCellBatchSnapshot;
+  if(!snapshot||snapshot!==cubeRenderEvidence||snapshot.rom!==model||
+     !cubeMapEvidence||cubeMapEvidence.options!==snapshot.options||
+     !cubeCellBatchQueue.length)
+    throw Error('CUBE cell queue expired; render and select again');
+  const ownership=cubeOwnershipEvidence;
+  const banks=ownership?.rom===model&&ownership.summary===mapBankCustomSummary&&
+    ownership.banks.some(b=>b.bankIndex===snapshot.options.bankIndex&&
+      b.mapCount===snapshot.options.mapCount)?ownership.banks:undefined;
+  const result=previewHmaCubeCellBatch(model,mapBankCustomSummary,{
+    ...snapshot.options,x:snapshot.x,y:snapshot.y,viewportWidth:10,viewportHeight:8,
+    changes:cubeCellBatchQueue,banks
+  });
+  if(JSON.stringify(result.beforeImage.map)!==JSON.stringify(snapshot.map)||
+     JSON.stringify(result.beforeImage.cells)!==snapshot.cellsJson||
+     JSON.stringify(result.beforeImage.attributes)!==snapshot.attributesJson||
+     result.beforeImage.pixels.length!==snapshot.pixels.length||
+     !result.beforeImage.pixels.every((value,i)=>value===snapshot.pixels[i]))
+    throw Error('CUBE rendering changed since queue creation; render again');
+  const after=result.afterImage,canvas=$('cube-map-preview-after');
+  canvas.width=after.width;canvas.height=after.height;
+  const ctx=canvas.getContext('2d'),image=ctx.createImageData(after.width,after.height);
+  image.data.set(after.pixels);ctx.putImageData(image,0,0);
+  canvas.style.width=(after.width*2)+'px';canvas.style.height=(after.height*2)+'px';
+  canvas.hidden=false;cubeCellPreview=result;
+  $('cube-map-preview-status').textContent='Virtual batch: '+
+    result.changedCells+' changed CUBE cells, '+result.changedPixels+
+    ' changed pixels. '+(result.ownership?
+      result.ownership.overlapCount+' known ownership overlaps; ':'Ownership not audited; ')+
+    'partial census cannot prove exclusivity. No ROM writes or walkability claims.';
 }));
 $('cube-map-cell-preview').addEventListener('click',()=>safeRun(()=>{
   const selected=cubeRenderSelection,snapshot=selected?.snapshot;
