@@ -1,0 +1,489 @@
+{
+  "schema": "cube-mobile-engineering-wbs/1",
+  "baselineDate": "2026-10-28",
+  "status": "provisional-source-grounded-estimate-not-an-audit",
+  "upstreamRepo": "kcradi/CUBHMA",
+  "upstreamCommit": "3044393183e01af2ae1e907fb37e4a75eda6a8dc",
+  "method": "Effort units are relative estimates of remaining-and-completed engineering effort per feature, including feature-specific implementation and tests. Shared workstreams cover reusable platform, integration and release acceptance only; do not double-count family implementation. Mid is judgement-based completed effort / total estimated effort, not hours or feature verification. Low/high reflect uncertainty about scope and actual completed effort. Rebaseline after upstream code audit, authenticated ROM evidence and measured implementation effort.",
+  "confidence": "low",
+  "milestones": {
+    "engineeringWorkPercent": 50,
+    "strictVerifiedParityPercent": 20
+  },
+  "families": [
+    {
+      "id": "rom-open",
+      "effortUnits": 5,
+      "completion": {
+        "low": 0.15,
+        "mid": 0.28,
+        "high": 0.46
+      },
+      "upstreamPath": "src/HexManiac.Core/Models/PokemonModel.cs",
+      "localEvidence": [
+        "tests/core.test.mjs"
+      ],
+      "rationale": "Raw ROM open/inspection exists; authenticated non-destructive save-as is missing."
+    },
+    {
+      "id": "hex-edit",
+      "effortUnits": 6,
+      "completion": {
+        "low": 0.23,
+        "mid": 0.42,
+        "high": 0.68
+      },
+      "upstreamPath": "src/HexManiac.Core/ViewModels/EditorViewModel.cs",
+      "localEvidence": [
+        "tests/core-regression.test.mjs"
+      ],
+      "rationale": "Staged hex edits and basic undo exist; full desktop semantics and device roundtrip remain."
+    },
+    {
+      "id": "patching",
+      "effortUnits": 5,
+      "completion": {
+        "low": 0.15,
+        "mid": 0.28,
+        "high": 0.46
+      },
+      "upstreamPath": "src/HexManiac.Core/Models/Code/BpsPatch.cs",
+      "localEvidence": [
+        "tests/core-regression.test.mjs"
+      ],
+      "rationale": "Partial IPS/BPS workbench; format and authentic ROM roundtrip gaps."
+    },
+    {
+      "id": "pointers",
+      "effortUnits": 9,
+      "completion": {
+        "low": 0.09,
+        "mid": 0.16,
+        "high": 0.28
+      },
+      "upstreamPath": "src/HexManiac.Core/Models/Runs/PointerRun.cs",
+      "localEvidence": [
+        "tests/pointer-references.test.mjs"
+      ],
+      "rationale": "Read-only pointer and alias probes; no complete ownership graph or relocation."
+    },
+    {
+      "id": "metadata",
+      "effortUnits": 9,
+      "completion": {
+        "low": 0.12,
+        "mid": 0.22,
+        "high": 0.37
+      },
+      "upstreamPath": "src/HexManiac.Core/Models/StoredMetadata.cs",
+      "localEvidence": [
+        "tests/metadata-layout.test.mjs"
+      ],
+      "rationale": "TOML identity and bounded anchors exist; full overlay/format DSL and provenance unverified."
+    },
+    {
+      "id": "tables",
+      "effortUnits": 10,
+      "completion": {
+        "low": 0.07,
+        "mid": 0.12,
+        "high": 0.22
+      },
+      "upstreamPath": "src/HexManiac.Core/Models/Runs/ArrayRun.cs",
+      "localEvidence": [
+        "tests/semantic.test.mjs"
+      ],
+      "rationale": "Partial typed previews; mutable nested table model missing."
+    },
+    {
+      "id": "text",
+      "effortUnits": 6,
+      "completion": {
+        "low": 0.13,
+        "mid": 0.24,
+        "high": 0.4
+      },
+      "upstreamPath": "src/HexManiac.Core/Models/Runs/PCSRun.cs",
+      "localEvidence": [
+        "tests/pcs-reference.test.mjs"
+      ],
+      "rationale": "PCS inspection/reference exists; robust text edit/repoint roundtrip missing."
+    },
+    {
+      "id": "scripts",
+      "effortUnits": 10,
+      "completion": {
+        "low": 0,
+        "mid": 0,
+        "high": 0
+      },
+      "upstreamPath": "src/HexManiac.Core/Models/Code/ScriptParser.cs",
+      "localEvidence": [],
+      "rationale": "Full script parser/compiler/editor not evidenced."
+    },
+    {
+      "id": "thumb",
+      "effortUnits": 7,
+      "completion": {
+        "low": 0,
+        "mid": 0,
+        "high": 0
+      },
+      "upstreamPath": "src/HexManiac.Core/Models/Code/ThumbParser.cs",
+      "localEvidence": [],
+      "rationale": "THUMB assembly editor not evidenced."
+    },
+    {
+      "id": "relocation",
+      "effortUnits": 10,
+      "completion": {
+        "low": 0,
+        "mid": 0,
+        "high": 0
+      },
+      "upstreamPath": "src/HexManiac.Core/ViewModels/Map/MapRepointer.cs",
+      "localEvidence": [],
+      "rationale": "Allocator/repoint transaction system absent."
+    },
+    {
+      "id": "map-catalog",
+      "effortUnits": 8,
+      "completion": {
+        "low": 0.17,
+        "mid": 0.3,
+        "high": 0.49
+      },
+      "upstreamPath": "src/HexManiac.Core/Models/Map/MapModel.cs",
+      "localEvidence": [
+        "tests/map-atlas.test.mjs"
+      ],
+      "rationale": "Declared CUBE bank/map catalog exists; authentic dynamic discovery and acceptance missing."
+    },
+    {
+      "id": "map-render",
+      "effortUnits": 10,
+      "completion": {
+        "low": 0.15,
+        "mid": 0.28,
+        "high": 0.46
+      },
+      "upstreamPath": "src/HexManiac.Core/ViewModels/Map/MapEditorViewModel.cs",
+      "localEvidence": [
+        "tests/map-render.test.mjs"
+      ],
+      "rationale": "Conservative RSE viewport exists; CUBE lighting/FRLG/real-ROM acceptance missing."
+    },
+    {
+      "id": "map-paint",
+      "effortUnits": 9,
+      "completion": {
+        "low": 0.12,
+        "mid": 0.22,
+        "high": 0.37
+      },
+      "upstreamPath": "src/HexManiac.Core/ViewModels/Map/BlockEditor.cs",
+      "localEvidence": [
+        "tests/map-blocks.test.mjs"
+      ],
+      "rationale": "Multi-cell virtual painting and dry-run exist; no safe persisted semantic edits."
+    },
+    {
+      "id": "collision",
+      "effortUnits": 8,
+      "completion": {
+        "low": 0.08,
+        "mid": 0.15,
+        "high": 0.26
+      },
+      "upstreamPath": "src/HexManiac.Core/Models/Map/BlockCollisionDefaults.cs",
+      "localEvidence": [
+        "tests/map-render.test.mjs"
+      ],
+      "rationale": "Raw high-bit overlays and virtual paint exist; behavior/passability semantics missing."
+    },
+    {
+      "id": "map-events",
+      "effortUnits": 8,
+      "completion": {
+        "low": 0.1,
+        "mid": 0.18,
+        "high": 0.31
+      },
+      "upstreamPath": "src/HexManiac.Core/ViewModels/Map/EventTemplate.cs",
+      "localEvidence": [
+        "tests/map-events.test.mjs"
+      ],
+      "rationale": "Read-only event records and impact preview; editing/save not implemented."
+    },
+    {
+      "id": "warps",
+      "effortUnits": 8,
+      "completion": {
+        "low": 0.13,
+        "mid": 0.24,
+        "high": 0.4
+      },
+      "upstreamPath": "src/HexManiac.Core/ViewModels/Map/SurfConnectionViewModel.cs",
+      "localEvidence": [
+        "tests/map-link-audit.test.mjs"
+      ],
+      "rationale": "Warp tracing, graph and overlay previews exist; persisted edits not validated."
+    },
+    {
+      "id": "wild",
+      "effortUnits": 5,
+      "completion": {
+        "low": 0,
+        "mid": 0,
+        "high": 0
+      },
+      "upstreamPath": "src/HexManiac.Core/ViewModels/Map/WildPokemonViewModel.cs",
+      "localEvidence": [],
+      "rationale": "Wild encounter editor not evidenced."
+    },
+    {
+      "id": "trainers",
+      "effortUnits": 7,
+      "completion": {
+        "low": 0,
+        "mid": 0,
+        "high": 0
+      },
+      "upstreamPath": "src/HexManiac.Core/Models/Runs/TrainerPokemonTeamRun.cs",
+      "localEvidence": [],
+      "rationale": "Trainer team editor not evidenced."
+    },
+    {
+      "id": "species",
+      "effortUnits": 9,
+      "completion": {
+        "low": 0,
+        "mid": 0,
+        "high": 0
+      },
+      "upstreamPath": "src/HexManiac.Core/Models/PokemonModel.cs",
+      "localEvidence": [],
+      "rationale": "Species/evolution editor not evidenced."
+    },
+    {
+      "id": "moves",
+      "effortUnits": 7,
+      "completion": {
+        "low": 0,
+        "mid": 0,
+        "high": 0
+      },
+      "upstreamPath": "src/HexManiac.Core/ViewModels/QuickEditItems/MakeMovesExpandable.cs",
+      "localEvidence": [],
+      "rationale": "Move editor/expansion not evidenced."
+    },
+    {
+      "id": "items",
+      "effortUnits": 6,
+      "completion": {
+        "low": 0,
+        "mid": 0,
+        "high": 0
+      },
+      "upstreamPath": "src/HexManiac.Core/ViewModels/QuickEditItems/MakeItemsExpandable.cs",
+      "localEvidence": [],
+      "rationale": "Item editor/expansion not evidenced."
+    },
+    {
+      "id": "tms",
+      "effortUnits": 5,
+      "completion": {
+        "low": 0,
+        "mid": 0,
+        "high": 0
+      },
+      "upstreamPath": "src/HexManiac.Core/ViewModels/QuickEditItems/MakeTmsExpandable.cs",
+      "localEvidence": [],
+      "rationale": "TM/HM/tutor editor not evidenced."
+    },
+    {
+      "id": "sprites",
+      "effortUnits": 10,
+      "completion": {
+        "low": 0.05,
+        "mid": 0.09,
+        "high": 0.17
+      },
+      "upstreamPath": "src/HexManiac.Core/ViewModels/ImageEditorViewModel.cs",
+      "localEvidence": [
+        "tests/lz-accessor.test.mjs"
+      ],
+      "rationale": "LZ10 graphics access exists; semantic sprite/palette editor absent."
+    },
+    {
+      "id": "animations",
+      "effortUnits": 7,
+      "completion": {
+        "low": 0,
+        "mid": 0,
+        "high": 0
+      },
+      "upstreamPath": "src/HexManiac.Core/Models/PokemonAnimations/PokemonAnimationEngine.cs",
+      "localEvidence": [],
+      "rationale": "Animation editing not evidenced."
+    },
+    {
+      "id": "sound",
+      "effortUnits": 9,
+      "completion": {
+        "low": 0,
+        "mid": 0,
+        "high": 0
+      },
+      "upstreamPath": "src/HexManiac.Core/Models/Sound/MidiToAgb.cs",
+      "localEvidence": [],
+      "rationale": "MIDI/music/cry editing not evidenced."
+    },
+    {
+      "id": "dex",
+      "effortUnits": 4,
+      "completion": {
+        "low": 0,
+        "mid": 0,
+        "high": 0
+      },
+      "upstreamPath": "src/HexManiac.Core/ViewModels/DexReorderTab.cs",
+      "localEvidence": [],
+      "rationale": "Dex reorder editor not evidenced."
+    },
+    {
+      "id": "intro",
+      "effortUnits": 4,
+      "completion": {
+        "low": 0,
+        "mid": 0,
+        "high": 0
+      },
+      "upstreamPath": "src/HexManiac.Core/ViewModels/IntroManagerTab.cs",
+      "localEvidence": [],
+      "rationale": "Intro manager not evidenced."
+    },
+    {
+      "id": "character",
+      "effortUnits": 4,
+      "completion": {
+        "low": 0,
+        "mid": 0,
+        "high": 0
+      },
+      "upstreamPath": "src/HexManiac.Core/ViewModels/CharacterCustomizationTab.cs",
+      "localEvidence": [],
+      "rationale": "Character customization not evidenced."
+    },
+    {
+      "id": "cube-update",
+      "effortUnits": 8,
+      "completion": {
+        "low": 0,
+        "mid": 0,
+        "high": 0
+      },
+      "upstreamPath": "src/HexManiac.Core/ViewModels/QuickEditItems/UpdateCube.cs",
+      "localEvidence": [],
+      "rationale": "CUBE migration/updater not evidenced."
+    },
+    {
+      "id": "rom-expand",
+      "effortUnits": 6,
+      "completion": {
+        "low": 0,
+        "mid": 0,
+        "high": 0
+      },
+      "upstreamPath": "src/HexManiac.Core/ViewModels/QuickEditItems/ExpandRom.cs",
+      "localEvidence": [],
+      "rationale": "Safe ROM expansion tooling not evidenced."
+    }
+  ],
+  "sharedWorkstreams": [
+    {
+      "id": "rom-provenance",
+      "effortUnits": 12,
+      "completion": {
+        "low": 0.02,
+        "mid": 0.08,
+        "high": 0.16
+      },
+      "sourceRefs": [
+        "FULL_PORT_PLAN.md",
+        "docs/ROM_FINGERPRINT_REGISTRY.md"
+      ],
+      "rationale": "Common independent ROM/CUBE version and TOML provenance acceptance, not family-specific decoding."
+    },
+    {
+      "id": "transaction-platform",
+      "effortUnits": 14,
+      "completion": {
+        "low": 0.02,
+        "mid": 0.12,
+        "high": 0.22
+      },
+      "sourceRefs": [
+        "FULL_PORT_PLAN.md",
+        "docs/HMA_CUBE_CELL_DRYRUN.md"
+      ],
+      "rationale": "Shared journal, exclusive ownership, save/reopen, rollback and copy-on-write platform; current dry-run is copy-only."
+    },
+    {
+      "id": "android-platform",
+      "effortUnits": 13,
+      "completion": {
+        "low": 0,
+        "mid": 0.04,
+        "high": 0.12
+      },
+      "sourceRefs": [
+        "FULL_PORT_PLAN.md",
+        "manifest.webmanifest"
+      ],
+      "rationale": "APK packaging, SAF, Back, lifecycle, performance and real device validation, beyond mobile web."
+    },
+    {
+      "id": "emulator-interoperability",
+      "effortUnits": 10,
+      "completion": {
+        "low": 0,
+        "mid": 0.01,
+        "high": 0.08
+      },
+      "sourceRefs": [
+        "FULL_PORT_PLAN.md",
+        "docs/PARITY_BASELINE.md"
+      ],
+      "rationale": "Shared emulator runtime regression and cross-editor compatibility infrastructure."
+    },
+    {
+      "id": "quality-release",
+      "effortUnits": 10,
+      "completion": {
+        "low": 0.06,
+        "mid": 0.15,
+        "high": 0.27
+      },
+      "sourceRefs": [
+        ".github/workflows/ci.yml",
+        "scripts/parity-audit.mjs"
+      ],
+      "rationale": "Shared CI, safety, fixture governance, release regression, provenance and independent acceptance reports."
+    },
+    {
+      "id": "mobile-ux-accessibility",
+      "effortUnits": 8,
+      "completion": {
+        "low": 0.08,
+        "mid": 0.18,
+        "high": 0.3
+      },
+      "sourceRefs": [
+        "src/app.js",
+        "src/styles.css"
+      ],
+      "rationale": "Shared touch-first navigation exists; accessibility and device UX acceptance not established."
+    }
+  ]
+}
