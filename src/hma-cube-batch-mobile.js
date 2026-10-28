@@ -50,7 +50,7 @@ export function bindHmaCubeBatchEditors({getContext,safeRun}){
  function current(snapshot){
   const ctx=getContext();
   if(!enabled||!ctx||!snapshot||snapshot!==ctx.snapshot||
-     snapshot.rom!==ctx.rom||snapshot.summary!==ctx.summary)
+     !ctx.rom||!ctx.summary)
    throw Error('CUBE event source expired; inspect map records again');
   const fresh=inspectHmaCubeMapEventWarps(ctx.rom,ctx.summary,snapshot.options);
   if(JSON.stringify(fresh)!==JSON.stringify(snapshot.report))
