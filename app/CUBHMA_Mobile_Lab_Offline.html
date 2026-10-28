@@ -6607,6 +6607,7 @@ function inspectHmaCubeMapEntry(source,summary,{bankIndex,mapIndex,mapCount}={})
     walkabilityVerified:false,writeAuthorized:false});
 }
 
+const inspectHmaCubeMapEventWarps=(()=>{
 /**
  * Read-only CUBE custom map event group and raw warp inspection.
  * Pinned CUBHMA MapModel.cs EventsFormat/WarpsFormat and cube_emerald.toml
@@ -6699,6 +6700,8 @@ function inspectHmaCubeMapEventWarps(source,summary,options){
     walkabilityVerified:false,writeAuthorized:false});
 }
 
+return inspectHmaCubeMapEventWarps;
+})();
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let pcsReference=null,pcsReferenceName='';
