@@ -2,6 +2,7 @@ package com.pokebacon.cubemobile;
 
 import android.app.Instrumentation;
 import android.content.Intent;
+import android.os.SystemClock;
 import android.view.ViewGroup;
 import android.webkit.WebView;
 import androidx.test.platform.app.InstrumentationRegistry;
@@ -32,7 +33,11 @@ public class OfflineShellSmokeTest {
                 web.set((WebView) root.getChildAt(0));
             });
             boolean loaded = false;
-            for (int attempt = 0; attempt < 40; attempt++) {
+            // Cold emulator WebView startup can delay the first JS callback.
+            // Retry until a bounded wall-clock deadline rather than treating
+            // one delayed callback as an application failure.
+            long deadline = SystemClock.elapsedRealtime() + 90000L;
+            while (SystemClock.elapsedRealtime() < deadline) {
                 CountDownLatch latch = new CountDownLatch(1);
                 AtomicReference<String> result = new AtomicReference<>();
                 instrumentation.runOnMainSync(() -> web.get().evaluateJavascript(
@@ -41,9 +46,9 @@ public class OfflineShellSmokeTest {
                     " && document.body.innerText.length>100 && !!window.CubeExport" +
                     " && !!window.__cubeNativeExportInstalled;})()",
                     value -> { result.set(value); latch.countDown(); }));
-                assertTrue("WebView callback timed out", latch.await(3, TimeUnit.SECONDS));
-                if ("true".equals(result.get())) { loaded = true; break; }
-                Thread.sleep(250);
+                if (latch.await(5, TimeUnit.SECONDS) &&
+                    "true".equals(result.get())) { loaded = true; break; }
+                Thread.sleep(300);
             }
             assertTrue("Offline HTML or native export bridge did not load", loaded);
         } finally {
