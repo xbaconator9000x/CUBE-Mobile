@@ -53,6 +53,7 @@ import {inspectHmaCubeBankCatalog} from './hma-cube-bank-catalog.js';
 import {traceHmaCubeWarpArrival} from './hma-cube-warp-arrival.js';
 import {traceHmaCubeConnectionDestination} from './hma-cube-connection-trace.js';
 import {auditHmaCubeCrossBankOwnership} from './hma-cube-cross-bank-ownership.js';
+import {previewHmaCubeCellBatch} from './hma-cube-cell-batch.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
@@ -62,6 +63,7 @@ let metadataFingerprints=[],metadataImportSerial=0,mapBankMetadataReport=null,ma
 let inspectedWarpMap=null,selectedWarpPreview=null,selectedEventPreview=null,inspectedEventMap=null,inspectedMapAtlas=null,atlasBatchStart=0,atlasCoordinateBatchStart=0,atlasScriptAliasStart=0,atlasScriptCrossPageStart=0,atlasIncomingStart=0,atlasIncomingTarget=null;
 let activeRenderedMap=null,selectedRenderedHit=null;
 let cubeCatalogEvidence=null,cubeWarpTraceEvidence=null,cubeConnectionTraceEvidence=null,cubeOwnershipEvidence=null;
+let cubeCellBatchQueue=[],cubeCellBatchSnapshot=null;
 let mapReviewQueue=[],mapReviewRom=null,lastMapPreviews={cell:null,warp:null,event:null};
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
 const PER_PAGE=128;
@@ -910,8 +912,42 @@ function clearCubeCatalog(message='No CUBE bank catalog inspected. Supply a veri
   clearCubeWarpTrace();
   clearCubeOwnership();
 }
+function drawCubeCellBatchQueue(){
+  const list=$('cube-map-batch-list');list.replaceChildren();
+  const current=cubeCellBatchSnapshot&&cubeCellBatchSnapshot===cubeRenderEvidence&&
+    cubeCellBatchSnapshot.rom===model;
+  if(!current&&cubeCellBatchQueue.length){clearCubeBatchQueue();return;}
+  $('cube-map-batch-preview').disabled=!cubeCellBatchQueue.length;
+  $('cube-map-batch-clear').disabled=!cubeCellBatchQueue.length;
+  $('cube-map-batch-status').textContent=cubeCellBatchQueue.length+
+    '/32 CUBE cell proposals queued for virtual preview. No ROM writes or save authorization.';
+  for(const change of cubeCellBatchQueue){
+    const remove=document.createElement('button');remove.type='button';
+    remove.className='subtle-button';
+    remove.textContent='Remove ('+change.x+','+change.y+') · tile '+
+      change.tileId+' · high bits '+change.collision;
+    remove.addEventListener('click',()=>safeRun(()=>{
+      if(!cubeCellBatchSnapshot||cubeCellBatchSnapshot!==cubeRenderEvidence||
+         cubeCellBatchSnapshot.rom!==model)
+        throw Error('Queued CUBE preview expired; render again');
+      cubeCellBatchQueue=cubeCellBatchQueue.filter(c=>c.x!==change.x||c.y!==change.y);
+      drawCubeCellBatchQueue();
+      $('cube-map-preview-after').hidden=true;
+    }));
+    list.append(remove);
+  }
+}
+function clearCubeBatchQueue(){
+  cubeCellBatchQueue=[];cubeCellBatchSnapshot=null;
+  $('cube-map-batch-add').disabled=true;
+  $('cube-map-batch-preview').disabled=true;
+  $('cube-map-batch-clear').disabled=true;
+  $('cube-map-batch-list').replaceChildren();
+  $('cube-map-batch-status').textContent='No queued CUBE changes. ROM remains unchanged.';
+}
 function clearCubeRenderedMap(message='CUBE render invalidated; render again.'){
   cubeRenderEvidence=null;cubeRenderSelection=null;cubeCellPreview=null;
+  clearCubeBatchQueue();
   $('cube-map-cell-preview').disabled=true;
   $('cube-map-preview-after').hidden=true;
   $('cube-map-preview-status').textContent='Select a rendered cell to preview a proposed change. No ROM writes.';
@@ -1215,6 +1251,7 @@ $('cube-map-render').addEventListener('click',()=>safeRun(()=>{
     pixels:rendered.pixels.slice(),cellsJson:JSON.stringify(rendered.cells),
     attributesJson:JSON.stringify(rendered.attributes)};
   cubeRenderSelection=null;cubeCellPreview=null;$('cube-map-cell-preview').disabled=true;
+  clearCubeBatchQueue();
   $('cube-map-preview-after').hidden=true;
   $('cube-map-preview-status').textContent='Tap a rendered cell to propose a visual-only change.';
   $('cube-map-render-jump').disabled=true;
@@ -1247,6 +1284,7 @@ $('cube-map-render-canvas').addEventListener('click',event=>safeRun(()=>{
   if(!hit)return;
   cubeRenderSelection={snapshot,cellOffset:hit.cell.byteOffset,x:hit.cell.x,y:hit.cell.y,raw:hit.cell.raw};
   cubeCellPreview=null;$('cube-map-preview-after').hidden=true;
+  $('cube-map-batch-add').disabled=false;
   $('cube-map-preview-status').textContent='Selected cell is ready for a read-only visual proposal.';
   $('cube-map-proposed-tile').value=String(hit.cell.tileId);
   $('cube-map-proposed-high').value=String(hit.cell.collision);
@@ -1257,6 +1295,75 @@ $('cube-map-render-canvas').addEventListener('click',event=>safeRun(()=>{
     ' · behavior 0x'+hex(hit.attribute.behavior,2)+' · layer '+hit.attribute.layer+
     ' · blockmap 0x'+hex(hit.cell.byteOffset)+' · attributes 0x'+
     hex(hit.attribute.attributeOffset)+'. Not verified walkability.';
+}));
+$('cube-map-batch-add').addEventListener('click',()=>safeRun(()=>{
+  const selected=cubeRenderSelection,snapshot=selected?.snapshot;
+  if(!snapshot||snapshot!==cubeRenderEvidence||snapshot.rom!==model||
+     !cubeMapEvidence||cubeMapEvidence.options!==snapshot.options)
+    throw Error('Select a current rendered CUBE cell first');
+  const tileText=$('cube-map-proposed-tile').value;
+  const highText=$('cube-map-proposed-high').value;
+  if(!/^\d+$/.test(tileText)||!/^\d+$/.test(highText))
+    throw new RangeError('Proposed tile and raw high bits must be unsigned integers');
+  const tileId=Number(tileText),collision=Number(highText);
+  if(!Number.isSafeInteger(tileId)||tileId>1023||
+     !Number.isSafeInteger(collision)||collision>63)
+    throw new RangeError('CUBE tile/high-bit proposal outside allowed range');
+  if(cubeCellBatchSnapshot&&cubeCellBatchSnapshot!==snapshot)
+    throw Error('Queued proposals belong to an earlier map rendering');
+  const proposal={x:selected.x,y:selected.y,tileId,collision,expectedRaw:selected.raw};
+  const next=cubeCellBatchQueue.filter(c=>c.x!==selected.x||c.y!==selected.y);
+  if(next.length>=32)throw new RangeError('Maximum 32 queued CUBE cells');
+  next.push(proposal);
+  // Revalidate all expected original words, rendering, and proposed values
+  // before accepting a new queue item; this never changes staged ROM bytes.
+  const result=previewHmaCubeCellBatch(model,mapBankCustomSummary,{
+    ...snapshot.options,x:snapshot.x,y:snapshot.y,viewportWidth:10,viewportHeight:8,
+    changes:next
+  });
+  if(JSON.stringify(result.beforeImage.map)!==JSON.stringify(snapshot.map)||
+     JSON.stringify(result.beforeImage.cells)!==snapshot.cellsJson||
+     JSON.stringify(result.beforeImage.attributes)!==snapshot.attributesJson||
+     result.beforeImage.pixels.length!==snapshot.pixels.length||
+     !result.beforeImage.pixels.every((value,i)=>value===snapshot.pixels[i]))
+    throw Error('CUBE map rendering changed; render again');
+  cubeCellBatchSnapshot=snapshot;cubeCellBatchQueue=next;
+  drawCubeCellBatchQueue();
+}));
+$('cube-map-batch-clear').addEventListener('click',()=>safeRun(()=>{
+  clearCubeBatchQueue();$('cube-map-preview-after').hidden=true;
+}));
+$('cube-map-batch-preview').addEventListener('click',()=>safeRun(()=>{
+  const snapshot=cubeCellBatchSnapshot;
+  if(!snapshot||snapshot!==cubeRenderEvidence||snapshot.rom!==model||
+     !cubeMapEvidence||cubeMapEvidence.options!==snapshot.options||
+     !cubeCellBatchQueue.length)
+    throw Error('CUBE cell queue expired; render and select again');
+  const ownership=cubeOwnershipEvidence;
+  const banks=ownership?.rom===model&&ownership.summary===mapBankCustomSummary&&
+    ownership.banks.some(b=>b.bankIndex===snapshot.options.bankIndex&&
+      b.mapCount===snapshot.options.mapCount)?ownership.banks:undefined;
+  const result=previewHmaCubeCellBatch(model,mapBankCustomSummary,{
+    ...snapshot.options,x:snapshot.x,y:snapshot.y,viewportWidth:10,viewportHeight:8,
+    changes:cubeCellBatchQueue,banks
+  });
+  if(JSON.stringify(result.beforeImage.map)!==JSON.stringify(snapshot.map)||
+     JSON.stringify(result.beforeImage.cells)!==snapshot.cellsJson||
+     JSON.stringify(result.beforeImage.attributes)!==snapshot.attributesJson||
+     result.beforeImage.pixels.length!==snapshot.pixels.length||
+     !result.beforeImage.pixels.every((value,i)=>value===snapshot.pixels[i]))
+    throw Error('CUBE rendering changed since queue creation; render again');
+  const after=result.afterImage,canvas=$('cube-map-preview-after');
+  canvas.width=after.width;canvas.height=after.height;
+  const ctx=canvas.getContext('2d'),image=ctx.createImageData(after.width,after.height);
+  image.data.set(after.pixels);ctx.putImageData(image,0,0);
+  canvas.style.width=(after.width*2)+'px';canvas.style.height=(after.height*2)+'px';
+  canvas.hidden=false;cubeCellPreview=result;
+  $('cube-map-preview-status').textContent='Virtual batch: '+
+    result.changedCells+' changed CUBE cells, '+result.changedPixels+
+    ' changed pixels. '+(result.ownership?
+      result.ownership.overlapCount+' known ownership overlaps; ':'Ownership not audited; ')+
+    'partial census cannot prove exclusivity. No ROM writes or walkability claims.';
 }));
 $('cube-map-cell-preview').addEventListener('click',()=>safeRun(()=>{
   const selected=cubeRenderSelection,snapshot=selected?.snapshot;
