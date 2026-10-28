@@ -6809,6 +6809,7 @@ function drawMapBankMetadataReport(){
   if(!report){
     status.textContent='Import TOML metadata to inspect the CUBHMA data.maps.banks declaration. No ROM layout is authenticated.';
     list.append(semanticChild('p','No map-bank metadata inspected.','palette-note'));
+    drawMapBankRawPointerEvidence();
     return;
   }
   const labels={
