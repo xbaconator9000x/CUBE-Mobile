@@ -1,3 +1,8 @@
+## Checkpoint — opt-in local CUBE second-hop raw target census (28 October 2026)
+- [x] Add bounded `--target-words 1–16` to SHA-256-matched local CUBE bank smoke, reporting aggregate nested pointer-shaped evidence without bytes, offsets, hashes or paths.
+- [x] Preserve immutable ROM inputs and reject invalid budgets; add synthetic CLI and safety regressions.
+- [ ] Independently authenticate genuine CUBE layouts, verify emulator/Android and save/reopen before interpreting nested words as maps or awarding parity. See [local bank smoke](docs/LOCAL_CUBE_BANK_SMOKE.md).
+
 ## Checkpoint — mobile raw HMA bank target windows (28 October 2026)
 - [x] Inspect bounded four-word second-hop samples at metadata-declared raw bank pointer targets; reject overlap, truncation, invalid and ambiguous sources without inferring maps.
 - [x] Add touchscreen source/candidate hex navigation with full sample revalidation, reset invalidation, synthetic UI checks and standalone offline support.
