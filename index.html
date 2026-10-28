@@ -150,6 +150,23 @@
     <button type="button" id="cube-warp-trace-open" class="subtle-button" disabled>Inspect raw destination map</button>
   </div>
   <output id="cube-warp-trace-status" class="palette-note" aria-live="polite">Inspect CUBE warps, then supply an explicit destination-bank map count.</output>
+  <div class="input-row" aria-label="Read-only CUBE warp record editing preflight">
+    <div class="input-wrap"><label for="cube-warp-edit-index">Warp index</label><input id="cube-warp-edit-index" type="number" min="0" max="254" value="0"></div>
+    <button type="button" id="cube-warp-edit-load" class="subtle-button" disabled>Load raw warp fields</button>
+  </div>
+  <div class="input-row" aria-label="Proposed CUBE warp raw fields">
+    <div class="input-wrap"><label for="cube-warp-edit-x">X</label><input id="cube-warp-edit-x" type="number" min="0" max="65535" value="0"></div>
+    <div class="input-wrap"><label for="cube-warp-edit-y">Y</label><input id="cube-warp-edit-y" type="number" min="0" max="65535" value="0"></div>
+    <div class="input-wrap"><label for="cube-warp-edit-elevation">Elevation</label><input id="cube-warp-edit-elevation" type="number" min="0" max="255" value="0"></div>
+    <div class="input-wrap"><label for="cube-warp-edit-warpId">Target warp ID</label><input id="cube-warp-edit-warpId" type="number" min="0" max="255" value="0"></div>
+    <div class="input-wrap"><label for="cube-warp-edit-targetMap">Target map</label><input id="cube-warp-edit-targetMap" type="number" min="0" max="255" value="0"></div>
+    <div class="input-wrap"><label for="cube-warp-edit-targetBank">Target bank</label><input id="cube-warp-edit-targetBank" type="number" min="0" max="255" value="0"></div>
+  </div>
+  <div class="input-row">
+    <div class="input-wrap"><label for="cube-warp-edit-target-banks">Optional explicit bank:map-count declarations</label><input id="cube-warp-edit-target-banks" type="text" placeholder="0:12,1:9" spellcheck="false"></div>
+    <button type="button" id="cube-warp-edit-preview" class="subtle-button" disabled>Compare virtual warp change</button>
+  </div>
+  <output id="cube-warp-edit-status" class="palette-note" aria-live="polite">Inspect CUBE warps, then load a record. This tool never writes ROM bytes.</output>
   <div class="input-row" aria-label="Bounded CUBE raw warp topology audit">
     <div class="input-wrap"><label for="cube-warp-audit-banks">Destination bank:map-count declarations</label><input id="cube-warp-audit-banks" type="text" value="0:1" placeholder="0:12,1:9" spellcheck="false"></div>
     <button type="button" id="cube-warp-audit" class="subtle-button" disabled>Audit all raw map warps (max 32)</button>
