@@ -133,6 +133,13 @@
 <section class="view" id="view-anchors">
  <div class="tool-heading"><div><div class="eyebrow">CUBHMA METADATA · SOURCE-GROUNDED</div><h2>Named ROM data</h2><p>Browse HMA / CUBHMA TOML anchors at their documented offsets. This is the start of the actual ROM-aware editor layer—not a replacement for the desktop table parser.</p></div><span class="pill">Read only</span></div>
  <div class="toolbar-card"><div class="input-wrap"><label>Load CUBHMA metadata</label><div class="input-row"><label for="metadata-picker" class="secondary-button picker-label">↑ Import .toml files</label><button class="subtle-button" id="metadata-stock">Get stock metadata</button></div><p class="palette-note">For a modified CUBE ROM, import metadata generated for <b>that exact ROM build</b>. Stock offsets are unsafe to assume. Stock metadata download needs internet; local TOML files work offline.</p></div><div id="metadata-status" class="palette-note">No metadata loaded. ROM and metadata files remain on this device. Stock metadata fetch downloads text only; it does not upload ROM data.</div><output id="metadata-fingerprint-status" class="palette-note" aria-live="polite" style="display:block;white-space:pre-wrap;overflow-wrap:anywhere">No metadata fingerprints loaded. Exact TOML identity is unverified.</output><div class="input-wrap"><label>Optional HMA text reference (read-only)</label><div class="input-row"><label for="pcs-reference-picker" class="secondary-button picker-label">↑ Import pcsReference.txt</label><button type="button" class="subtle-button" id="pcs-reference-clear">Clear reference</button></div><p id="pcs-reference-status" class="palette-note">No optional PCS reference loaded.</p><p class="palette-note">Imported glyphs and game-specific macros are <b>unverified</b> against this ROM. Files stay on your device; text and pointers cannot be semantically edited.</p></div></div>
+ <div class="toolbar-card" aria-label="CUBHMA map-bank metadata inspection">
+  <div class="section-heading"><h3>Map-bank metadata</h3><span class="pill">Read only · unverified</span></div>
+  <output id="map-bank-metadata-status" class="palette-note" aria-live="polite">Import TOML metadata to inspect the CUBHMA data.maps.banks declaration. No ROM layout is authenticated.</output>
+  <div id="map-bank-metadata-list" class="anchor-list"><p class="palette-note">No map-bank metadata inspected.</p></div>
+  <div class="input-row"><button type="button" id="map-bank-metadata-jump" class="subtle-button" disabled>Inspect anchor bytes in hex</button></div>
+  <p class="palette-note">Metadata format hints are not proof of CUBE compatibility, collision semantics or safe ROM editing.</p>
+ </div>
  <div class="toolbar-card"><div class="input-wrap"><label for="anchor-find">Search named anchors</label><input id="anchor-find" placeholder="e.g. pokemon.stats, maps, trainers, sound…" spellcheck="false"></div><div class="input-wrap"><label for="anchor-group">Category</label><select id="anchor-group"><option value="all">All categories</option></select></div></div>
  <div class="semantic-grid"><div class="semantic-card"><div class="card-caption"><b>ANCHOR DIRECTORY</b><span id="anchor-count">0 loaded</span></div><div id="anchor-list" class="anchor-list"><div class="empty-state">Load ROM metadata to browse named data.</div></div></div><div class="semantic-card"><div class="card-caption"><b>DATA INSPECTION</b><span>Never writes ROM data</span></div><div id="anchor-detail" class="anchor-detail"><div class="empty-state">Choose an anchor to inspect its address, format and bytes.</div></div><div class="input-row"><button id="anchor-to-hex" class="secondary-button" disabled>Open in hex</button><button id="anchor-follow-pointer" class="secondary-button" disabled>Follow pointer</button><button id="anchor-to-graphics" class="secondary-button" disabled>View LZ graphic</button></div></div></div>
  <div class="safety-strip"><span class="safety-icon">!</span><div><strong>Metadata ≠ verified ROM compatibility.</strong><p>HMA named anchors can describe tables, text, graphics and scripts, but reading their addresses does not establish that an expanded CUBE ROM uses those locations. Full writable format decoding, repointing and map/collision editing are not implemented here.</p></div></div>
@@ -5905,11 +5912,248 @@ function auditVanillaAtlasScriptOperandAliases(source,atlas,{
  });
 }
 
+const summarizeHmaMapBankSources=(()=>{
+/**
+ * Conservative read-only HMA map format hierarchy extractor.
+ * Ported from pinned kcradi/CUBHMA MapModel.cs Format.ExtractPointerContent
+ * and its custom MapFormat / LayoutFormat / EventsFormat fallback.
+ * This parses metadata text only: it does not authenticate a ROM or execute DSL.
+ */
+const names=Object.freeze(['layout','events','connections','objects',
+ 'warps','scripts','signposts','primaryBlockset']);
+function extractHmaPointerContent(format,prefix,{maxLength=8192,maxDepth=32}={}){
+ if(typeof format!=='string'||typeof prefix!=='string'||
+    !/^[A-Za-z][A-Za-z0-9]*<$/.test(prefix))
+  throw new TypeError('Expected HMA format string and named pointer prefix');
+ if(!Number.isSafeInteger(maxLength)||maxLength<1||maxLength>65536||
+    !Number.isSafeInteger(maxDepth)||maxDepth<1||maxDepth>128)
+  throw new RangeError('Invalid bounded HMA pointer-format limits');
+ if(format.length>maxLength)throw new RangeError('HMA map format exceeds byte budget');
+ let at=format.indexOf(prefix);
+ while(at>=0){
+  if(at===0||' [<'.includes(format[at-1]))break;
+  at=format.indexOf(prefix,at+1);
+ }
+ if(at<0)return null;
+ const start=at+prefix.length;
+ if(format[start]!=='[')return null;
+ let depth=0,closing=-1;
+ for(let i=start;i<format.length;i++){
+  if(format[i]==='['){
+   depth++;if(depth>maxDepth)throw new RangeError('HMA pointer nesting too deep');
+  }else if(format[i]===']'){
+   depth--;if(depth<0)throw new RangeError('Unbalanced HMA pointer brackets');
+   if(depth===0){closing=i;break;}
+  }
+ }
+ if(closing<0)throw new RangeError('Unterminated HMA pointer format');
+ const end=format.indexOf('>',closing+1);
+ if(end<0||end-closing>64||
+    /[\[\]<>]/.test(format.slice(closing+1,end)))
+  throw new RangeError('Malformed HMA pointer format suffix');
+ return format.slice(start,end);
+}
+function inspectHmaMapFormatHierarchy(mapBankFormat){
+ if(typeof mapBankFormat!=='string')
+  throw new TypeError('Provide the HMA map-bank table format text');
+ const mapFormat=extractHmaPointerContent(mapBankFormat,'map<');
+ if(mapFormat===null)return Object.freeze({
+  status:'unresolved',mapFormat:null,vanillaMarker:false,
+  readOnly:true,romAuthenticated:false,cubeLayoutAuthenticated:false
+ });
+ const vanillaMarker=mapFormat.includes(' cave. ');
+ const supportedShape=mapFormat.endsWith(']1');
+ const layout=extractHmaPointerContent(mapFormat,'layout<');
+ const events=extractHmaPointerContent(mapFormat,'events<');
+ const connections=extractHmaPointerContent(mapFormat,'connections<');
+ const objects=events===null?null:extractHmaPointerContent(events,'objects<');
+ const warps=events===null?null:extractHmaPointerContent(events,'warps<');
+ const scripts=events===null?null:extractHmaPointerContent(events,'scripts<');
+ const signposts=events===null?null:extractHmaPointerContent(events,'signposts<');
+ const primaryBlockset=layout===null?null:
+  extractHmaPointerContent(layout,'primaryBlockset<');
+ const sections=Object.freeze({layout,events,connections,objects,
+  warps,scripts,signposts,primaryBlockset});
+ return Object.freeze({
+  status:!supportedShape?'unsupported-shape':
+   vanillaMarker?'vanilla-marker':'custom-candidate',
+  mapFormat,sections,sectionCount:names.filter(n=>sections[n]!==null).length,
+  vanillaMarker,supportedShape,
+  readOnly:true,romAuthenticated:false,cubeLayoutAuthenticated:false,
+  writeAuthorized:false
+ });
+}
+
+/**
+ * Conservative HMA custom-map pointer multiplicity audit.
+ * CUBHMA MapModel.cs extracts the first named pointer format from each scope.
+ * Before using that as evidence, detect duplicate same-name declarations.
+ * This is metadata-only and does not claim to implement HMA's full DSL.
+ */
+function occurrences(text,name){
+ if(text===null)return 0;
+ // HMA can legitimately reuse a field name inside a nested array, e.g.
+ // connections<[count:: connections<[...]/count>]1>. Only repeated fields
+ // at the SAME nesting depth are ambiguous. Ignore backtick DSL macros.
+ let depth=0,quoted=false,firstDepth=null,count=0;
+ for(let i=0;i<text.length;i++){
+  const ch=text[i];
+  if(ch==='`'){quoted=!quoted;continue;}
+  if(quoted)continue;
+  if(ch==='['){depth++;continue;}
+  if(ch===']'){depth--;continue;}
+  if(text.startsWith(name+'<',i)&&
+     (i===0||' [<\n\t'.includes(text[i-1]))){
+    if(firstDepth===null)firstDepth=depth;
+    if(depth===firstDepth)count++;
+  }
+ }
+ return count;
+}
+
+function auditHmaMapPointerMultiplicity(bankFormat){
+ if(typeof bankFormat!=='string'||bankFormat.length>8192)
+  throw new RangeError('Expected bounded HMA map-bank format text');
+ const mapFormat=extractHmaPointerContent(bankFormat,'map<');
+ const layout=mapFormat===null?null:extractHmaPointerContent(mapFormat,'layout<');
+ const events=mapFormat===null?null:extractHmaPointerContent(mapFormat,'events<');
+ const scopes=[
+  ['banks',bankFormat,['map']],
+  ['map',mapFormat,['layout','events','connections']],
+  ['events',events,['objects','warps','scripts','signposts']],
+  ['layout',layout,['primaryBlockset','secondaryBlockset']]
+ ];
+ const duplicates=[],counts={};
+ for(const [scope,format,names] of scopes){
+  for(const name of names){
+   const count=occurrences(format,name);
+   counts[scope+'.'+name]=count;
+   if(count>1)duplicates.push(Object.freeze({scope,name,count}));
+  }
+ }
+ return Object.freeze({
+  ambiguous:duplicates.length>0,
+  duplicates:Object.freeze(duplicates),
+  counts:Object.freeze(counts),
+  readOnly:true,romAuthenticated:false,writeAuthorized:false
+ });
+}
+
+/**
+ * Read-only bridge from real imported HMA [[NamedAnchors]] declarations to
+ * the upstream CUBHMA map-bank format hierarchy. No ROM format is inferred.
+ *
+ * Source: kcradi/CUBHMA MapModel.cs AllMapsModel.Create uses the
+ * "data.maps.banks" table; Format(model) obtains its FormatString and
+ * extracts map<...> metadata. The metadata is evidence, NOT authentication.
+ */
+const MAP_BANK_ANCHOR='data.maps.banks';
+const MAX_SOURCES=64;
+const MAX_DECLARATIONS=128;
+
+function result(status, declarations, extra={}) {
+  return Object.freeze({
+    status,anchorName:MAP_BANK_ANCHOR,
+    declarationCount:declarations.length,
+    declarations:Object.freeze(declarations.map(d=>Object.freeze(d))),
+    readOnly:true,romAuthenticated:false,cubeLayoutAuthenticated:false,
+    writeAuthorized:false,...extra
+  });
+}
+
+/**
+ * Compare exact named-anchor declarations across TOML sources, including
+ * duplicates, conflicting overlays, invalid ROM spans and malformed formats.
+ * A matching header, address or metadata declaration is NEVER sufficient
+ * evidence to decode a custom CUBE map.
+ */
+function inspectHmaMapBankAnchorSources(sources,{romSize=Infinity}={}){
+  if(!Array.isArray(sources)||sources.length>MAX_SOURCES)
+    throw new RangeError('Expected at most 64 named TOML sources');
+  if(romSize!==Infinity&&(!Number.isSafeInteger(romSize)||romSize<0))
+    throw new RangeError('Invalid ROM length');
+  const declarations=[];
+  const sourceNames=new Set();
+  for(const source of sources){
+    if(typeof source?.name!=='string'||!source.name.trim()||
+       typeof source.text!=='string'||sourceNames.has(source.name))
+      throw new TypeError('Each TOML source needs a unique name and text');
+    sourceNames.add(source.name);
+    for(const anchor of parseHmaNamedAnchors(source.text,{romSize})){
+      if(anchor.name!==MAP_BANK_ANCHOR)continue;
+      if(declarations.length>=MAX_DECLARATIONS)
+        throw new RangeError('Too many map-bank anchor declarations');
+      declarations.push({
+        source:source.name,line:anchor.line,
+        address:anchor.address,format:anchor.format,
+        addressInBounds:romSize===Infinity?null:
+          anchor.address%4===0&&anchor.address<=romSize-4
+      });
+    }
+  }
+  if(!declarations.length)return result('missing',declarations,{
+    hierarchy:null,uniqueDeclarationCount:0
+  });
+  const signatures=new Set(declarations.map(d=>JSON.stringify([d.address,d.format])));
+  const common={uniqueDeclarationCount:signatures.size};
+  // HMA's metadata overlay precedence has not been ported: never silently
+  // choose one of two differing map-bank declarations.
+  if(signatures.size!==1)return result('conflicting-declarations',declarations,{
+    ...common,hierarchy:null
+  });
+  const first=declarations[0];
+  if(first.address%4!==0||first.addressInBounds===false)
+    return result('invalid-address',declarations,{...common,hierarchy:null});
+  let hierarchy,multiplicity;
+  try {
+    multiplicity=auditHmaMapPointerMultiplicity(first.format);
+    if(!multiplicity.ambiguous)
+      hierarchy=inspectHmaMapFormatHierarchy(first.format);
+  } catch(err) {
+    if(!(err instanceof RangeError))throw err;
+    return result('malformed-format',declarations,{...common,hierarchy:null});
+  }
+  if(multiplicity.ambiguous)
+    return result('ambiguous-format',declarations,{...common,hierarchy:null,multiplicity});
+  const status=hierarchy.status==='custom-candidate'?'custom-candidate':
+    hierarchy.status==='vanilla-marker'?'vanilla-marker':'unresolved-format';
+  return result(status,declarations,{...common,hierarchy,multiplicity});
+}
+
+/**
+ * Safe mobile view model for upstream CUBHMA data.maps.banks metadata.
+ * Does not expose raw format strings, TOML content or ROM bytes.
+ * Evidence is not ROM authentication and never grants write authority.
+ */
+function summarizeHmaMapBankSources(sources,{romSize=Infinity}={}){
+  const report=inspectHmaMapBankAnchorSources(sources,{romSize});
+  const declarations=report.declarations.map(d=>Object.freeze({
+    source:d.source,line:d.line,address:d.address,
+    formatLength:d.format.length,addressInBounds:d.addressInBounds
+  }));
+  const sections=report.hierarchy?.sections?
+    Object.entries(report.hierarchy.sections).filter(([,format])=>format!==null).map(([name])=>name):[];
+  return Object.freeze({
+    status:report.status,anchorName:report.anchorName,
+    declarationCount:report.declarationCount,
+    uniqueDeclarationCount:report.uniqueDeclarationCount,
+    declarations:Object.freeze(declarations),
+    sectionNames:Object.freeze(sections),
+    vanillaMarker:report.hierarchy?.vanillaMarker===true,
+    ambiguousFields:Object.freeze((report.multiplicity?.duplicates||[]).map(d=>
+      Object.freeze({scope:d.scope,name:d.name,count:d.count}))),
+    readOnly:true,romAuthenticated:false,cubeLayoutAuthenticated:false,
+    writeAuthorized:false
+  });
+}
+
+return summarizeHmaMapBankSources;
+})();
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let pcsReference=null,pcsReferenceName='';
 let fingerprintResult=null,fingerprintAbort=null;
-let metadataFingerprints=[],metadataImportSerial=0;
+let metadataFingerprints=[],metadataImportSerial=0,mapBankMetadataReport=null;
 let inspectedWarpMap=null,selectedWarpPreview=null,selectedEventPreview=null,inspectedEventMap=null,inspectedMapAtlas=null,atlasBatchStart=0,atlasCoordinateBatchStart=0,atlasScriptAliasStart=0,atlasScriptCrossPageStart=0,atlasIncomingStart=0,atlasIncomingTarget=null;
 let activeRenderedMap=null,selectedRenderedHit=null;
 let mapReviewQueue=[],mapReviewRom=null,lastMapPreviews={cell:null,warp:null,event:null};
@@ -5997,7 +6241,7 @@ function updateIndicators(){
   if(active)showRomInfo();
   drawMetadataFingerprintStatus();
 }
-function installModel(name,bytes){clearMapChangeReview();clearMapAtlas('ROM replaced; declared atlas invalidated.');metadataImportSerial++;metadataFingerprints=[];clearRenderedMap('ROM replaced. Select vanilla header again.');$('map-grid').innerHTML='<div class="empty-state">No blockmap inspected.</div>';$('map-bank-status').textContent='ROM replaced. Re-enter independently verified vanilla bank location and counts.';clearWarpInspection('ROM replaced. Select a vanilla map header again.');clearConnectionInspection('ROM replaced. Select a vanilla map header again.');$('map-layout-status').textContent='ROM replaced. No vanilla-format layout inspected.';$('map-status').textContent='ROM replaced. Enter a verified offset and inspect again.';pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
+function installModel(name,bytes){clearMapChangeReview();clearMapAtlas('ROM replaced; declared atlas invalidated.');metadataImportSerial++;metadataFingerprints=[];mapBankMetadataReport=null;clearRenderedMap('ROM replaced. Select vanilla header again.');$('map-grid').innerHTML='<div class="empty-state">No blockmap inspected.</div>';$('map-bank-status').textContent='ROM replaced. Re-enter independently verified vanilla bank location and counts.';clearWarpInspection('ROM replaced. Select a vanilla map header again.');clearConnectionInspection('ROM replaced. Select a vanilla map header again.');$('map-layout-status').textContent='ROM replaced. No vanilla-format layout inspected.';$('map-status').textContent='ROM replaced. Enter a verified offset and inspect again.';pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
 $('rom-picker').addEventListener('change',async e=>{
   const file=e.target.files?.[0];e.target.value='';if(!file)return;
   if(file.size<0xC0 || file.size>MAX_BYTES)return toast('ROM must be 192 bytes to 128 MiB',true);
@@ -6267,7 +6511,7 @@ if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostn
 // engine, game fingerprints and pointer allocator have been ported and tested.
 let displayedAnchors=[], selectedInspection=null;
 const encodeHex=bytes=>Array.from(bytes).map((b,i)=>hex(b,2)+(i%16===15?'\n':' ')).join('').trim();
-function metadataReset(){metadataImportSerial++;metadataFingerprints=[];clearWarpInspection('Metadata reset; inspect warps again.');clearMapChangeReview();clearConnectionInspection('Metadata reset; inspect connections again.');clearMapGrid('Metadata reset; inspect map again.');metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
+function metadataReset(){metadataImportSerial++;metadataFingerprints=[];clearWarpInspection('Metadata reset; inspect warps again.');clearMapChangeReview();clearConnectionInspection('Metadata reset; inspect connections again.');clearMapGrid('Metadata reset; inspect map again.');metadata=[];metadataSources=[];mapBankMetadataReport=null;metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
 function snapshotMatchedWords(words=metadataMatchedWords){
   if(!model)return [];
   return words.map(word=>{
@@ -6298,6 +6542,7 @@ function metadataCommit(sources){
   // Fail closed for known mismatched stock-game TOML before changing active metadata.
   // Custom CUBE/project TOML remains manually importable but is never authenticated by header alone.
   const metadataCheck=checkHmaMetadataSources(sources,model);
+  const nextMapBankReport=summarizeHmaMapBankSources(sources,{romSize:model.length});
   // Preserve contradictory named declarations instead of silently replacing
   // them; the semantic resolver will exclude conflicting names from typed reads.
   const merged=collectHmaNamedAnchors(sources,{romSize:model.length});
@@ -6325,6 +6570,7 @@ function metadataCommit(sources){
   metadataWordSnapshot=nextWordSnapshot;
   metadata=nextMetadata;metadataResolution=nextResolution;
   metadataSources=sources.map(({name})=>name);metadataLayoutKind=metadataCheck.layout.kind;
+  mapBankMetadataReport=nextMapBankReport;
   metadataFingerprints=nextFingerprints;
   clearWarpInspection('Metadata changed; re-inspect vanilla warps.');
   clearConnectionInspection('Metadata changed; re-inspect vanilla connections.');
@@ -6488,8 +6734,53 @@ function drawMetadataFingerprintStatus(){
   output.textContent='Exact imported TOML SHA-256 (local only):\n'+hashes+
     '\n'+identity+' Identity does not authenticate CUBE layout or permit semantic writes.';
 }
+function drawMapBankMetadataReport(){
+  const status=$('map-bank-metadata-status'),list=$('map-bank-metadata-list');
+  const jump=$('map-bank-metadata-jump');
+  list.replaceChildren();
+  const report=mapBankMetadataReport;
+  jump.disabled=true;
+  if(!report){
+    status.textContent='Import TOML metadata to inspect the CUBHMA data.maps.banks declaration. No ROM layout is authenticated.';
+    list.append(semanticChild('p','No map-bank metadata inspected.','palette-note'));
+    return;
+  }
+  const labels={
+    'missing':'No data.maps.banks anchor in imported TOML',
+    'custom-candidate':'Custom map format declared (unverified)',
+    'vanilla-marker':'Vanilla format marker declared (unverified)',
+    'conflicting-declarations':'Conflicting map-bank declarations — no selection',
+    'ambiguous-format':'Ambiguous repeated pointer fields — no selection',
+    'invalid-address':'Unaligned or out-of-ROM map-bank address',
+    'malformed-format':'Malformed map-bank format',
+    'unresolved-format':'Unsupported or unresolved map-bank format'
+  };
+  status.textContent=(labels[report.status]||'Unresolved map-bank metadata')+
+    '. '+report.declarationCount+' declaration(s), '+report.uniqueDeclarationCount+
+    ' unique. Metadata only; no CUBE ROM authentication or semantic writes.';
+  for(const d of report.declarations){
+    const row=document.createElement('div');row.className='palette-note';
+    row.append(semanticChild('strong',d.source+' · line '+d.line));
+    row.append(semanticChild('p','Offset 0x'+hex(d.address)+
+      ' · format length '+d.formatLength+
+      ' · ROM bounds '+(d.addressInBounds===true?'within declared ROM':d.addressInBounds===false?'invalid':'unknown')));
+    list.append(row);
+  }
+  if(report.sectionNames.length)
+    list.append(semanticChild('p','Declared sections: '+report.sectionNames.join(', ')+
+      '. These are metadata hints, not decoded ROM structures.','palette-note'));
+  if(report.ambiguousFields.length)
+    list.append(semanticChild('p','Repeated fields: '+report.ambiguousFields.map(d=>
+      d.scope+'.'+d.name+' ('+d.count+')').join(', ')+'.','semantic-warning'));
+  const valid=['custom-candidate','vanilla-marker'].includes(report.status)&&
+    report.uniqueDeclarationCount===1&&report.declarations.length>0&&
+    report.declarations.every(d=>d.addressInBounds===true)&&
+    !!model&&report.declarations[0].address<=model.length-4;
+  jump.disabled=!valid;
+}
 function drawAnchors(){
   drawMetadataFingerprintStatus();
+  drawMapBankMetadataReport();
   const root=$('anchor-list'),selector=$('anchor-group');root.replaceChildren();
   const previous=selector.value;
   selector.replaceChildren(new Option('All categories','all'));
@@ -6518,6 +6809,16 @@ function drawAnchors(){
 $('anchor-find').addEventListener('input',drawAnchors);
 $('anchor-group').addEventListener('change',drawAnchors);
 $('anchor-to-hex').addEventListener('click',()=>safeRun(()=>{if(!selectedAnchor?.valid)throw Error('No valid offset selected');setPageForOffset(selectedAnchor.address);gotoTab('hex');}));
+$('map-bank-metadata-jump').addEventListener('click',()=>safeRun(()=>{
+  const report=mapBankMetadataReport;
+  if(!model||!report||!['custom-candidate','vanilla-marker'].includes(report.status)||
+     report.uniqueDeclarationCount!==1||!report.declarations.length||
+     !report.declarations.every(d=>d.addressInBounds===true))
+    throw Error('No unambiguous in-bounds map-bank anchor');
+  const address=report.declarations[0].address;
+  if(address<0||address>model.length-4)throw Error('Map-bank offset no longer fits the ROM');
+  setPageForOffset(address);gotoTab('hex');
+}));
 $('anchor-follow-pointer').addEventListener('click',()=>safeRun(()=>{if(selectedInspection?.pointer===null||!Number.isInteger(selectedInspection?.pointer))throw Error('Not a valid ROM pointer');setPageForOffset(selectedInspection.pointer);gotoTab('hex');}));
 $('anchor-to-graphics').addEventListener('click',()=>safeRun(()=>{if(!selectedAnchor?.valid)throw Error('No selected graphic');chooseGraphic('lz',selectedAnchor.address);gotoTab('graphics');}));
 $('pcs-reference-picker').addEventListener('change',async e=>{

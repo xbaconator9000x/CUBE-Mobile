@@ -38,12 +38,13 @@ import {auditVanillaAtlasRawCells} from './map-cell-census.js';
 import {auditVanillaAtlasWarpGraph} from './map-warp-graph.js';
 import {inspectVanillaAtlasRawRoute} from './map-route-explorer.js';
 import {compareVanillaReviewedRawRoute} from './map-route-change-preview.js';
+import {summarizeHmaMapBankSources} from './hma-map-bank-report.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let pcsReference=null,pcsReferenceName='';
 let fingerprintResult=null,fingerprintAbort=null;
-let metadataFingerprints=[],metadataImportSerial=0;
+let metadataFingerprints=[],metadataImportSerial=0,mapBankMetadataReport=null;
 let inspectedWarpMap=null,selectedWarpPreview=null,selectedEventPreview=null,inspectedEventMap=null,inspectedMapAtlas=null,atlasBatchStart=0,atlasCoordinateBatchStart=0,atlasScriptAliasStart=0,atlasScriptCrossPageStart=0,atlasIncomingStart=0,atlasIncomingTarget=null;
 let activeRenderedMap=null,selectedRenderedHit=null;
 let mapReviewQueue=[],mapReviewRom=null,lastMapPreviews={cell:null,warp:null,event:null};
@@ -131,7 +132,7 @@ function updateIndicators(){
   if(active)showRomInfo();
   drawMetadataFingerprintStatus();
 }
-function installModel(name,bytes){clearMapChangeReview();clearMapAtlas('ROM replaced; declared atlas invalidated.');metadataImportSerial++;metadataFingerprints=[];clearRenderedMap('ROM replaced. Select vanilla header again.');$('map-grid').innerHTML='<div class="empty-state">No blockmap inspected.</div>';$('map-bank-status').textContent='ROM replaced. Re-enter independently verified vanilla bank location and counts.';clearWarpInspection('ROM replaced. Select a vanilla map header again.');clearConnectionInspection('ROM replaced. Select a vanilla map header again.');$('map-layout-status').textContent='ROM replaced. No vanilla-format layout inspected.';$('map-status').textContent='ROM replaced. Enter a verified offset and inspect again.';pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
+function installModel(name,bytes){clearMapChangeReview();clearMapAtlas('ROM replaced; declared atlas invalidated.');metadataImportSerial++;metadataFingerprints=[];mapBankMetadataReport=null;clearRenderedMap('ROM replaced. Select vanilla header again.');$('map-grid').innerHTML='<div class="empty-state">No blockmap inspected.</div>';$('map-bank-status').textContent='ROM replaced. Re-enter independently verified vanilla bank location and counts.';clearWarpInspection('ROM replaced. Select a vanilla map header again.');clearConnectionInspection('ROM replaced. Select a vanilla map header again.');$('map-layout-status').textContent='ROM replaced. No vanilla-format layout inspected.';$('map-status').textContent='ROM replaced. Enter a verified offset and inspect again.';pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
 $('rom-picker').addEventListener('change',async e=>{
   const file=e.target.files?.[0];e.target.value='';if(!file)return;
   if(file.size<0xC0 || file.size>MAX_BYTES)return toast('ROM must be 192 bytes to 128 MiB',true);
@@ -401,7 +402,7 @@ if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostn
 // engine, game fingerprints and pointer allocator have been ported and tested.
 let displayedAnchors=[], selectedInspection=null;
 const encodeHex=bytes=>Array.from(bytes).map((b,i)=>hex(b,2)+(i%16===15?'\n':' ')).join('').trim();
-function metadataReset(){metadataImportSerial++;metadataFingerprints=[];clearWarpInspection('Metadata reset; inspect warps again.');clearMapChangeReview();clearConnectionInspection('Metadata reset; inspect connections again.');clearMapGrid('Metadata reset; inspect map again.');metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
+function metadataReset(){metadataImportSerial++;metadataFingerprints=[];clearWarpInspection('Metadata reset; inspect warps again.');clearMapChangeReview();clearConnectionInspection('Metadata reset; inspect connections again.');clearMapGrid('Metadata reset; inspect map again.');metadata=[];metadataSources=[];mapBankMetadataReport=null;metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
 function snapshotMatchedWords(words=metadataMatchedWords){
   if(!model)return [];
   return words.map(word=>{
@@ -432,6 +433,7 @@ function metadataCommit(sources){
   // Fail closed for known mismatched stock-game TOML before changing active metadata.
   // Custom CUBE/project TOML remains manually importable but is never authenticated by header alone.
   const metadataCheck=checkHmaMetadataSources(sources,model);
+  const nextMapBankReport=summarizeHmaMapBankSources(sources,{romSize:model.length});
   // Preserve contradictory named declarations instead of silently replacing
   // them; the semantic resolver will exclude conflicting names from typed reads.
   const merged=collectHmaNamedAnchors(sources,{romSize:model.length});
@@ -459,6 +461,7 @@ function metadataCommit(sources){
   metadataWordSnapshot=nextWordSnapshot;
   metadata=nextMetadata;metadataResolution=nextResolution;
   metadataSources=sources.map(({name})=>name);metadataLayoutKind=metadataCheck.layout.kind;
+  mapBankMetadataReport=nextMapBankReport;
   metadataFingerprints=nextFingerprints;
   clearWarpInspection('Metadata changed; re-inspect vanilla warps.');
   clearConnectionInspection('Metadata changed; re-inspect vanilla connections.');
@@ -622,8 +625,53 @@ function drawMetadataFingerprintStatus(){
   output.textContent='Exact imported TOML SHA-256 (local only):\n'+hashes+
     '\n'+identity+' Identity does not authenticate CUBE layout or permit semantic writes.';
 }
+function drawMapBankMetadataReport(){
+  const status=$('map-bank-metadata-status'),list=$('map-bank-metadata-list');
+  const jump=$('map-bank-metadata-jump');
+  list.replaceChildren();
+  const report=mapBankMetadataReport;
+  jump.disabled=true;
+  if(!report){
+    status.textContent='Import TOML metadata to inspect the CUBHMA data.maps.banks declaration. No ROM layout is authenticated.';
+    list.append(semanticChild('p','No map-bank metadata inspected.','palette-note'));
+    return;
+  }
+  const labels={
+    'missing':'No data.maps.banks anchor in imported TOML',
+    'custom-candidate':'Custom map format declared (unverified)',
+    'vanilla-marker':'Vanilla format marker declared (unverified)',
+    'conflicting-declarations':'Conflicting map-bank declarations — no selection',
+    'ambiguous-format':'Ambiguous repeated pointer fields — no selection',
+    'invalid-address':'Unaligned or out-of-ROM map-bank address',
+    'malformed-format':'Malformed map-bank format',
+    'unresolved-format':'Unsupported or unresolved map-bank format'
+  };
+  status.textContent=(labels[report.status]||'Unresolved map-bank metadata')+
+    '. '+report.declarationCount+' declaration(s), '+report.uniqueDeclarationCount+
+    ' unique. Metadata only; no CUBE ROM authentication or semantic writes.';
+  for(const d of report.declarations){
+    const row=document.createElement('div');row.className='palette-note';
+    row.append(semanticChild('strong',d.source+' · line '+d.line));
+    row.append(semanticChild('p','Offset 0x'+hex(d.address)+
+      ' · format length '+d.formatLength+
+      ' · ROM bounds '+(d.addressInBounds===true?'within declared ROM':d.addressInBounds===false?'invalid':'unknown')));
+    list.append(row);
+  }
+  if(report.sectionNames.length)
+    list.append(semanticChild('p','Declared sections: '+report.sectionNames.join(', ')+
+      '. These are metadata hints, not decoded ROM structures.','palette-note'));
+  if(report.ambiguousFields.length)
+    list.append(semanticChild('p','Repeated fields: '+report.ambiguousFields.map(d=>
+      d.scope+'.'+d.name+' ('+d.count+')').join(', ')+'.','semantic-warning'));
+  const valid=['custom-candidate','vanilla-marker'].includes(report.status)&&
+    report.uniqueDeclarationCount===1&&report.declarations.length>0&&
+    report.declarations.every(d=>d.addressInBounds===true)&&
+    !!model&&report.declarations[0].address<=model.length-4;
+  jump.disabled=!valid;
+}
 function drawAnchors(){
   drawMetadataFingerprintStatus();
+  drawMapBankMetadataReport();
   const root=$('anchor-list'),selector=$('anchor-group');root.replaceChildren();
   const previous=selector.value;
   selector.replaceChildren(new Option('All categories','all'));
@@ -652,6 +700,16 @@ function drawAnchors(){
 $('anchor-find').addEventListener('input',drawAnchors);
 $('anchor-group').addEventListener('change',drawAnchors);
 $('anchor-to-hex').addEventListener('click',()=>safeRun(()=>{if(!selectedAnchor?.valid)throw Error('No valid offset selected');setPageForOffset(selectedAnchor.address);gotoTab('hex');}));
+$('map-bank-metadata-jump').addEventListener('click',()=>safeRun(()=>{
+  const report=mapBankMetadataReport;
+  if(!model||!report||!['custom-candidate','vanilla-marker'].includes(report.status)||
+     report.uniqueDeclarationCount!==1||!report.declarations.length||
+     !report.declarations.every(d=>d.addressInBounds===true))
+    throw Error('No unambiguous in-bounds map-bank anchor');
+  const address=report.declarations[0].address;
+  if(address<0||address>model.length-4)throw Error('Map-bank offset no longer fits the ROM');
+  setPageForOffset(address);gotoTab('hex');
+}));
 $('anchor-follow-pointer').addEventListener('click',()=>safeRun(()=>{if(selectedInspection?.pointer===null||!Number.isInteger(selectedInspection?.pointer))throw Error('Not a valid ROM pointer');setPageForOffset(selectedInspection.pointer);gotoTab('hex');}));
 $('anchor-to-graphics').addEventListener('click',()=>safeRun(()=>{if(!selectedAnchor?.valid)throw Error('No selected graphic');chooseGraphic('lz',selectedAnchor.address);gotoTab('graphics');}));
 $('pcs-reference-picker').addEventListener('change',async e=>{

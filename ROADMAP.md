@@ -1,3 +1,9 @@
+## Checkpoint — mobile CUBHMA map-bank metadata provenance (28 October 2026)
+- [x] Surface exact imported `data.maps.banks` TOML declaration provenance and conservative nested format section names on the Named Data touchscreen UI.
+- [x] Reject ambiguous/conflicting/out-of-bounds map-bank navigation, preserve atomic import and ROM-reset behavior, and provide source-offset-only hex navigation.
+- [x] Add pinned upstream metadata and synthetic regression coverage, generated offline HTML and read-only safety documentation. No ROM assets or semantic writes.
+- [ ] Authenticate exact CUBE ROM+metadata fingerprints and custom layout decoding, then verify ROM save/reopen, emulator and Android acceptance. Strict parity unchanged. See [mobile map-bank metadata](docs/MOBILE_CUBE_MAP_BANK_METADATA.md).
+
 ## Checkpoint — pinned upstream CUBE metadata and nested pointer depth (28 October 2026)
 - [x] Add a small MIT-licensed, metadata-only map-bank declaration excerpt from pinned upstream CUBE Emerald TOML; no ROM or graphics assets.
 - [x] Correct the ambiguity audit to distinguish legitimate nested same-name pointer fields from conflicting same-depth duplicates.
