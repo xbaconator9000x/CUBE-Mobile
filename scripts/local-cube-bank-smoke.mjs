@@ -48,7 +48,8 @@ export async function inspectLocalCubeBankSmoke(argv){
  const metadata=inspectHmaMapBankAnchorSources([{name:'local-metadata',text}],{romSize:rom.length});
  if(!['custom-candidate','vanilla-marker'].includes(metadata.status))
   throw new RangeError('No unambiguous bounded map-bank metadata declaration');
- const table=inspectHmaDeclaredBankPointerTable(rom,metadata);
+ const reader={length:rom.length,read:index=>rom[index]};
+ const table=inspectHmaDeclaredBankPointerTable(reader,metadata);
  return Object.freeze({
   schema:'cube-mobile-local-cube-bank-table-smoke/1',
   hashMatchedUserDeclaration:true,
