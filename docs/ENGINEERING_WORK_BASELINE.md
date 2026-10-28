@@ -8,7 +8,7 @@ The 30 feature families are exactly the IDs and pinned C# paths from `parity/fea
 
 Each workstream has an estimated completed fraction `low <= mid <= high`. The calculation is `100 * sum(effortUnits * completedFraction) / sum(effortUnits)`. The mid is a planning point estimate; low/high are judgemental scope-and-evidence sensitivity bounds, **not statistical confidence intervals**. Absent feature families receive zero credited implementation effort, even if a generic helper might later be reusable. Partial family estimates are based on the cited local tests, existing modules, and explicit gaps in `ROADMAP.md`, `FULL_PORT_PLAN.md` and `docs/PARITY_BASELINE.md`. Neither passing tests nor raw pointer counts imply a particular percentage.
 
-This first baseline contains **286 relative effort units** across 30 feature families and six shared tracks. Its initial midpoint is approximately **10.6%** complete, with a deliberately broad **5.2–18.5%** sensitivity range and **low confidence**. These values are not externally audited, measured engineer-hours, or independent CUBE compatibility claims. They should change only with an evidence-backed reassessment of scope and effort; adding tests alone does not automatically change a fraction.
+This first baseline contains **286 relative effort units** across 30 feature families and six shared tracks. Its initial midpoint is approximately **10.7%** complete, with a deliberately broad **5.2–18.6%** sensitivity range and **low confidence**. These values are not externally audited, measured engineer-hours, or independent CUBE compatibility claims. They should change only with an evidence-backed reassessment of scope and effort; adding tests alone does not automatically change a fraction.
 
 ## Two independent milestones
 
@@ -23,3 +23,7 @@ This first baseline contains **286 relative effort units** across 30 feature fam
 4. Report both metrics separately, with uncertainty, unsupported features, and any missing acceptance evidence. Do not treat the midpoint as audited until an independent source-and-effort review exists.
 
 The README opening remains the non-descript `# Test` / `This is a test.`. Repository visibility is intentionally public; no proprietary ROM, credential, private conversation or device data belongs in source control.
+
+## 28 October 2026: CUBE warp implementation reassessment
+
+Following PRs #180–#182, the `warps` family's midpoint completion fraction moves from 0.24 to 0.28 (low 0.13→0.14; high 0.40→0.42). Evidence is the CUBE warp raw-field mobile/offline UI, virtual before/after arrival comparison, and isolated copy-only re-decode/rollback tests in `src/hma-cube-warp-edit-preview.js` and `tests/hma-cube-warp-edit-preview.test.mjs`. This is a **small, judgement-based increment**, not measured hours or authenticated game compatibility. The same 286 effort units and six shared workstreams remain. Persisted editing, full ownership proof, genuine save/reopen, emulator and Android acceptance remain outstanding. Strict parity remains 0/30.
