@@ -4,6 +4,9 @@ import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Build;
+import android.window.OnBackInvokedCallback;
+import android.window.OnBackInvokedDispatcher;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -27,6 +30,7 @@ public final class MainActivity extends Activity {
     private WebView webView;
     private ValueCallback<Uri[]> fileCallback;
     private NativeExport nativeExport;
+    private OnBackInvokedCallback modernBackCallback;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -49,6 +53,11 @@ public final class MainActivity extends Activity {
             .build();
         nativeExport.install();
         webView.setWebViewClient(new WebViewClient() {
+            @Override public void onPageStarted(WebView view, String url,
+                android.graphics.Bitmap favicon) {
+                if (!url.startsWith(APP_URL) && nativeExport != null)
+                    nativeExport.close();
+            }
             @Override public void onPageFinished(WebView view, String url) {
                 if (APP_URL.equals(url)) nativeExport.inject();
             }
@@ -70,9 +79,9 @@ public final class MainActivity extends Activity {
             @Override public boolean shouldOverrideUrlLoading(
                 WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
-                return !("https".equals(uri.getScheme()) &&
-                    "appassets.androidplatform.net".equals(uri.getHost()) &&
-                    uri.getPath().startsWith("/assets/"));
+                String destination = uri.toString();
+                return !(destination.equals(APP_URL) ||
+                    destination.startsWith(APP_URL + "#"));
             }
         });
         webView.setWebChromeClient(new WebChromeClient() {
@@ -100,6 +109,11 @@ public final class MainActivity extends Activity {
             Toast.makeText(this,
                 "This build does not yet support native downloads",
                 Toast.LENGTH_LONG).show());
+        if (Build.VERSION.SDK_INT >= 33) {
+            modernBackCallback = this::handleBack;
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                OnBackInvokedDispatcher.PRIORITY_DEFAULT, modernBackCallback);
+        }
         webView.loadUrl(APP_URL);
     }
 
@@ -118,6 +132,10 @@ public final class MainActivity extends Activity {
     }
 
     @Override public void onBackPressed() {
+        handleBack();
+    }
+
+    private void handleBack() {
         if (webView != null && webView.canGoBack()) {
             webView.goBack();
         } else if (webView != null) {
@@ -130,6 +148,10 @@ public final class MainActivity extends Activity {
     }
 
     @Override protected void onDestroy() {
+        if (Build.VERSION.SDK_INT >= 33 && modernBackCallback != null) {
+            getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(modernBackCallback);
+            modernBackCallback = null;
+        }
         if (fileCallback != null) {
             fileCallback.onReceiveValue(null);
             fileCallback = null;
