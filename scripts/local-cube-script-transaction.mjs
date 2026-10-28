@@ -5,10 +5,10 @@
  * No ROM/metadata bytes, paths, digests, pointer addresses or script bytes
  * appear in reports. No output ROM or patch file is created.
  */
-import {readFile,stat} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {readStableLocalFile} from './local-input-safety.mjs';
 import {inspectHmaMapBankAnchorSources} from '../src/hma-map-bank-metadata.js';
 import {inspectHmaCubeScriptReferences,previewHmaCubeScriptRetargetBatch,
  verifyHmaCubeScriptRetargetDryRun} from '../src/hma-cube-script-retarget.js';
@@ -64,16 +64,6 @@ function parseDeclaredBanks(value,sourceBank,sourceCount){
   throw RangeError('Ownership census must include exact source bank and remain bounded');
  return banks;
 }
-async function boundedRead(path,max){
- const before=await stat(path);
- if(!before.isFile()||before.size<1||before.size>max)
-  throw RangeError('Local input exceeds size budget');
- const bytes=await readFile(path),after=await stat(path);
- if(bytes.length!==before.size||after.size!==before.size||
-    after.mtimeMs!==before.mtimeMs)
-  throw RangeError('Local input changed while reading');
- return bytes;
-}
 function parsePlan(bytes){
  let plan;
  try{plan=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));}
@@ -91,17 +81,17 @@ function parsePlan(bytes){
 }
 export async function inspectLocalCubeScriptTransaction(argv){
  const args=parseLocalCubeScriptTransactionArgs(argv);
- const rom=await boundedRead(args['--rom'],64*1024*1024);
+ const rom=await readStableLocalFile(args['--rom'],64*1024*1024);
  const digest=createHash('sha256').update(rom).digest('hex');
  if(digest!==args['--expected-sha256'].toLowerCase())
   throw RangeError('ROM differs from user-declared exact SHA-256');
- const metadata=await boundedRead(args['--metadata'],4*1024*1024);
+ const metadata=await readStableLocalFile(args['--metadata'],4*1024*1024);
  const text=new TextDecoder('utf-8',{fatal:true}).decode(metadata);
  const summary=inspectHmaMapBankAnchorSources(
   [{name:'local-cube-metadata',text}],{romSize:rom.length});
  if(summary.status!=='custom-candidate'||summary.uniqueDeclarationCount!==1)
   throw RangeError('Unambiguous CUBE custom metadata declaration required');
- const changes=parsePlan(await boundedRead(args['--plan'],64*1024));
+ const changes=parsePlan(await readStableLocalFile(args['--plan'],64*1024));
  const options={bankIndex:Number(args['--bank-index']),
   mapIndex:Number(args['--map-index']),mapCount:Number(args['--map-count'])};
  const inventory=inspectHmaCubeScriptReferences(rom,summary,options);
@@ -113,7 +103,7 @@ export async function inspectLocalCubeScriptTransaction(argv){
  const ownership=args['--banks']===undefined?null:auditHmaCubeEditOwnershipImpact(
   rom,summary,{...options,scripts:changes,banks:parseDeclaredBanks(
    args['--banks'],options.bankIndex,options.mapCount)});
- const reread=await boundedRead(args['--rom'],64*1024*1024);
+ const reread=await readStableLocalFile(args['--rom'],64*1024*1024);
  if(createHash('sha256').update(reread).digest('hex')!==digest)
   throw RangeError('Local ROM changed during script transaction');
  return Object.freeze({
