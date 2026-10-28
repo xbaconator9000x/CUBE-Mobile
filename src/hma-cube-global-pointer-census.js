@@ -6,7 +6,7 @@ import {previewHmaCubeScriptRetargetBatch} from './hma-cube-script-retarget.js';
 
 /**
  * Conservative, read-only whole-ROM GBA pointer-candidate census.
- * It detects aligned 32-bit words that could reference source-grounded
+ * It detects aligned and unaligned 32-bit words that could reference source-grounded
  * records affected by a proposed CUBE transaction. Pointer-shaped data
  * are NOT a parsed alias graph or evidence of exclusive ownership.
  *
@@ -28,7 +28,8 @@ function sourceReader(source) {
 
 /**
  * Ranges are existing decoded record spans, not arbitrary guessed pointers.
- * Scans every 4-byte-aligned source word. Reports aggregate counts only.
+ * Scans every possible four-byte window, including unaligned script operands.
+ * Reports aggregate counts only; raw matches never prove pointer ownership.
  */
 export function auditHmaCubeGlobalPointerCandidates(source, ranges) {
   const rom = sourceReader(source);
@@ -57,32 +58,54 @@ export function auditHmaCubeGlobalPointerCandidates(source, ranges) {
   }
   let alignedWords = 0, canonicalHits = 0, alternateHits = 0;
   let ambiguousExpandedHits = 0, distinctHitWords = 0;
-  for (let at = 0; at <= rom.length - 4; at += 4) {
-    const a = rom.read(at), b = rom.read(at + 1),
-      c = rom.read(at + 2), d = rom.read(at + 3);
-    if (!Number.isInteger(a) || a < 0 || a > 255 ||
-        !Number.isInteger(b) || b < 0 || b > 255 ||
-        !Number.isInteger(c) || c < 0 || c > 255 ||
-        !Number.isInteger(d) || d < 0 || d > 255)
+  let unalignedWords = 0, unalignedCanonicalHits = 0;
+  let unalignedAlternateHits = 0, unalignedAmbiguousHits = 0;
+  let unalignedDistinctHits = 0;
+  // A rolling little-endian window reads each ROM byte once, instead of
+  // performing four accessor reads for every overlapping candidate.
+  // This includes unaligned script operands and record-field pointers.
+  function checkedByte(at) {
+    const value = rom.read(at);
+    if (!Number.isInteger(value) || value < 0 || value > 255)
       throw new RangeError('ROM accessor returned invalid byte');
-    alignedWords++;
-    const value = (a + b * 256 + c * 65536 + d * 16777216) >>> 0;
-    const direct = canonical.has(value), mirror = alternate.has(value);
-    if (direct) canonicalHits++;
-    if (mirror) alternateHits++;
-    if (direct && mirror) ambiguousExpandedHits++;
-    if (direct || mirror) distinctHitWords++;
+    return value;
+  }
+  let word = (checkedByte(0) | (checkedByte(1) << 8) |
+    (checkedByte(2) << 16) | (checkedByte(3) << 24)) >>> 0;
+  for (let at = 0; at <= rom.length - 4; at++) {
+    const direct = canonical.has(word), mirror = alternate.has(word);
+    if (at % 4 === 0) {
+      alignedWords++;
+      if (direct) canonicalHits++;
+      if (mirror) alternateHits++;
+      if (direct && mirror) ambiguousExpandedHits++;
+      if (direct || mirror) distinctHitWords++;
+    } else {
+      unalignedWords++;
+      if (direct) unalignedCanonicalHits++;
+      if (mirror) unalignedAlternateHits++;
+      if (direct && mirror) unalignedAmbiguousHits++;
+      if (direct || mirror) unalignedDistinctHits++;
+    }
+    if (at < rom.length - 4)
+      word = ((word >>> 8) | (checkedByte(at + 4) << 24)) >>> 0;
   }
   return Object.freeze({
     scannedAlignedWords: alignedWords,
+    scannedUnalignedWords: unalignedWords,
     decodedRecordRanges: ranges.length,
     distinctTargetBytes: canonical.size,
     canonicalPointerCandidates: canonicalHits,
     alternateWindowCandidates: alternateHits,
     ambiguousExpandedWindowCandidates: ambiguousExpandedHits,
     distinctCandidateSourceWords: distinctHitWords,
+    unalignedCanonicalPointerCandidates: unalignedCanonicalHits,
+    unalignedAlternateWindowCandidates: unalignedAlternateHits,
+    unalignedAmbiguousExpandedWindowCandidates: unalignedAmbiguousHits,
+    unalignedDistinctCandidateSourceWords: unalignedDistinctHits,
     allAlignedWordsScanned: true,
-    unalignedPointersInspected: false,
+    unalignedPointersInspected: true,
+    allByteWindowsScanned: true,
     candidateReferencesOnly: true,
     globalOwnershipProven: false,
     independentlyAuthenticated: false,

@@ -113,7 +113,7 @@ export async function inspectLocalCubeCombinedTransaction(argv){
   independentlyAuthenticated:false,exclusiveOwnershipProven:false,
   emulatorVerified:false,androidHardwareVerified:false,writeAuthorized:false,
   strictParityEvidence:false,
-  warning:'User-supplied ROM hash, metadata and map counts do not authenticate CUBE. Whole-ROM aligned pointer candidates are heuristic, not an alias graph or ownership proof. This is a read-only rehearsal, not edited-ROM save/reopen or gameplay acceptance.'
+  warning:'User-supplied ROM hash, metadata and map counts do not authenticate CUBE. Whole-ROM aligned and unaligned pointer candidates are heuristic, not an alias graph or ownership proof. This is a read-only rehearsal, not edited-ROM save/reopen or gameplay acceptance.'
  });
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
