@@ -10,21 +10,24 @@ import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {inspectHmaMapBankAnchorSources} from '../src/hma-map-bank-metadata.js';
 import {inspectHmaDeclaredBankPointerTable} from '../src/hma-map-bank-declared-table.js';
+import {inspectHmaDeclaredBankTargetWindows} from '../src/hma-map-bank-target-windows.js';
 
 const SHA=/^[0-9a-f]{64}$/i;
 export function parseLocalCubeBankSmokeArgs(argv){
- if(!Array.isArray(argv)||argv.length!==6)
+ if(!Array.isArray(argv)||![6,8].includes(argv.length))
   throw new RangeError('Usage: --rom <local.gba> --metadata <local.toml> --expected-sha256 <64 hex>');
  const options={};
  for(let i=0;i<argv.length;i+=2){
   const key=argv[i],value=argv[i+1];
-  if(!['--rom','--metadata','--expected-sha256'].includes(key)||
+  if(!['--rom','--metadata','--expected-sha256','--target-words'].includes(key)||
      Object.hasOwn(options,key)||typeof value!=='string'||!value)
     throw new RangeError('Invalid local smoke arguments');
   options[key]=value;
  }
  if(!options['--rom']||!options['--metadata']||
-    !SHA.test(options['--expected-sha256']||''))
+    !SHA.test(options['--expected-sha256']||'')||
+    (options['--target-words']!==undefined&&
+     !/^(?:[1-9]|1[0-6])$/.test(options['--target-words'])))
   throw new RangeError('ROM, metadata and separately supplied exact SHA-256 are required');
  return options;
 }
@@ -50,8 +53,11 @@ export async function inspectLocalCubeBankSmoke(argv){
   throw new RangeError('No unambiguous bounded map-bank metadata declaration');
  const reader={length:rom.length,read:index=>rom[index]};
  const table=inspectHmaDeclaredBankPointerTable(reader,metadata);
+ const targets=args['--target-words']===undefined?null:
+   inspectHmaDeclaredBankTargetWindows(reader,metadata,
+     {wordsPerTarget:Number(args['--target-words'])});
  return Object.freeze({
-  schema:'cube-mobile-local-cube-bank-table-smoke/1',
+  schema:'cube-mobile-local-cube-bank-table-smoke/2',
   hashMatchedUserDeclaration:true,
   metadataDeclarationStatus:metadata.status,
   declaredPointerSlots:table.declaredBankCount,
@@ -60,12 +66,23 @@ export async function inspectLocalCubeBankSmoke(argv){
   repeatedTargets:table.duplicateTargetCount,
   unalignedTargets:table.unalignedCount,
   targetsInsideDeclaredTable:table.insideTableCount,
+  ...(targets?{
+    rawTargetWindowWords:targets.wordsPerTarget,
+    rawTargetsSampled:targets.sampledTargets,
+    rawNestedPointerShapedWords:targets.conventionalNestedWords,
+    rawNestedInRomPointerWords:targets.inRomNestedWords,
+    rawTargetOverlapSkips:targets.tableOverlaps+targets.overlappingWindows,
+    rawTargetTruncationSkips:targets.truncatedTargets,
+    rawTargetMisalignedSkips:targets.misalignedTargets,
+    rawTargetInvalidSkips:targets.invalidTargets,
+    rawTargetDuplicateSkips:targets.duplicateTargets
+  }:{}),
   readOnly:true,romModified:false,romExported:false,
   independentlyAuthenticated:false,cubeLayoutAuthenticated:false,
   safeSemanticEditingVerified:false,romSaveReopenVerified:false,
   emulatorVerified:false,androidHardwareVerified:false,
   independentParityEvidence:false,
-  warning:'Only a user-SHA-matched, metadata-declared raw pointer census. No authenticated CUBE bank decoding or strict parity evidence.'
+  warning:'Only user-SHA-matched metadata-declared raw pointer evidence. Optional nested raw windows do not decode CUBE maps or establish strict parity.'
  });
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
