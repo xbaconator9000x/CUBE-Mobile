@@ -46,7 +46,7 @@ jobs:
           APK=$(find android/app/build/outputs/apk/debug -name '*.apk' -print -quit)
           test -n "$APK"
           unzip -Z1 "$APK" | grep -Fx 'assets/index.html'
-          if unzip -Z1 "$APK" | grep -Ei '\\.(gba|gbc|rom|sav|srm)$'; then exit 1; fi
+          if unzip -Z1 "$APK" | grep -Ei '[.](gba|gbc|rom|sav|srm)$'; then exit 1; fi
       - uses: actions/upload-artifact@v4
         with:
           name: cube-mobile-debug-apk
