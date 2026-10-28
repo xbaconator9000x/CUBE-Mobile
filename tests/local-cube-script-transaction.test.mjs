@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,writeFile,readFile,rm} from 'node:fs/promises';
+import {mkdtemp,writeFile,readFile,rm,symlink} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createHash} from 'node:crypto';
@@ -128,5 +128,19 @@ test('malformed, incomplete and duplicate bank declarations fail before touching
  await fixture(async({args})=>{
   for(const value of ['0:0','0:129','0:1,0:1','1:1','0:1,1:256','0:1,','0:1;1:1'])
    assert.throws(()=>parseLocalCubeScriptTransactionArgs([...args,'--banks',value]),RangeError);
+ });
+});
+
+test('legacy local script CLI refuses symlinked ROM, metadata and edit-plan inputs',async()=>{
+ await fixture(async({args,dir,rom,metadata,plan})=>{
+  for(const [position,target] of [[1,rom],[3,metadata],[13,plan]]){
+   const alias=join(dir,'alias-'+position);
+   await symlink(target,alias);
+   const modified=args.map((v,i)=>i===position?alias:v);
+   await assert.rejects(inspectLocalCubeScriptTransaction(modified),/non-symlink/i);
+   const cliRun=spawnSync(process.execPath,[cli,...modified],{encoding:'utf8'});
+   assert.equal(cliRun.status,2);
+   assert.ok(!cliRun.stderr.includes(dir));
+  }
  });
 });

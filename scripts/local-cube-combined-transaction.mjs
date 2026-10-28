@@ -4,11 +4,10 @@
  * A user-provided hash, TOML and bank counts are not independent authentication.
  * Reports contain counts and booleans only: no ROM bytes, paths, pointers or hashes.
  */
-import {constants} from 'node:fs';
-import {lstat,open} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {readStableLocalFile} from './local-input-safety.mjs';
 import {inspectHmaMapBankAnchorSources} from '../src/hma-map-bank-metadata.js';
 import {verifyHmaCubeCombinedTransaction} from '../src/hma-cube-combined-transaction.js';
 import {auditHmaCubeEditOwnershipImpact} from '../src/hma-cube-edit-ownership-impact.js';
@@ -16,25 +15,6 @@ import {parseLocalCubeScriptTransactionArgs} from './local-cube-script-transacti
 
 const KINDS=['cells','warps','events','connections','scripts'];
 function sha(bytes){return createHash('sha256').update(bytes).digest('hex');}
-function identity(a,b){
- return a.dev===b.dev&&a.ino===b.ino&&a.size===b.size&&
-  a.mtimeMs===b.mtimeMs&&a.ctimeMs===b.ctimeMs;
-}
-/** Reject symlinks and changing local inputs; never log their paths. */
-async function readStableFile(path,limit){
- const before=await lstat(path);
- if(!before.isFile()||before.isSymbolicLink()||before.size<1||before.size>limit)
-  throw RangeError('Local input must be a bounded regular non-symlink file');
- const file=await open(path,constants.O_RDONLY|constants.O_NOFOLLOW);
- try{
-  const opened=await file.stat();
-  if(!identity(before,opened))throw RangeError('Local input changed before reading');
-  const bytes=await file.readFile(),after=await file.stat();
-  if(!identity(opened,after)||bytes.length!==opened.size)
-   throw RangeError('Local input changed while reading');
-  return bytes;
- }finally{await file.close();}
-}
 function declaredBanks(raw,bankIndex,mapCount){
  if(typeof raw!=='string'||!/^[0-9]+:[0-9]+(?:,[0-9]+:[0-9]+)*$/.test(raw))
   throw RangeError('Explicit bank:count declarations are required');
@@ -92,18 +72,18 @@ export async function inspectLocalCubeCombinedTransaction(argv){
  const bankIndex=Number(args['--bank-index']),mapIndex=Number(args['--map-index']),
   mapCount=Number(args['--map-count']);
  const banks=declaredBanks(args['--banks'],bankIndex,mapCount);
- const rom=await readStableFile(args['--rom'],64*1024*1024);
+ const rom=await readStableLocalFile(args['--rom'],64*1024*1024);
  const originalHash=sha(rom);
  if(originalHash!==args['--expected-sha256'].toLowerCase())
   throw RangeError('ROM differs from user-declared SHA-256');
- const metadata=await readStableFile(args['--metadata'],4*1024*1024);
+ const metadata=await readStableLocalFile(args['--metadata'],4*1024*1024);
  const summary=inspectHmaMapBankAnchorSources([{
   name:'local-cube-metadata',
   text:new TextDecoder('utf-8',{fatal:true}).decode(metadata)
  }],{romSize:rom.length});
  if(summary.status!=='custom-candidate'||summary.uniqueDeclarationCount!==1)
   throw RangeError('Unambiguous CUBE custom map metadata required');
- const {changes,viewport,count}=parsePlan(await readStableFile(args['--plan'],64*1024));
+ const {changes,viewport,count}=parsePlan(await readStableLocalFile(args['--plan'],64*1024));
  const options={bankIndex,mapIndex,mapCount,banks,targetBanks:banks,...changes,...viewport};
  const rehearsal=verifyHmaCubeCombinedTransaction(rom,summary,options);
  const ownership=auditHmaCubeEditOwnershipImpact(rom,summary,options);
@@ -111,7 +91,7 @@ export async function inspectLocalCubeCombinedTransaction(argv){
     !rehearsal.sourceBytesPreserved||!ownership.copyOnlyRehearsalVerified||
     rehearsal.changedBytes!==ownership.changedBytes||sha(rom)!==originalHash)
   throw RangeError('Combined transaction or ownership evidence disagrees');
- const reopened=await readStableFile(args['--rom'],64*1024*1024);
+ const reopened=await readStableLocalFile(args['--rom'],64*1024*1024);
  if(sha(reopened)!==originalHash||!reopened.equals(rom))
   throw RangeError('Original ROM changed during local transaction');
  return Object.freeze({
