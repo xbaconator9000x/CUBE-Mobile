@@ -13,6 +13,10 @@ test('CUBE visual-only proposed cell UI is wired in modular and offline builds',
  }
  assert.match(app,/previewHmaCubeBlockmapVisualChange\(model,mapBankCustomSummary/);
  assert.match(app,/expectedRaw:selected\.raw/);
+ for(const source of [app,offline]){
+  assert.ok(source.includes(String.raw`/^\d+$/`),'digit validation must match numbers');
+  assert.ok(!source.includes(String.raw`/^\\d+$/`),'double-escaped digit validation is broken');
+ }
  assert.match(app,/cube-map-preview-after/);
  assert.match(app,/No ROM writes, unknown shared ownership/);
  assert.match(build,/stripHmaCubeMapCellPreview/);

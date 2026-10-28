@@ -1158,7 +1158,7 @@ $('cube-map-cell-preview').addEventListener('click',()=>safeRun(()=>{
      !cubeMapEvidence||cubeMapEvidence.options!==snapshot.options)
     throw Error('Select a current rendered CUBE cell first');
   const tileText=$('cube-map-proposed-tile').value,highText=$('cube-map-proposed-high').value;
-  if(!/^\\d+$/.test(tileText)||!/^\\d+$/.test(highText))
+  if(!/^\d+$/.test(tileText)||!/^\d+$/.test(highText))
     throw new RangeError('Proposed tile and raw high bits must be unsigned integers');
   const proposal=previewHmaCubeBlockmapVisualChange(model,mapBankCustomSummary,{
     ...snapshot.options,x:selected.x,y:selected.y,expectedRaw:selected.raw,
