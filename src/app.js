@@ -1061,6 +1061,74 @@ $('cube-map-inspect').addEventListener('click',()=>safeRun(()=>{
 }));
 
 
+$('cube-map-render').addEventListener('click',()=>safeRun(()=>{
+  if(!cubeMapEvidence)throw Error('Inspect a custom CUBE map first');
+  const options=cubeMapEvidence.options;
+  const current=inspectHmaCubeMapEntry(ensureModel(),mapBankCustomSummary,options);
+  if(JSON.stringify(current)!==JSON.stringify(cubeMapEvidence.report))
+    throw Error('Selected CUBE map changed; inspect again');
+  const x=Number($('cube-map-x').value),y=Number($('cube-map-y').value);
+  if(!/^[0-9]+$/.test($('cube-map-x').value)||!/^[0-9]+$/.test($('cube-map-y').value))
+    throw Error('Enter valid CUBE viewport coordinates');
+  const rendered=renderHmaCubeMapViewport(model,mapBankCustomSummary,{
+    ...options,x,y,viewportWidth:10,viewportHeight:8});
+  const canvas=$('cube-map-render-canvas'),ctx=canvas.getContext('2d');
+  canvas.width=rendered.width;canvas.height=rendered.height;
+  const image=ctx.createImageData(rendered.width,rendered.height);
+  image.data.set(rendered.pixels);ctx.putImageData(image,0,0);
+  canvas.style.width=(rendered.width*2)+'px';
+  canvas.style.height=(rendered.height*2)+'px';
+  canvas.hidden=false;
+  cubeRenderEvidence={rom:model,options,x,y,map:rendered.map,
+    pixels:rendered.pixels.slice(),cellsJson:JSON.stringify(rendered.cells),
+    attributesJson:JSON.stringify(rendered.attributes)};
+  cubeRenderSelection=null;$('cube-map-render-jump').disabled=true;
+  $('cube-map-render-status').textContent='Rendered '+rendered.columns+' × '+
+    rendered.rows+' CUBE RSE metatiles (16 × 16 pixels each). Unsupported custom light palettes and FRLG layouts are refused. ROM/layout and walkability remain unverified.';
+  $('cube-map-render-selection').textContent='Tap a rendered cell to inspect raw source offsets.';
+}));
+$('cube-map-render-canvas').addEventListener('click',event=>safeRun(()=>{
+  const snapshot=cubeRenderEvidence;
+  if(!snapshot||snapshot.rom!==model||!cubeMapEvidence||
+     snapshot.options!==cubeMapEvidence.options)
+    throw Error('CUBE rendered map expired; render again');
+  const fresh=renderHmaCubeMapViewport(model,mapBankCustomSummary,{
+    ...snapshot.options,x:snapshot.x,y:snapshot.y,viewportWidth:10,viewportHeight:8});
+  if(JSON.stringify(fresh.map)!==JSON.stringify(snapshot.map)||
+     JSON.stringify(fresh.cells)!==snapshot.cellsJson||
+     JSON.stringify(fresh.attributes)!==snapshot.attributesJson||
+     fresh.pixels.length!==snapshot.pixels.length||
+     !fresh.pixels.every((value,i)=>value===snapshot.pixels[i]))
+    throw Error('CUBE rendered bytes changed; render again');
+  const canvas=$('cube-map-render-canvas'),rect=canvas.getBoundingClientRect();
+  if(!rect.width||!rect.height)throw Error('Rendered canvas is not visible');
+  const hit=inspectRenderedMapPixel(fresh,
+    (event.clientX-rect.left)*canvas.width/rect.width,
+    (event.clientY-rect.top)*canvas.height/rect.height);
+  if(!hit)return;
+  cubeRenderSelection={snapshot,cellOffset:hit.cell.byteOffset};
+  $('cube-map-render-jump').disabled=false;
+  $('cube-map-render-selection').textContent='Cell ('+hit.cell.x+','+hit.cell.y+
+    ') · tile '+hit.cell.tileId+' · raw high bits '+hit.cell.collision+
+    ' · behavior 0x'+hex(hit.attribute.behavior,2)+' · layer '+hit.attribute.layer+
+    ' · blockmap 0x'+hex(hit.cell.byteOffset)+' · attributes 0x'+
+    hex(hit.attribute.attributeOffset)+'. Not verified walkability.';
+}));
+$('cube-map-render-jump').addEventListener('click',()=>safeRun(()=>{
+  const selection=cubeRenderSelection,snapshot=selection?.snapshot;
+  if(!snapshot||snapshot!==cubeRenderEvidence||snapshot.rom!==model)
+    throw Error('Rendered CUBE selection expired');
+  const fresh=renderHmaCubeMapViewport(model,mapBankCustomSummary,{
+    ...snapshot.options,x:snapshot.x,y:snapshot.y,viewportWidth:10,viewportHeight:8});
+  if(JSON.stringify(fresh.map)!==JSON.stringify(snapshot.map)||
+     JSON.stringify(fresh.cells)!==snapshot.cellsJson||
+     JSON.stringify(fresh.attributes)!==snapshot.attributesJson||
+     fresh.pixels.length!==snapshot.pixels.length||
+     !fresh.pixels.every((value,i)=>value===snapshot.pixels[i]))
+    throw Error('Rendered CUBE selection changed; render again');
+  setPageForOffset(selection.cellOffset);gotoTab('hex');
+}));
+
 function drawCubeWarpEvidence(){
   const status=$('cube-warps-status'),list=$('cube-warps-list');
   list.replaceChildren();
