@@ -1,3 +1,9 @@
+## Checkpoint — CUBE custom spatial inspection and RSE rendering (28 October 2026)
+- [x] Decode bounded CUBE custom connections, all four event arrays and raw script pointer field provenance, with touch-first navigation.
+- [x] Add 10×8 panning raw cell grid, event coordinate markers, and conservative 16×16 RSE metatile rendering with raw high-bit/behavior overlays.
+- [x] Revalidate staged bytes, map provenance, pixels and attributes before rendered-cell navigation; generate offline HTML and synthetic tests.
+- [ ] Authenticate real CUBE ROM and matching TOML, expand custom lighting/FRLG rendering, validate emulator and Android, and prove save/reopen transactions before strict parity credit.
+
 ## Checkpoint — custom CUBE structural map and warp inspection (28 October 2026)
 - [x] Decode pinned CUBE Emerald custom 28-byte map header and layout from a metadata-declared bank pointer and explicitly supplied per-bank map count, without guessing dynamic lengths.
 - [x] Add bounded mobile/offline raw map-cell and custom warp/event inspection, stale-byte validation, exact ROM source navigation and synthetic regression coverage.
