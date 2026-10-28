@@ -242,8 +242,10 @@
   <div class="input-row">
     <div class="input-wrap"><label for="cube-warp-edit-target-banks">Optional explicit bank:map-count declarations</label><input id="cube-warp-edit-target-banks" type="text" placeholder="0:12,1:9" spellcheck="false"></div>
     <button type="button" id="cube-warp-edit-preview" class="subtle-button" disabled>Compare virtual warp change</button>
+    <button type="button" id="cube-warp-edit-dryrun" class="subtle-button" disabled>Verify isolated apply and rollback</button>
   </div>
   <output id="cube-warp-edit-status" class="palette-note" aria-live="polite">Inspect CUBE warps, then load a record. This tool never writes ROM bytes.</output>
+  <output id="cube-warp-edit-dryrun-status" class="palette-note" aria-live="polite">No isolated warp rehearsal performed.</output>
   <div class="input-row" aria-label="Bounded CUBE raw warp topology audit">
     <div class="input-wrap"><label for="cube-warp-audit-banks">Destination bank:map-count declarations</label><input id="cube-warp-audit-banks" type="text" value="0:1" placeholder="0:12,1:9" spellcheck="false"></div>
     <button type="button" id="cube-warp-audit" class="subtle-button" disabled>Audit all raw map warps (max 32)</button>
@@ -7254,7 +7256,7 @@ function auditHmaCubeWarpTopology(source,summary,{
 
 return {traceHmaCubeWarpArrival,auditHmaCubeWarpTopology};
 })();
-const previewHmaCubeWarpRecordChange=(()=>{
+const {previewHmaCubeWarpRecordChange,verifyHmaCubeWarpRecordDryRun}=(()=>{
 /**
  * CUBE Emerald 8-byte warp record preflight, source-grounded in pinned
  * kcradi/CUBHMA MapModel.cs WarpsFormat. This is an immutable virtual
@@ -7432,7 +7434,7 @@ function verifyHmaCubeWarpRecordDryRun(source,summary,options={}){
  });
 }
 
-return previewHmaCubeWarpRecordChange;
+return {previewHmaCubeWarpRecordChange,verifyHmaCubeWarpRecordDryRun};
 })();
 const traceHmaCubeConnectionDestination=(()=>{
 /**
@@ -9484,6 +9486,8 @@ function clearCubeWarpEditPreview(){
   cubeWarpEditSelection=null;
   $('cube-warp-edit-load').disabled=true;
   $('cube-warp-edit-preview').disabled=true;
+  $('cube-warp-edit-dryrun').disabled=true;
+  $('cube-warp-edit-dryrun-status').textContent='No isolated warp rehearsal performed.';
   $('cube-warp-edit-status').textContent='Inspect CUBE warps, then load a record. This tool never writes ROM bytes.';
 }
 function clearCubeWarpTrace(){
@@ -9592,10 +9596,12 @@ $('cube-warp-edit-load').addEventListener('click',()=>safeRun(()=>{
   cubeWarpEditSelection={rom:model,summary:mapBankCustomSummary,
     sourceReport:snapshot.report,options:snapshot.options,warpIndex,expected};
   $('cube-warp-edit-preview').disabled=false;
+  $('cube-warp-edit-dryrun').disabled=true;
+  $('cube-warp-edit-dryrun-status').textContent='Loaded a new warp. Run a virtual preview before rehearsal.';
   $('cube-warp-edit-status').textContent='Warp #'+warpIndex+' loaded from 0x'+hex(record.offset)+
     '. Adjust raw fields and compare; no ROM changes will be saved.';
 }));
-$('cube-warp-edit-preview').addEventListener('click',()=>safeRun(()=>{
+function readCubeWarpEditProposal(){
   const selection=cubeWarpEditSelection;
   if(!selection||selection.rom!==model||selection.summary!==mapBankCustomSummary||
      cubeWarpEvidence?.report!==selection.sourceReport)
@@ -9617,9 +9623,13 @@ $('cube-warp-edit-preview').addEventListener('click',()=>safeRun(()=>{
     const [bankIndex,mapCount]=part.split(':').map(Number);
     return {bankIndex,mapCount};
   });
-  const result=previewHmaCubeWarpRecordChange(model,mapBankCustomSummary,{
-    ...selection.options,warpIndex:selection.warpIndex,
-    expected:selection.expected,proposed,targetBanks});
+  return {...selection.options,warpIndex:selection.warpIndex,
+    expected:selection.expected,proposed,targetBanks};
+}
+$('cube-warp-edit-preview').addEventListener('click',()=>safeRun(()=>{
+  const options=readCubeWarpEditProposal();
+  const result=previewHmaCubeWarpRecordChange(model,mapBankCustomSummary,options);
+  $('cube-warp-edit-dryrun').disabled=false;
   $('cube-warp-edit-status').textContent='Virtual warp #'+result.warpIndex+
     ' · changed: '+(result.changedFields.join(', ')||'none')+
     ' · before: '+result.beforeTrace.status+
@@ -9629,6 +9639,17 @@ $('cube-warp-edit-preview').addEventListener('click',()=>safeRun(()=>{
       ' · raw return: '+result.afterTrace.arrival.returnsToOrigin:'')+
     '. Other warps preserved: '+result.otherWarpsPreserved+
     '. Preview only: no ROM writing, no emulator or walkability verification.';
+}));
+$('cube-warp-edit-dryrun').addEventListener('click',()=>safeRun(()=>{
+  const options=readCubeWarpEditProposal();
+  const result=verifyHmaCubeWarpRecordDryRun(model,mapBankCustomSummary,options);
+  $('cube-warp-edit-dryrun-status').textContent='Isolated copy-only warp #'+result.warpIndex+
+    ' · changed bytes: '+result.changedBytes+
+    ' · raw re-decode: '+result.inMemoryReDecodeVerified+
+    ' · full rollback: '+result.inMemoryRollbackVerified+
+    ' · source unchanged: '+result.sourceBytesPreserved+
+    ' · after destination: '+result.afterTrace.status+
+    '. No ROM file written or exported; real save/reopen, ownership and emulator acceptance NOT verified.';
 }));
 $('cube-warp-audit').addEventListener('click',()=>safeRun(()=>{
   const snapshot=cubeWarpEvidence;
