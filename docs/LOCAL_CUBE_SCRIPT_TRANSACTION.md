@@ -18,3 +18,7 @@ The command checks exact user-declared ROM identity, parses the pinned CUBHMA cu
 ## Optional cross-bank ownership evidence (29 October 2026)
 
 Add `--banks 0:1,1:1` (replace with the **exact**, user-known bank:map counts) to the local script transaction command. The optional bounded census includes events, connections, map-script tables and conditional map-script tables and intersects their claims with the changed script-pointer bytes. The JSON report adds `boundedOwnershipInspected`, `declaredOwnershipMaps`, `editedByteOwnershipConflicts`, `ownershipCensusIncomplete` and `mapScriptOwnershipIssueCount`. The bank list must include the edited bank with the same explicit count; invalid, duplicate, oversized and incomplete declarations fail closed. Even a clean census is only partial and **never** authorizes ROM writes or proves a global pointer graph, ROM identity or script semantics. The CLI continues to export no ROM or patch bytes.
+
+## Local input integrity hardening
+
+The script-only and five-kind local acceptance CLIs now share an inode-bound reader that rejects symlinked ROM, TOML and plan inputs, verifies the regular-file identity before and after reading, and enforces their separate size budgets. This is a local file-input defense, not proof of independent ROM authenticity or permission to persist semantic edits.
