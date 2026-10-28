@@ -51,6 +51,7 @@ import {renderHmaCubeMapViewport} from './hma-cube-map-render.js';
 import {previewHmaCubeBlockmapVisualChange} from './hma-cube-map-cell-preview.js';
 import {inspectHmaCubeBankCatalog} from './hma-cube-bank-catalog.js';
 import {traceHmaCubeWarpArrival} from './hma-cube-warp-arrival.js';
+import {traceHmaCubeConnectionDestination} from './hma-cube-connection-trace.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
@@ -59,7 +60,7 @@ let fingerprintResult=null,fingerprintAbort=null;
 let metadataFingerprints=[],metadataImportSerial=0,mapBankMetadataReport=null,mapBankRawPointerEvidence=null,mapBankRawWindowEvidence=null,mapBankDeclaredEvidence=null,mapBankTargetEvidence=null,mapBankCustomSummary=null,cubeMapEvidence=null,cubeWarpEvidence=null,cubeConnectionEvidence=null,cubeRenderEvidence=null,cubeRenderSelection=null,cubeCellPreview=null;
 let inspectedWarpMap=null,selectedWarpPreview=null,selectedEventPreview=null,inspectedEventMap=null,inspectedMapAtlas=null,atlasBatchStart=0,atlasCoordinateBatchStart=0,atlasScriptAliasStart=0,atlasScriptCrossPageStart=0,atlasIncomingStart=0,atlasIncomingTarget=null;
 let activeRenderedMap=null,selectedRenderedHit=null;
-let cubeCatalogEvidence=null,cubeWarpTraceEvidence=null;
+let cubeCatalogEvidence=null,cubeWarpTraceEvidence=null,cubeConnectionTraceEvidence=null;
 let mapReviewQueue=[],mapReviewRom=null,lastMapPreviews={cell:null,warp:null,event:null};
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
 const PER_PAGE=128;
@@ -1110,7 +1111,7 @@ $('cube-map-inspect').addEventListener('click',()=>safeRun(()=>{
   if(!['cube-bank-index','cube-map-index','cube-map-count'].every(id=>/^[0-9]+$/.test($(id).value)))
     throw Error('Explicit integer bank/map indexes and map count required');
   const report=inspectHmaCubeMapEntry(model,mapBankCustomSummary,options);
-  clearCubeRenderedMap('New CUBE map selected; render again.');clearCubeWarpTrace();
+  clearCubeRenderedMap('New CUBE map selected; render again.');clearCubeWarpTrace();clearCubeConnectionTrace();
   cubeMapEvidence={options,report};cubeWarpEvidence=null;cubeConnectionEvidence=null;
   $('cube-map-x').value='0';$('cube-map-y').value='0';
   drawCubeMapEvidence();
@@ -1376,10 +1377,17 @@ $('cube-map-warps').addEventListener('click',()=>safeRun(()=>{
   drawCubeMapEvidence();
 }));
 
+function clearCubeConnectionTrace(){
+  cubeConnectionTraceEvidence=null;
+  $('cube-connection-trace-open').disabled=true;
+  $('cube-connection-trace-status').textContent=
+    'Inspect CUBE connections, then provide the destination-bank map count.';
+}
 function drawCubeConnectionEvidence(){
   const status=$('cube-connections-status'),list=$('cube-connections-list');
   list.replaceChildren();
   const snapshot=cubeConnectionEvidence;
+  $('cube-connection-trace').disabled=!snapshot;
   if(!snapshot){
     status.textContent='No CUBE custom connections inspected. Select a map first.';
     return;
@@ -1392,7 +1400,8 @@ function drawCubeConnectionEvidence(){
     if(JSON.stringify(fresh)!==JSON.stringify(snapshot.report))
       throw Error('Connection records changed');
   }catch(_err){
-    cubeConnectionEvidence=null;
+    cubeConnectionEvidence=null;clearCubeConnectionTrace();
+    $('cube-connection-trace').disabled=true;
     status.textContent='CUBE connections changed or expired. Inspect again before navigation.';
     return;
   }
@@ -1423,8 +1432,48 @@ $('cube-map-connections').addEventListener('click',()=>safeRun(()=>{
   if(JSON.stringify(map)!==JSON.stringify(cubeMapEvidence.report))
     throw Error('Selected CUBE map changed; inspect again');
   const report=inspectHmaCubeMapConnections(model,mapBankCustomSummary,options);
-  cubeConnectionEvidence={options,report};
+  clearCubeConnectionTrace();cubeConnectionEvidence={options,report};
   drawCubeConnectionEvidence();
+}));
+
+
+$('cube-connection-trace').addEventListener('click',()=>safeRun(()=>{
+  const snapshot=cubeConnectionEvidence;
+  if(!snapshot||!cubeMapEvidence||snapshot.options!==cubeMapEvidence.options)
+    throw Error('Inspect current CUBE connection records first');
+  const current=inspectHmaCubeMapConnections(ensureModel(),mapBankCustomSummary,snapshot.options);
+  if(JSON.stringify(current)!==JSON.stringify(snapshot.report))
+    throw Error('CUBE connection records changed; inspect again');
+  const indexText=$('cube-connection-trace-index').value;
+  const countText=$('cube-connection-target-count').value;
+  if(!/^\d+$/.test(indexText)||!/^\d+$/.test(countText))
+    throw new RangeError('Explicit connection index and destination map count required');
+  const connectionIndex=Number(indexText),targetMapCount=Number(countText);
+  const report=traceHmaCubeConnectionDestination(model,mapBankCustomSummary,{
+    ...snapshot.options,connectionIndex,targetMapCount});
+  cubeConnectionTraceEvidence={rom:model,summary:mapBankCustomSummary,
+    options:snapshot.options,connectionIndex,targetMapCount,report};
+  $('cube-connection-trace-open').disabled=report.status!=='resolved-raw';
+  $('cube-connection-trace-status').textContent=report.status==='resolved-raw'?
+    'Raw target bank '+report.targetBank+', map '+report.targetMap+
+    ' ('+report.targetWidth+'×'+report.targetHeight+'). Raw backlinks: '+
+    report.backLinks.length+'. Gameplay travel, connection alignment and walkability NOT verified.':
+    'Raw connection destination status: '+report.status+'. No gameplay travel inferred.';
+}));
+$('cube-connection-trace-open').addEventListener('click',()=>safeRun(()=>{
+  const snapshot=cubeConnectionTraceEvidence;
+  if(!snapshot||snapshot.rom!==model||snapshot.summary!==mapBankCustomSummary||
+     snapshot.report.status!=='resolved-raw')
+    throw Error('CUBE connection destination selection expired');
+  const now=traceHmaCubeConnectionDestination(model,mapBankCustomSummary,{
+    ...snapshot.options,connectionIndex:snapshot.connectionIndex,
+    targetMapCount:snapshot.targetMapCount});
+  if(JSON.stringify(now)!==JSON.stringify(snapshot.report))
+    throw Error('CUBE connection destination changed; trace again');
+  $('cube-bank-index').value=String(now.targetBank);
+  $('cube-map-index').value=String(now.targetMap);
+  $('cube-map-count').value=String(snapshot.targetMapCount);
+  $('cube-map-inspect').click();
 }));
 
 function drawAnchors(){
