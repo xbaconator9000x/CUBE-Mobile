@@ -135,3 +135,29 @@ test('connection-only edits participate in exact changed-byte ownership census',
   c.firstKind==='connection-records'&&c.secondKind==='connection-records'));
  assert.equal(shared.writeAuthorized,false);
 });
+
+test('script-pointer ownership audit counts exact changed bytes and detects shared event arrays',async()=>{
+ const {bytes,summary}=await fixture(),original=bytes.slice();
+ // Synthetic, source-grounded CUBE object (24-byte) and trigger (16-byte) records.
+ bytes[0x600]=1;bytes[0x602]=1;
+ ptr(bytes,0x604,0x900);ptr(bytes,0x60c,0x940);
+ ptr(bytes,0x910,0xa00);ptr(bytes,0x94c,0xa10);
+ const scripts=[{kind:'objects',index:0,expectedRaw:0x08000a00,
+  targetKind:'scripts',targetIndex:0}];
+ const options={...opts,warps:[],scripts};
+ const clean=auditHmaCubeEditOwnershipImpact(bytes,summary,options);
+ assert.equal(clean.changedBytes,1);
+ assert.equal(clean.copyOnlyRehearsalVerified,true);
+ assert.equal(clean.changedBytesTouchSharedClaims,false);
+ assert.equal(clean.writeAuthorized,false);
+ const before=bytes.slice();
+ // Another declared map now points at the exact same event array header.
+ ptr(bytes,0x244,0x600);
+ const shared=auditHmaCubeEditOwnershipImpact(bytes,summary,options);
+ assert.equal(shared.changedBytesTouchSharedClaims,true);
+ assert.ok(shared.conflicts.some(c=>c.changedKinds.includes('script-reference')));
+ assert.equal(shared.globalPointerOwnershipProven,false);
+ assert.equal(shared.writeAuthorized,false);
+ assert.deepEqual(bytes.slice(0,0x244),before.slice(0,0x244));
+ assert.deepEqual(original.slice(0,0x10),before.slice(0,0x10));
+});
