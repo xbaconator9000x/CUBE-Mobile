@@ -196,6 +196,9 @@
   </div>
   <div class="input-row" aria-label="Read-only CUBE multi-cell proposal queue">
     <button type="button" id="cube-map-batch-add" class="subtle-button" disabled>Queue selected cell (preview only)</button>
+    <div class="input-wrap"><label for="cube-map-brush-width">Brush width (1–8)</label><input id="cube-map-brush-width" type="number" min="1" max="8" value="2"></div>
+    <div class="input-wrap"><label for="cube-map-brush-height">Brush height (1–8)</label><input id="cube-map-brush-height" type="number" min="1" max="8" value="2"></div>
+    <button type="button" id="cube-map-batch-brush" class="subtle-button" disabled>Queue rectangle from selected cell</button>
     <button type="button" id="cube-map-batch-preview" class="subtle-button" disabled>Preview queued changes</button>
     <button type="button" id="cube-map-batch-clear" class="subtle-button" disabled>Clear queue</button>
   </div>
@@ -8264,6 +8267,37 @@ function clearCubeCatalog(message='No CUBE bank catalog inspected. Supply a veri
   clearCubeWarpTrace();
   clearCubeOwnership();
 }
+function cubeBatchProposalInputs(){
+  const tileText=$('cube-map-proposed-tile').value;
+  const highText=$('cube-map-proposed-high').value;
+  if(!/^\d+$/.test(tileText)||!/^\d+$/.test(highText))
+    throw new RangeError('Proposed tile and raw high bits must be unsigned integers');
+  const tileId=Number(tileText),collision=Number(highText);
+  if(!Number.isSafeInteger(tileId)||tileId>1023||
+     !Number.isSafeInteger(collision)||collision>63)
+    throw new RangeError('CUBE tile/high-bit proposal outside allowed range');
+  return {tileId,collision};
+}
+function appendCubeBatchProposals(snapshot,additions){
+  if(cubeCellBatchSnapshot&&cubeCellBatchSnapshot!==snapshot)
+    throw Error('Queued proposals belong to an earlier map rendering');
+  const locations=new Set(additions.map(c=>c.x+':'+c.y));
+  const next=cubeCellBatchQueue.filter(c=>!locations.has(c.x+':'+c.y)).concat(additions);
+  if(next.length>32)throw new RangeError('Maximum 32 queued CUBE cells');
+  const result=previewHmaCubeCellBatch(model,mapBankCustomSummary,{
+    ...snapshot.options,x:snapshot.x,y:snapshot.y,viewportWidth:10,viewportHeight:8,
+    changes:next
+  });
+  if(JSON.stringify(result.beforeImage.map)!==JSON.stringify(snapshot.map)||
+     JSON.stringify(result.beforeImage.cells)!==snapshot.cellsJson||
+     JSON.stringify(result.beforeImage.attributes)!==snapshot.attributesJson||
+     result.beforeImage.pixels.length!==snapshot.pixels.length||
+     !result.beforeImage.pixels.every((value,i)=>value===snapshot.pixels[i]))
+    throw Error('CUBE map rendering changed; render again');
+  cubeCellBatchSnapshot=snapshot;cubeCellBatchQueue=next;
+  drawCubeCellBatchQueue();
+  $('cube-map-preview-after').hidden=true;
+}
 function drawCubeCellBatchQueue(){
   const list=$('cube-map-batch-list');list.replaceChildren();
   const current=cubeCellBatchSnapshot&&cubeCellBatchSnapshot===cubeRenderEvidence&&
@@ -8292,6 +8326,7 @@ function drawCubeCellBatchQueue(){
 function clearCubeBatchQueue(){
   cubeCellBatchQueue=[];cubeCellBatchSnapshot=null;
   $('cube-map-batch-add').disabled=true;
+  $('cube-map-batch-brush').disabled=true;
   $('cube-map-batch-preview').disabled=true;
   $('cube-map-batch-clear').disabled=true;
   $('cube-map-batch-list').replaceChildren();
@@ -8637,6 +8672,7 @@ $('cube-map-render-canvas').addEventListener('click',event=>safeRun(()=>{
   cubeRenderSelection={snapshot,cellOffset:hit.cell.byteOffset,x:hit.cell.x,y:hit.cell.y,raw:hit.cell.raw};
   cubeCellPreview=null;$('cube-map-preview-after').hidden=true;
   $('cube-map-batch-add').disabled=false;
+  $('cube-map-batch-brush').disabled=false;
   $('cube-map-preview-status').textContent='Selected cell is ready for a read-only visual proposal.';
   $('cube-map-proposed-tile').value=String(hit.cell.tileId);
   $('cube-map-proposed-high').value=String(hit.cell.collision);
@@ -8653,34 +8689,34 @@ $('cube-map-batch-add').addEventListener('click',()=>safeRun(()=>{
   if(!snapshot||snapshot!==cubeRenderEvidence||snapshot.rom!==model||
      !cubeMapEvidence||cubeMapEvidence.options!==snapshot.options)
     throw Error('Select a current rendered CUBE cell first');
-  const tileText=$('cube-map-proposed-tile').value;
-  const highText=$('cube-map-proposed-high').value;
-  if(!/^\d+$/.test(tileText)||!/^\d+$/.test(highText))
-    throw new RangeError('Proposed tile and raw high bits must be unsigned integers');
-  const tileId=Number(tileText),collision=Number(highText);
-  if(!Number.isSafeInteger(tileId)||tileId>1023||
-     !Number.isSafeInteger(collision)||collision>63)
-    throw new RangeError('CUBE tile/high-bit proposal outside allowed range');
-  if(cubeCellBatchSnapshot&&cubeCellBatchSnapshot!==snapshot)
-    throw Error('Queued proposals belong to an earlier map rendering');
-  const proposal={x:selected.x,y:selected.y,tileId,collision,expectedRaw:selected.raw};
-  const next=cubeCellBatchQueue.filter(c=>c.x!==selected.x||c.y!==selected.y);
-  if(next.length>=32)throw new RangeError('Maximum 32 queued CUBE cells');
-  next.push(proposal);
-  // Revalidate all expected original words, rendering, and proposed values
-  // before accepting a new queue item; this never changes staged ROM bytes.
-  const result=previewHmaCubeCellBatch(model,mapBankCustomSummary,{
-    ...snapshot.options,x:snapshot.x,y:snapshot.y,viewportWidth:10,viewportHeight:8,
-    changes:next
-  });
-  if(JSON.stringify(result.beforeImage.map)!==JSON.stringify(snapshot.map)||
-     JSON.stringify(result.beforeImage.cells)!==snapshot.cellsJson||
-     JSON.stringify(result.beforeImage.attributes)!==snapshot.attributesJson||
-     result.beforeImage.pixels.length!==snapshot.pixels.length||
-     !result.beforeImage.pixels.every((value,i)=>value===snapshot.pixels[i]))
-    throw Error('CUBE map rendering changed; render again');
-  cubeCellBatchSnapshot=snapshot;cubeCellBatchQueue=next;
-  drawCubeCellBatchQueue();
+  const {tileId,collision}=cubeBatchProposalInputs();
+  appendCubeBatchProposals(snapshot,[{
+    x:selected.x,y:selected.y,tileId,collision,expectedRaw:selected.raw
+  }]);
+}));
+$('cube-map-batch-brush').addEventListener('click',()=>safeRun(()=>{
+  const selected=cubeRenderSelection,snapshot=selected?.snapshot;
+  if(!snapshot||snapshot!==cubeRenderEvidence||snapshot.rom!==model||
+     !cubeMapEvidence||cubeMapEvidence.options!==snapshot.options)
+    throw Error('Select a current rendered CUBE cell first');
+  const widthText=$('cube-map-brush-width').value;
+  const heightText=$('cube-map-brush-height').value;
+  if(!/^\d+$/.test(widthText)||!/^\d+$/.test(heightText))
+    throw new RangeError('Brush dimensions must be unsigned integers');
+  const width=Number(widthText),height=Number(heightText);
+  if(!Number.isSafeInteger(width)||!Number.isSafeInteger(height)||
+     width<1||height<1||width>8||height>8||width*height>32)
+    throw new RangeError('Brush must be 1–8 per axis and at most 32 cells');
+  const {tileId,collision}=cubeBatchProposalInputs();
+  const cells=JSON.parse(snapshot.cellsJson).flat();
+  const changes=[];
+  for(let dy=0;dy<height;dy++)for(let dx=0;dx<width;dx++){
+    const x=selected.x+dx,y=selected.y+dy;
+    const cell=cells.find(c=>c.x===x&&c.y===y);
+    if(!cell)throw new RangeError('Brush extends outside the rendered viewport');
+    changes.push({x,y,tileId,collision,expectedRaw:cell.raw});
+  }
+  appendCubeBatchProposals(snapshot,changes);
 }));
 $('cube-map-batch-clear').addEventListener('click',()=>safeRun(()=>{
   clearCubeBatchQueue();$('cube-map-preview-after').hidden=true;
