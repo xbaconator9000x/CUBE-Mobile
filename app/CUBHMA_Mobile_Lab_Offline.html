@@ -199,6 +199,8 @@
     <div class="input-wrap"><label for="cube-map-brush-width">Brush width (1–8)</label><input id="cube-map-brush-width" type="number" min="1" max="8" value="2"></div>
     <div class="input-wrap"><label for="cube-map-brush-height">Brush height (1–8)</label><input id="cube-map-brush-height" type="number" min="1" max="8" value="2"></div>
     <button type="button" id="cube-map-batch-brush" class="subtle-button" disabled>Queue rectangle from selected cell</button>
+    <div class="input-wrap"><label for="cube-map-flood-match">Flood matching</label><select id="cube-map-flood-match"><option value="tile">Same metatile ID</option><option value="exact">Same tile and raw high bits</option></select></div>
+    <button type="button" id="cube-map-batch-flood" class="subtle-button" disabled>Flood fill from selected cell (max 32)</button>
     <button type="button" id="cube-map-batch-preview" class="subtle-button" disabled>Preview queued changes</button>
     <button type="button" id="cube-map-batch-clear" class="subtle-button" disabled>Clear queue</button>
   </div>
@@ -7279,7 +7281,7 @@ function auditHmaCubeCrossBankOwnership(source,summary,{banks}={}) {
 
 return auditHmaCubeCrossBankOwnership;
 })();
-const previewHmaCubeCellBatch=(()=>{
+const {previewHmaCubeCellBatch,planHmaCubeViewportFloodFill}=(()=>{
 /**
  * Multi-cell, read-only CUBE Emerald visual preflight.
  * Source: pinned kcradi/CUBHMA MapModel.cs BlockCell encoding and
@@ -7408,7 +7410,71 @@ function previewHmaCubeCellBatch(source,summary,{
   });
 }
 
-return previewHmaCubeCellBatch;
+/**
+ * Four-neighbor flood fill of a bounded, already rendered CUBE viewport.
+ * A tile-only match deliberately ignores raw high bits; exact mode matches
+ * the full 16-bit blockmap word. Neither mode infers walkability.
+ * No ROM access, no writes, no silent partial fill on the 32-cell limit.
+ */
+function planHmaCubeViewportFloodFill(image,{
+  seedX,seedY,tileId,collision,matchMode='tile',maxCells=32
+}={}){
+  if(!image||!Array.isArray(image.cells)||!image.cells.length||
+     image.cells.length>32||!Array.isArray(image.cells[0])||
+     !image.cells[0].length||image.cells[0].length>32)
+    throw new RangeError('Expected a bounded rendered CUBE cell grid');
+  integer(tileId,0,1023,'Proposed tile ID');
+  integer(collision,0,63,'Proposed raw high bits');
+  integer(maxCells,1,32,'Flood-fill cell limit');
+  if(matchMode!=='tile'&&matchMode!=='exact')
+    throw new RangeError('Flood match must be tile or exact');
+  const rows=image.cells,width=rows[0].length,height=rows.length;
+  const originX=rows[0][0]?.x,originY=rows[0][0]?.y;
+  integer(originX,0,1023,'Viewport X');
+  integer(originY,0,1023,'Viewport Y');
+  const cells=new Map();
+  for(let y=0;y<height;y++){
+    if(!Array.isArray(rows[y])||rows[y].length!==width)
+      throw new RangeError('Flood-fill grid is not rectangular');
+    for(let x=0;x<width;x++){
+      const c=rows[y][x];
+      if(!c||c.x!==originX+x||c.y!==originY+y||
+         !Number.isSafeInteger(c.raw)||c.raw<0||c.raw>65535||
+         c.tileId!==(c.raw&1023)||c.collision!==(c.raw>>>10))
+        throw new RangeError('Flood-fill grid has invalid or stale cells');
+      cells.set(c.x+':'+c.y,c);
+    }
+  }
+  integer(seedX,originX,originX+width-1,'Flood seed X');
+  integer(seedY,originY,originY+height-1,'Flood seed Y');
+  const seed=cells.get(seedX+':'+seedY);
+  const same=c=>matchMode==='exact'?c.raw===seed.raw:c.tileId===seed.tileId;
+  const queue=[seed],visited=new Set([seedX+':'+seedY]),changes=[];
+  let touchesViewportEdge=false;
+  for(let head=0;head<queue.length;head++){
+    const cell=queue[head];
+    changes.push(Object.freeze({x:cell.x,y:cell.y,tileId,collision,
+      expectedRaw:cell.raw}));
+    if(changes.length>maxCells)
+      throw new RangeError('Flood fill exceeds 32-cell budget; no proposals queued');
+    if(cell.x===originX||cell.y===originY||
+       cell.x===originX+width-1||cell.y===originY+height-1)
+      touchesViewportEdge=true;
+    for(const [dx,dy] of [[0,-1],[-1,0],[1,0],[0,1]]){
+      const nx=cell.x+dx,ny=cell.y+dy,key=nx+':'+ny;
+      if(visited.has(key))continue;
+      visited.add(key);
+      const next=cells.get(key);
+      if(next&&same(next))queue.push(next);
+    }
+  }
+  return Object.freeze({changes:Object.freeze(changes),
+    matchedCells:changes.length,matchMode,touchesViewportEdge,
+    viewportOnly:true,readOnly:true,previewOnly:true,writeAuthorized:false,
+    walkabilityVerified:false});
+}
+
+return {previewHmaCubeCellBatch,planHmaCubeViewportFloodFill};
 })();
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
@@ -8327,6 +8393,7 @@ function clearCubeBatchQueue(){
   cubeCellBatchQueue=[];cubeCellBatchSnapshot=null;
   $('cube-map-batch-add').disabled=true;
   $('cube-map-batch-brush').disabled=true;
+  $('cube-map-batch-flood').disabled=true;
   $('cube-map-batch-preview').disabled=true;
   $('cube-map-batch-clear').disabled=true;
   $('cube-map-batch-list').replaceChildren();
@@ -8673,6 +8740,7 @@ $('cube-map-render-canvas').addEventListener('click',event=>safeRun(()=>{
   cubeCellPreview=null;$('cube-map-preview-after').hidden=true;
   $('cube-map-batch-add').disabled=false;
   $('cube-map-batch-brush').disabled=false;
+  $('cube-map-batch-flood').disabled=false;
   $('cube-map-preview-status').textContent='Selected cell is ready for a read-only visual proposal.';
   $('cube-map-proposed-tile').value=String(hit.cell.tileId);
   $('cube-map-proposed-high').value=String(hit.cell.collision);
@@ -8717,6 +8785,22 @@ $('cube-map-batch-brush').addEventListener('click',()=>safeRun(()=>{
     changes.push({x,y,tileId,collision,expectedRaw:cell.raw});
   }
   appendCubeBatchProposals(snapshot,changes);
+}));
+$('cube-map-batch-flood').addEventListener('click',()=>safeRun(()=>{
+  const selected=cubeRenderSelection,snapshot=selected?.snapshot;
+  if(!snapshot||snapshot!==cubeRenderEvidence||snapshot.rom!==model||
+     !cubeMapEvidence||cubeMapEvidence.options!==snapshot.options)
+    throw Error('Select a current rendered CUBE cell first');
+  const {tileId,collision}=cubeBatchProposalInputs();
+  const matchMode=$('cube-map-flood-match').value;
+  const plan=planHmaCubeViewportFloodFill({cells:JSON.parse(snapshot.cellsJson)},{
+    seedX:selected.x,seedY:selected.y,tileId,collision,matchMode
+  });
+  appendCubeBatchProposals(snapshot,plan.changes);
+  $('cube-map-batch-status').textContent=plan.matchedCells+
+    ' contiguous CUBE cells queued ('+matchMode+' match). '+
+    (plan.touchesViewportEdge?'Fill touches viewport edge; pan and inspect adjacent cells. ':'')+
+    'Preview only; no ROM writes.';
 }));
 $('cube-map-batch-clear').addEventListener('click',()=>safeRun(()=>{
   clearCubeBatchQueue();$('cube-map-preview-after').hidden=true;

@@ -1,3 +1,8 @@
+## Checkpoint — CUBE touch flood-fill preview (28 October 2026)
+- [x] Add bounded four-neighbor tile/exact-word flood fill for the rendered CUBE viewport, preserving original cell words.
+- [x] Integrate a touch control with atomic 32-cell queue preflight, explicit edge warning, offline HTML and regression tests.
+- [ ] Authenticate genuine ROM/metadata and prove emulator/Android/save-reopen behavior before strict parity credit; writing remains disabled.
+
 ## Checkpoint — local CUBE RSE render smoke (28 October 2026)
 - [x] Add opt-in SHA-256-matched local 10×8 CUBE Emerald RSE render compatibility check, with aggregate-only output and fail-closed unsupported modes.
 - [x] Synthetic ROM immutability, input rejection and no-byte-disclosure tests.

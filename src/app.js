@@ -53,7 +53,7 @@ import {inspectHmaCubeBankCatalog} from './hma-cube-bank-catalog.js';
 import {traceHmaCubeWarpArrival} from './hma-cube-warp-arrival.js';
 import {traceHmaCubeConnectionDestination} from './hma-cube-connection-trace.js';
 import {auditHmaCubeCrossBankOwnership} from './hma-cube-cross-bank-ownership.js';
-import {previewHmaCubeCellBatch} from './hma-cube-cell-batch.js';
+import {previewHmaCubeCellBatch,planHmaCubeViewportFloodFill} from './hma-cube-cell-batch.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
@@ -972,6 +972,7 @@ function clearCubeBatchQueue(){
   cubeCellBatchQueue=[];cubeCellBatchSnapshot=null;
   $('cube-map-batch-add').disabled=true;
   $('cube-map-batch-brush').disabled=true;
+  $('cube-map-batch-flood').disabled=true;
   $('cube-map-batch-preview').disabled=true;
   $('cube-map-batch-clear').disabled=true;
   $('cube-map-batch-list').replaceChildren();
@@ -1318,6 +1319,7 @@ $('cube-map-render-canvas').addEventListener('click',event=>safeRun(()=>{
   cubeCellPreview=null;$('cube-map-preview-after').hidden=true;
   $('cube-map-batch-add').disabled=false;
   $('cube-map-batch-brush').disabled=false;
+  $('cube-map-batch-flood').disabled=false;
   $('cube-map-preview-status').textContent='Selected cell is ready for a read-only visual proposal.';
   $('cube-map-proposed-tile').value=String(hit.cell.tileId);
   $('cube-map-proposed-high').value=String(hit.cell.collision);
@@ -1362,6 +1364,22 @@ $('cube-map-batch-brush').addEventListener('click',()=>safeRun(()=>{
     changes.push({x,y,tileId,collision,expectedRaw:cell.raw});
   }
   appendCubeBatchProposals(snapshot,changes);
+}));
+$('cube-map-batch-flood').addEventListener('click',()=>safeRun(()=>{
+  const selected=cubeRenderSelection,snapshot=selected?.snapshot;
+  if(!snapshot||snapshot!==cubeRenderEvidence||snapshot.rom!==model||
+     !cubeMapEvidence||cubeMapEvidence.options!==snapshot.options)
+    throw Error('Select a current rendered CUBE cell first');
+  const {tileId,collision}=cubeBatchProposalInputs();
+  const matchMode=$('cube-map-flood-match').value;
+  const plan=planHmaCubeViewportFloodFill({cells:JSON.parse(snapshot.cellsJson)},{
+    seedX:selected.x,seedY:selected.y,tileId,collision,matchMode
+  });
+  appendCubeBatchProposals(snapshot,plan.changes);
+  $('cube-map-batch-status').textContent=plan.matchedCells+
+    ' contiguous CUBE cells queued ('+matchMode+' match). '+
+    (plan.touchesViewportEdge?'Fill touches viewport edge; pan and inspect adjacent cells. ':'')+
+    'Preview only; no ROM writes.';
 }));
 $('cube-map-batch-clear').addEventListener('click',()=>safeRun(()=>{
   clearCubeBatchQueue();$('cube-map-preview-after').hidden=true;
