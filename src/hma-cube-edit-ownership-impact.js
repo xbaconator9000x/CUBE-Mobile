@@ -12,6 +12,7 @@ import {previewHmaCubeEventPositionBatch} from './hma-cube-event-batch.js';
 import {previewHmaCubeConnectionBatch} from './hma-cube-connection-edit.js';
 import {previewHmaCubeScriptRetargetBatch} from './hma-cube-script-retarget.js';
 import {auditHmaCubeCrossBankOwnership} from './hma-cube-cross-bank-ownership.js';
+import {auditHmaCubeGlobalPointerCandidates} from './hma-cube-global-pointer-census.js';
 import {verifyHmaCubeCombinedTransaction} from './hma-cube-combined-transaction.js';
 
 function addChanged(changes, offset, before, after, kind) {
@@ -51,6 +52,8 @@ function intersectChanged(changes,start,length) {
 export function auditHmaCubeEditOwnershipImpact(source,summary,options={}) {
  const {bankIndex,mapIndex,mapCount,banks,cells=[],warps=[],events=[],connections=[],scripts=[],
   targetBanks,x=0,y=0,viewportWidth=10,viewportHeight=8}=options;
+ if(options.wholeRomPointerScan!==undefined&&typeof options.wholeRomPointerScan!=='boolean')
+  throw new TypeError('Whole-ROM pointer scan option must be boolean');
  if(!Array.isArray(banks)||!banks.some(b=>
     b?.bankIndex===bankIndex&&b?.mapCount===mapCount))
   throw new RangeError('Ownership census must include exact edited bank and map count');
@@ -59,19 +62,23 @@ export function auditHmaCubeEditOwnershipImpact(source,summary,options={}) {
  // Rehearse the entire edit first, including a complete immutable snapshot,
  // re-decoding and rollback. No byte stream escapes this verifier.
  const rehearsal=verifyHmaCubeCombinedTransaction(source,summary,options);
- const changes=new Map();
+ const changes=new Map(),recordRanges=[];
  if(cells.length) {
   const plan=previewHmaCubeCellBatch(source,summary,{
    ...opts,changes:cells,banks,x,y,viewportWidth,viewportHeight
   });
-  for(const r of plan.changes)for(let i=0;i<2;i++)
-   addChanged(changes,r.byteOffset+i,r.before.bytes[i],r.after.bytes[i],'blockmap');
+  for(const r of plan.changes){
+   recordRanges.push({start:r.byteOffset,length:2});
+   for(let i=0;i<2;i++)
+    addChanged(changes,r.byteOffset+i,r.before.bytes[i],r.after.bytes[i],'blockmap');
+  }
  }
  if(warps.length) {
   const plan=previewHmaCubeWarpBatch(source,summary,{
    ...opts,changes:warps,targetBanks
   });
   for(const r of plan.changes) {
+   recordRanges.push({start:r.sourceOffset,length:8});
    const before=warpBytes(r.before),after=warpBytes(r.after);
    for(let i=0;i<8;i++)
     addChanged(changes,r.sourceOffset+i,before[i],after[i],'event-warps');
@@ -81,6 +88,11 @@ export function auditHmaCubeEditOwnershipImpact(source,summary,options={}) {
   const plan=previewHmaCubeEventPositionBatch(source,summary,{
    ...opts,changes:events
   });
+  const widths={objects:24,warps:8,scripts:16,signposts:12};
+  for(const r of plan.changes){
+   if(!widths[r.kind])throw new RangeError('Unsupported CUBE event record kind');
+   recordRanges.push({start:r.sourceOffset,length:widths[r.kind]});
+  }
   for(const r of plan.rawBytes)
    addChanged(changes,r.offset,r.expected,r.value,'event-position');
  }
@@ -89,6 +101,7 @@ export function auditHmaCubeEditOwnershipImpact(source,summary,options={}) {
    ...opts,changes:connections,targetBanks
   });
   for(const r of plan.changes) {
+   recordRanges.push({start:r.sourceOffset,length:12});
    const before=connectionBytes(r.before),after=connectionBytes(r.after);
    for(let i=0;i<12;i++)
     addChanged(changes,r.sourceOffset+i,before[i],after[i],'connection-records');
@@ -98,6 +111,11 @@ export function auditHmaCubeEditOwnershipImpact(source,summary,options={}) {
   const plan=previewHmaCubeScriptRetargetBatch(source,summary,{
    ...opts,changes:scripts
   });
+  for(const r of plan.changes){
+   const back=r.kind==='objects'?16:r.kind==='scripts'?12:8;
+   const width=r.kind==='objects'?24:r.kind==='scripts'?16:12;
+   recordRanges.push({start:r.sourceOffset-back,length:width});
+  }
   for(const r of plan.rawBytes)
    addChanged(changes,r.offset,r.expected,r.value,'script-reference');
  }
@@ -122,6 +140,8 @@ export function auditHmaCubeEditOwnershipImpact(source,summary,options={}) {
    changedKinds:Object.freeze([...new Set(offsets.map(i=>changes.get(i)))].sort())
   }));
  }
+ const globalPointerCandidates=options.wholeRomPointerScan===true?
+  auditHmaCubeGlobalPointerCandidates(source,recordRanges):null;
  const sourceDecoded=census.maps.some(m=>m.id===sourceId&&m.status==='decoded');
  const incomplete=census.invalid>0||census.eventIssues.length>0||
   census.connectionIssues.length>0||census.mapScriptIssues.length>0||
@@ -135,6 +155,7 @@ export function auditHmaCubeEditOwnershipImpact(source,summary,options={}) {
   mapScriptClaimsInspected:census.mapScriptClaimsInspected,
   sameMapStructuralOverlapCount:census.sameMapStructuralOverlapCount,
   conflicts:Object.freeze(conflicts),
+  globalPointerCandidates,
   changedBytesTouchSharedClaims:conflicts.length>0,
   censusIncomplete:incomplete,
   noDetectedOverlapInInspectedMaps:conflicts.length===0&&!incomplete,
