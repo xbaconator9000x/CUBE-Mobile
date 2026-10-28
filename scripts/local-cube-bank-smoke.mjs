@@ -71,7 +71,7 @@ export function parseLocalCubeBankSmokeArgs(argv){
 export function fingerprintHmaCubeRenderedViewport(image){
  if(!image||!Number.isSafeInteger(image.width)||!Number.isSafeInteger(image.height)||
     image.width<1||image.height<1||image.width>512||image.height>512||
-    !(image.pixels instanceof Uint8Array)||
+    !(image.pixels instanceof Uint8Array || image.pixels instanceof Uint8ClampedArray)||
     image.pixels.length!==image.width*image.height*4)
   throw new RangeError('Expected a bounded RGBA viewport');
  const dims=Buffer.alloc(8);
