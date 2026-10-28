@@ -48,12 +48,13 @@ import {inspectHmaCubeMapEntry} from './hma-cube-map-discovery.js';
 import {inspectHmaCubeMapEventWarps} from './hma-cube-map-events.js';
 import {inspectHmaCubeMapConnections} from './hma-cube-map-connections.js';
 import {renderHmaCubeMapViewport} from './hma-cube-map-render.js';
+import {previewHmaCubeBlockmapVisualChange} from './hma-cube-map-cell-preview.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let pcsReference=null,pcsReferenceName='';
 let fingerprintResult=null,fingerprintAbort=null;
-let metadataFingerprints=[],metadataImportSerial=0,mapBankMetadataReport=null,mapBankRawPointerEvidence=null,mapBankRawWindowEvidence=null,mapBankDeclaredEvidence=null,mapBankTargetEvidence=null,mapBankCustomSummary=null,cubeMapEvidence=null,cubeWarpEvidence=null,cubeConnectionEvidence=null,cubeRenderEvidence=null,cubeRenderSelection=null;
+let metadataFingerprints=[],metadataImportSerial=0,mapBankMetadataReport=null,mapBankRawPointerEvidence=null,mapBankRawWindowEvidence=null,mapBankDeclaredEvidence=null,mapBankTargetEvidence=null,mapBankCustomSummary=null,cubeMapEvidence=null,cubeWarpEvidence=null,cubeConnectionEvidence=null,cubeRenderEvidence=null,cubeRenderSelection=null,cubeCellPreview=null;
 let inspectedWarpMap=null,selectedWarpPreview=null,selectedEventPreview=null,inspectedEventMap=null,inspectedMapAtlas=null,atlasBatchStart=0,atlasCoordinateBatchStart=0,atlasScriptAliasStart=0,atlasScriptCrossPageStart=0,atlasIncomingStart=0,atlasIncomingTarget=null;
 let activeRenderedMap=null,selectedRenderedHit=null;
 let mapReviewQueue=[],mapReviewRom=null,lastMapPreviews={cell:null,warp:null,event:null};
@@ -896,7 +897,10 @@ function drawMapBankMetadataReport(){
 }
 
 function clearCubeRenderedMap(message='CUBE render invalidated; render again.'){
-  cubeRenderEvidence=null;cubeRenderSelection=null;
+  cubeRenderEvidence=null;cubeRenderSelection=null;cubeCellPreview=null;
+  $('cube-map-cell-preview').disabled=true;
+  $('cube-map-preview-after').hidden=true;
+  $('cube-map-preview-status').textContent='Select a rendered cell to preview a proposed change. No ROM writes.';
   $('cube-map-render-canvas').hidden=true;
   $('cube-map-render-jump').disabled=true;
   $('cube-map-render-status').textContent=message;
@@ -1104,7 +1108,10 @@ $('cube-map-render').addEventListener('click',()=>safeRun(()=>{
   cubeRenderEvidence={rom:model,options,x,y,overlayMode,map:rendered.map,
     pixels:rendered.pixels.slice(),cellsJson:JSON.stringify(rendered.cells),
     attributesJson:JSON.stringify(rendered.attributes)};
-  cubeRenderSelection=null;$('cube-map-render-jump').disabled=true;
+  cubeRenderSelection=null;cubeCellPreview=null;$('cube-map-cell-preview').disabled=true;
+  $('cube-map-preview-after').hidden=true;
+  $('cube-map-preview-status').textContent='Tap a rendered cell to propose a visual-only change.';
+  $('cube-map-render-jump').disabled=true;
   $('cube-map-render-status').textContent='Rendered '+rendered.columns+' × '+
     rendered.rows+' CUBE RSE metatiles (16 × 16 pixels each). Unsupported custom light palettes and FRLG layouts are refused. ROM/layout and walkability remain unverified.';
   $('cube-map-render-selection').textContent='Tap a rendered cell to inspect raw source offsets.';
@@ -1132,13 +1139,47 @@ $('cube-map-render-canvas').addEventListener('click',event=>safeRun(()=>{
     (event.clientX-rect.left)*canvas.width/rect.width,
     (event.clientY-rect.top)*canvas.height/rect.height);
   if(!hit)return;
-  cubeRenderSelection={snapshot,cellOffset:hit.cell.byteOffset};
+  cubeRenderSelection={snapshot,cellOffset:hit.cell.byteOffset,x:hit.cell.x,y:hit.cell.y,raw:hit.cell.raw};
+  cubeCellPreview=null;$('cube-map-preview-after').hidden=true;
+  $('cube-map-preview-status').textContent='Selected cell is ready for a read-only visual proposal.';
+  $('cube-map-proposed-tile').value=String(hit.cell.tileId);
+  $('cube-map-proposed-high').value=String(hit.cell.collision);
+  $('cube-map-cell-preview').disabled=false;
   $('cube-map-render-jump').disabled=false;
   $('cube-map-render-selection').textContent='Cell ('+hit.cell.x+','+hit.cell.y+
     ') · tile '+hit.cell.tileId+' · raw high bits '+hit.cell.collision+
     ' · behavior 0x'+hex(hit.attribute.behavior,2)+' · layer '+hit.attribute.layer+
     ' · blockmap 0x'+hex(hit.cell.byteOffset)+' · attributes 0x'+
     hex(hit.attribute.attributeOffset)+'. Not verified walkability.';
+}));
+$('cube-map-cell-preview').addEventListener('click',()=>safeRun(()=>{
+  const selected=cubeRenderSelection,snapshot=selected?.snapshot;
+  if(!snapshot||snapshot!==cubeRenderEvidence||snapshot.rom!==model||
+     !cubeMapEvidence||cubeMapEvidence.options!==snapshot.options)
+    throw Error('Select a current rendered CUBE cell first');
+  const tileText=$('cube-map-proposed-tile').value,highText=$('cube-map-proposed-high').value;
+  if(!/^\\d+$/.test(tileText)||!/^\\d+$/.test(highText))
+    throw new RangeError('Proposed tile and raw high bits must be unsigned integers');
+  const proposal=previewHmaCubeBlockmapVisualChange(model,mapBankCustomSummary,{
+    ...snapshot.options,x:selected.x,y:selected.y,expectedRaw:selected.raw,
+    tileId:Number(tileText),collision:Number(highText),
+    viewportX:snapshot.x,viewportY:snapshot.y,viewportWidth:10,viewportHeight:8
+  });
+  if(JSON.stringify(proposal.beforeImage.map)!==JSON.stringify(snapshot.map)||
+     JSON.stringify(proposal.beforeImage.cells)!==snapshot.cellsJson||
+     JSON.stringify(proposal.beforeImage.attributes)!==snapshot.attributesJson||
+     proposal.beforeImage.pixels.length!==snapshot.pixels.length||
+     !proposal.beforeImage.pixels.every((value,i)=>value===snapshot.pixels[i]))
+    throw Error('CUBE rendering changed since selection; render again');
+  const after=proposal.afterImage,canvas=$('cube-map-preview-after');
+  canvas.width=after.width;canvas.height=after.height;
+  const ctx=canvas.getContext('2d'),image=ctx.createImageData(after.width,after.height);
+  image.data.set(after.pixels);ctx.putImageData(image,0,0);
+  canvas.style.width=(after.width*2)+'px';canvas.style.height=(after.height*2)+'px';
+  canvas.hidden=false;cubeCellPreview=proposal;
+  $('cube-map-preview-status').textContent='Visual-only CUBE cell ('+selected.x+','+selected.y+
+    '): raw '+proposal.before.raw+' → '+proposal.after.raw+'; '+
+    proposal.changedPixels+' changed pixels. No ROM writes, unknown shared ownership and no verified walkability.';
 }));
 $('cube-map-render-jump').addEventListener('click',()=>safeRun(()=>{
   const selection=cubeRenderSelection,snapshot=selection?.snapshot;
