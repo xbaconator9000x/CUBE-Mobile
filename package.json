@@ -14,7 +14,8 @@
     "map:metadata:inspect": "node scripts/hma-map-metadata-report.mjs",
     "smoke:cube-manifest": "node scripts/local-hma-manifest-smoke.mjs",
     "engineering:check": "node scripts/engineering-audit.mjs",
-    "smoke:cube-scripts": "node scripts/local-cube-script-transaction.mjs"
+    "smoke:cube-scripts": "node scripts/local-cube-script-transaction.mjs",
+    "rom:saveas:local": "node scripts/local-rom-atomic-saveas.mjs"
   },
   "license": "MIT"
 }
