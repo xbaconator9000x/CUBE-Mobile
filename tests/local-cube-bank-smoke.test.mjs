@@ -21,6 +21,7 @@ async function fixture(fn){
   const bytes=new Uint8Array(128);
   for(const [index,word] of [0x08000040,0x08000040].entries())
    for(let j=0;j<4;j++)bytes[16+index*4+j]=(word>>>(j*8))&255;
+  bytes[64]=0x70;bytes[67]=0x08; // raw pointer-shaped nested word, not a map
   await writeFile(rom,bytes);await writeFile(toml,metadata);
   const hash=createHash('sha256').update(bytes).digest('hex');
   return await fn({dir,rom,toml,hash,bytes});
@@ -66,5 +67,36 @@ test('wrong SHA, invalid metadata and malformed arguments fail closed',async()=>
    '--expected-sha256',hash],{encoding:'utf8'});
   assert.equal(p.status,2);
   assert.ok(!p.stderr.includes(dir));
+ });
+});
+
+test('optional bounded target-word census is aggregate-only and ROM-immutable',async()=>{
+ await fixture(async({dir,rom,toml,hash})=>{
+  const before=await readFile(rom);
+  const args=['--rom',rom,'--metadata',toml,'--expected-sha256',hash,'--target-words','4'];
+  const report=await inspectLocalCubeBankSmoke(args);
+  assert.equal(report.schema,'cube-mobile-local-cube-bank-table-smoke/2');
+  assert.equal(report.rawTargetWindowWords,4);
+  assert.equal(report.rawTargetsSampled,1);
+  assert.equal(report.rawTargetDuplicateSkips,1);
+  assert.equal(report.rawNestedInRomPointerWords,1);
+  assert.equal(report.independentlyAuthenticated,false);
+  const serialized=JSON.stringify(report);
+  assert.ok(!serialized.includes(dir));
+  assert.ok(!serialized.includes(hash));
+  assert.ok(!serialized.includes('0x08000070'));
+  assert.deepEqual(await readFile(rom),before);
+  const cli=spawnSync(process.execPath,[fileURLToPath(new URL('../scripts/local-cube-bank-smoke.mjs',import.meta.url)),...args],{encoding:'utf8'});
+  assert.equal(cli.status,0,cli.stderr);
+  assert.equal(JSON.parse(cli.stdout).rawTargetsSampled,1);
+ });
+});
+test('optional target window arguments fail closed on unsafe counts',async()=>{
+ await fixture(async({rom,toml,hash})=>{
+  for(const words of ['0','17','-1','1.5','01','999']){
+   const args=['--rom',rom,'--metadata',toml,'--expected-sha256',hash,'--target-words',words];
+   assert.throws(()=>parseLocalCubeBankSmokeArgs(args),RangeError);
+   await assert.rejects(inspectLocalCubeBankSmoke(args),RangeError);
+  }
  });
 });
