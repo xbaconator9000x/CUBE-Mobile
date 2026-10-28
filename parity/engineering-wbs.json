@@ -63,8 +63,7 @@
       },
       "upstreamPath": "src/HexManiac.Core/Models/Runs/PointerRun.cs",
       "localEvidence": [
-        "tests/pointer-references.test.mjs",
-        "tests/hma-cube-cross-bank-ownership.test.mjs"
+        "tests/pointer-references.test.mjs"
       ],
       "rationale": "Read-only pointer and alias probes plus optional cross-bank CUBE event-group/record-array ownership census; still no complete ownership graph, relocation, or authenticated write permission."
     },
@@ -212,8 +211,7 @@
       },
       "upstreamPath": "src/HexManiac.Core/ViewModels/Map/EventTemplate.cs",
       "localEvidence": [
-        "tests/map-events.test.mjs",
-        "tests/mobile-cube-batch-editors.test.mjs"
+        "tests/map-events.test.mjs"
       ],
       "rationale": "CUBE object/trigger/signpost position preflight, atomic multi-event overlay and copy-only rollback now integrated into mobile/offline queues, with cross-kind rehearsal; persisted editing and genuine ROM/emulator/Android acceptance remain absent."
     },
@@ -227,8 +225,7 @@
       },
       "upstreamPath": "src/HexManiac.Core/ViewModels/Map/SurfConnectionViewModel.cs",
       "localEvidence": [
-        "tests/map-link-audit.test.mjs",
-        "tests/mobile-cube-batch-editors.test.mjs"
+        "tests/map-link-audit.test.mjs"
       ],
       "rationale": "Single and multi-warp mobile/offline queue, combined topology preview and copy-only rollback, plus cross-kind rehearsal; no persisted semantic edits, authenticated CUBE ROM, emulator travel or Android hardware acceptance."
     },
