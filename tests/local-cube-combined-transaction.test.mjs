@@ -66,6 +66,10 @@ test('five kinds re-decode and roll back on disk without exporting edited ROM',a
   assert.equal(r.rollbackVerified,true);
   assert.equal(r.sourcePreserved,true);
   assert.equal(r.ownershipConflicts,0);
+  assert.ok(r.globalPointerCensus.scannedAlignedWords>0);
+  assert.ok(r.globalPointerCensus.canonicalPointerCandidates>=4);
+  assert.equal(r.globalPointerCensus.globalOwnershipProven,false);
+  assert.equal(r.globalPointerCensus.writeAuthorized,false);
   assert.equal(r.writeAuthorized,false);
   assert.equal(r.strictParityEvidence,false);
   assert.deepEqual(await readFile(rom),Buffer.from(bytes));
