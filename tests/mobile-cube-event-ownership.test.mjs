@@ -9,7 +9,7 @@ test('mobile and offline cross-bank event claims are explicitly opt-in',async()=
  ]);
  for(const page of [html,offline])assert.match(page,/id="cube-ownership-events"/);
  assert.match(app,/includeEvents=\$\('cube-ownership-events'\)\.checked/);
- assert.match(app,/auditHmaCubeCrossBankOwnership\(model,mapBankCustomSummary,\{banks,includeEvents\}\)/);
+ assert.match(app,/auditHmaCubeCrossBankOwnership\(model,mapBankCustomSummary,\{banks,includeEvents,includeConnections\}\)/);
  assert.match(app,/Event coverage setting changed/);
  assert.match(source,/eventIssues/);
  assert.match(source,/sameMapRelationships/);
