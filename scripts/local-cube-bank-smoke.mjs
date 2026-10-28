@@ -11,15 +11,17 @@ import {pathToFileURL} from 'node:url';
 import {inspectHmaMapBankAnchorSources} from '../src/hma-map-bank-metadata.js';
 import {inspectHmaDeclaredBankPointerTable} from '../src/hma-map-bank-declared-table.js';
 import {inspectHmaDeclaredBankTargetWindows} from '../src/hma-map-bank-target-windows.js';
+import {inspectHmaCubeMapEntry} from '../src/hma-cube-map-discovery.js';
+import {inspectHmaCubeMapEventWarps} from '../src/hma-cube-map-events.js';
 
 const SHA=/^[0-9a-f]{64}$/i;
 export function parseLocalCubeBankSmokeArgs(argv){
- if(!Array.isArray(argv)||![6,8].includes(argv.length))
+ if(!Array.isArray(argv)||argv.length<6||argv.length>14||argv.length%2!==0)
   throw new RangeError('Usage: --rom <local.gba> --metadata <local.toml> --expected-sha256 <64 hex>');
  const options={};
  for(let i=0;i<argv.length;i+=2){
   const key=argv[i],value=argv[i+1];
-  if(!['--rom','--metadata','--expected-sha256','--target-words'].includes(key)||
+  if(!['--rom','--metadata','--expected-sha256','--target-words','--bank-index','--map-index','--map-count'].includes(key)||
      Object.hasOwn(options,key)||typeof value!=='string'||!value)
     throw new RangeError('Invalid local smoke arguments');
   options[key]=value;
@@ -29,6 +31,17 @@ export function parseLocalCubeBankSmokeArgs(argv){
     (options['--target-words']!==undefined&&
      !/^(?:[1-9]|1[0-6])$/.test(options['--target-words'])))
   throw new RangeError('ROM, metadata and separately supplied exact SHA-256 are required');
+ const keys=['--bank-index','--map-index','--map-count'];
+ const present=keys.filter(k=>options[k]!==undefined);
+ if(present.length!==0&&present.length!==3)
+  throw new RangeError('Custom map inspection requires bank index, map index and explicit map count together');
+ if(present.length===3){
+  for(const key of keys)if(!/^(?:0|[1-9][0-9]{0,3})$/.test(options[key]))
+   throw new RangeError('Invalid explicit custom map selection');
+  if(Number(options['--bank-index'])>255||Number(options['--map-index'])>1023||
+     Number(options['--map-count'])<1||Number(options['--map-count'])>1024)
+   throw new RangeError('Custom map selection exceeds bounded limits');
+ }
  return options;
 }
 async function boundedRead(path,max){
@@ -56,8 +69,13 @@ export async function inspectLocalCubeBankSmoke(argv){
  const targets=args['--target-words']===undefined?null:
    inspectHmaDeclaredBankTargetWindows(reader,metadata,
      {wordsPerTarget:Number(args['--target-words'])});
+ const customOptions=args['--map-count']===undefined?null:{
+   bankIndex:Number(args['--bank-index']),mapIndex:Number(args['--map-index']),
+   mapCount:Number(args['--map-count'])};
+ const custom=customOptions?inspectHmaCubeMapEntry(reader,metadata,customOptions):null;
+ const events=customOptions?inspectHmaCubeMapEventWarps(reader,metadata,customOptions):null;
  return Object.freeze({
-  schema:'cube-mobile-local-cube-bank-table-smoke/2',
+  schema:custom?'cube-mobile-local-cube-bank-table-smoke/3':'cube-mobile-local-cube-bank-table-smoke/2',
   hashMatchedUserDeclaration:true,
   metadataDeclarationStatus:metadata.status,
   declaredPointerSlots:table.declaredBankCount,
@@ -77,12 +95,21 @@ export async function inspectLocalCubeBankSmoke(argv){
     rawTargetInvalidSkips:targets.invalidTargets,
     rawTargetDuplicateSkips:targets.duplicateTargets
   }:{}),
+  ...(custom?{
+    customMapSelection:{bankIndex:custom.bankIndex,mapIndex:custom.mapIndex,
+      explicitMapCount:custom.mapCount},
+    customMapWidth:custom.layout.width,customMapHeight:custom.layout.height,
+    customMapRawCellCount:custom.layout.width*custom.layout.height,
+    customMapMetadataFormatRecognized:custom.metadataFormatRecognized,
+    customEventCounts:events.counts,customWarpOutsideMapCount:events.warps.filter(w=>w.outsideDeclaredMap).length,
+    customWarpSpecialTargetCount:events.warps.filter(w=>w.specialTarget).length
+  }:{}),
   readOnly:true,romModified:false,romExported:false,
   independentlyAuthenticated:false,cubeLayoutAuthenticated:false,
   safeSemanticEditingVerified:false,romSaveReopenVerified:false,
   emulatorVerified:false,androidHardwareVerified:false,
   independentParityEvidence:false,
-  warning:'Only user-SHA-matched metadata-declared raw pointer evidence. Optional nested raw windows do not decode CUBE maps or establish strict parity.'
+  warning:'User-SHA-matched, metadata-declared evidence only. Optional explicit custom map structural reads do not authenticate CUBE ROMs, verify gameplay, or establish strict parity.'
  });
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
