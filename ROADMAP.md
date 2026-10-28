@@ -1,3 +1,8 @@
+## Checkpoint — mobile raw HMA bank target windows (28 October 2026)
+- [x] Inspect bounded four-word second-hop samples at metadata-declared raw bank pointer targets; reject overlap, truncation, invalid and ambiguous sources without inferring maps.
+- [x] Add touchscreen source/candidate hex navigation with full sample revalidation, reset invalidation, synthetic UI checks and standalone offline support.
+- [ ] Authenticate exact CUBE layout, implement real map decoding and test save/reopen, emulator and Android hardware before parity credit. See [mobile target windows](docs/MOBILE_HMA_BANK_TARGET_WINDOWS.md).
+
 ## Checkpoint — opt-in local CUBE bank-table smoke (28 October 2026)
 - [x] SHA-256-match a user-supplied local ROM before inspecting an unambiguous imported CUBHMA map-bank TOML declaration.
 - [x] Report aggregate declared raw pointer slot diagnostics only, without ROM bytes, paths, offsets or pointer values; synthetic CLI and immutability tests.
