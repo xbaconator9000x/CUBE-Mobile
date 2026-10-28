@@ -40,7 +40,14 @@ public final class MainActivity extends Activity {
         WebView.setWebContentsDebuggingEnabled(false);
         webView = new WebView(this);
         setContentView(webView);
-        nativeExport = new NativeExport(this, webView, importedDocuments::contains);
+        nativeExport = new NativeExport(this, webView, chosen -> {
+            if (importedDocuments.contains(chosen)) return true;
+            for (Uri imported : importedDocuments) {
+                if (SafDocumentIdentity.aliases(imported.toString(), chosen.toString()))
+                    return true;
+            }
+            return false;
+        });
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
