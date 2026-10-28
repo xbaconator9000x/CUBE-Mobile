@@ -7,6 +7,7 @@ import {inspectHmaCubeMapEventWarps} from './hma-cube-map-events.js';
 import {previewHmaCubeWarpBatch,verifyHmaCubeWarpBatchDryRun} from './hma-cube-warp-batch.js';
 import {previewHmaCubeEventPositionBatch,verifyHmaCubeEventPositionBatchDryRun} from './hma-cube-event-batch.js';
 import {verifyHmaCubeCombinedTransaction} from './hma-cube-combined-transaction.js';
+import {auditHmaCubeRawPlacements} from './hma-cube-raw-placement-audit.js';
 
 const warpFields=['x','y','elevation','warpId','targetMap','targetBank'];
 const positionFields=['x','y','elevation'];
@@ -148,9 +149,15 @@ export function bindHmaCubeBatchEditors({getContext,getSelectedCell,safeRun}){
  });
  on('cube-batch-warp-preview',()=>{
   const {ctx,params}=options('warp'),r=previewHmaCubeWarpBatch(ctx.rom,ctx.summary,params);
+  const raw=auditHmaCubeRawPlacements(ctx.rom,ctx.summary,{
+   ...params,placements:r.changes.map(c=>({kind:'warps',index:c.warpIndex,
+    x:c.after.x,y:c.after.y}))
+  });
   status('warp','Atomic preview: '+r.changedRecords+' records, '+r.changedBytes+
    ' bytes; topology changed: '+r.topologyChanged+'; re-decode: '+r.combinedReDecodeVerified+
-   '. No ownership proof, ROM write or emulator acceptance.');
+   '. Raw high bits nonzero: '+raw.nonzeroRawHighBits+
+   '; source co-locations: '+raw.sourceColocations+
+   '. Raw warnings are NOT walkability; no ROM writes.');
  });
  on('cube-batch-warp-verify',()=>{
   const {ctx,params}=options('warp'),r=verifyHmaCubeWarpBatchDryRun(ctx.rom,ctx.summary,params);
@@ -192,9 +199,16 @@ export function bindHmaCubeBatchEditors({getContext,getSelectedCell,safeRun}){
  });
  on('cube-batch-event-preview',()=>{
   const {ctx,params}=options('event'),r=previewHmaCubeEventPositionBatch(ctx.rom,ctx.summary,params);
+  const raw=auditHmaCubeRawPlacements(ctx.rom,ctx.summary,{
+   ...params,placements:r.changes.map(c=>({kind:c.kind,index:c.index,
+    x:c.after.x,y:c.after.y}))
+  });
   status('event','Atomic preview: '+r.changedRecords+' records, '+r.changedBytes+
    ' bytes, '+r.colocatedDestinations.length+' shared destinations; re-decode: '+
-   r.combinedReDecodeVerified+'. Script pointers preserved; no ROM writes.');
+   r.combinedReDecodeVerified+'; raw high bits nonzero: '+raw.nonzeroRawHighBits+
+   '; source co-locations: '+raw.sourceColocations+
+   '; proposed co-locations: '+raw.proposedColocations+
+   '. Script pointers preserved; no walkability inference or ROM writes.');
  });
  on('cube-batch-event-verify',()=>{
   const {ctx,params}=options('event'),r=verifyHmaCubeEventPositionBatchDryRun(ctx.rom,ctx.summary,params);
