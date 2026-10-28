@@ -119,6 +119,9 @@
   </div>
   <div class="input-row" aria-label="Read-only CUBE multi-cell proposal queue">
     <button type="button" id="cube-map-batch-add" class="subtle-button" disabled>Queue selected cell (preview only)</button>
+    <div class="input-wrap"><label for="cube-map-brush-width">Brush width (1–8)</label><input id="cube-map-brush-width" type="number" min="1" max="8" value="2"></div>
+    <div class="input-wrap"><label for="cube-map-brush-height">Brush height (1–8)</label><input id="cube-map-brush-height" type="number" min="1" max="8" value="2"></div>
+    <button type="button" id="cube-map-batch-brush" class="subtle-button" disabled>Queue rectangle from selected cell</button>
     <button type="button" id="cube-map-batch-preview" class="subtle-button" disabled>Preview queued changes</button>
     <button type="button" id="cube-map-batch-clear" class="subtle-button" disabled>Clear queue</button>
   </div>
