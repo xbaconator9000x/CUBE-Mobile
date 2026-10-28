@@ -117,6 +117,13 @@
     <div class="input-wrap"><label for="cube-map-proposed-high">Proposed raw collision/elevation (0–63)</label><input id="cube-map-proposed-high" type="number" min="0" max="63" value="0"></div>
     <button type="button" id="cube-map-cell-preview" class="subtle-button" disabled>Preview selected CUBE cell (no save)</button>
   </div>
+  <div class="input-row" aria-label="Read-only CUBE multi-cell proposal queue">
+    <button type="button" id="cube-map-batch-add" class="subtle-button" disabled>Queue selected cell (preview only)</button>
+    <button type="button" id="cube-map-batch-preview" class="subtle-button" disabled>Preview queued changes</button>
+    <button type="button" id="cube-map-batch-clear" class="subtle-button" disabled>Clear queue</button>
+  </div>
+  <output id="cube-map-batch-status" class="palette-note" aria-live="polite">No queued CUBE changes. ROM remains unchanged.</output>
+  <div id="cube-map-batch-list" class="anchor-list" aria-label="Read-only queued CUBE cell proposals"></div>
   <output id="cube-map-preview-status" class="palette-note" aria-live="polite">Select a rendered cell to preview a proposed change. No ROM writes.</output>
   <div style="overflow-x:auto"><canvas id="cube-map-preview-after" hidden aria-label="Read-only proposed CUBE metatile canvas" style="max-width:none;image-rendering:pixelated"></canvas></div>
   <div class="input-row"><button type="button" id="cube-map-warps" class="subtle-button" disabled>Inspect CUBE custom event/warp records (read only)</button></div>
