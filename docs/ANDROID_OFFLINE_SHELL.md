@@ -27,3 +27,7 @@ A cancelled WebView export does not imply that the external Android document pic
 ## Nonblocking Android SAF readback verification (29 October 2026)
 
 The Android export host now streams the final document readback and SHA-256 verification on a dedicated worker rather than the WebView/UI callback thread. It accepts only an exact-length, matching digest; truncated, expanded, corrupted or unreadable documents fail closed. A cancelled/reloaded export invalidates the worker result, and activity destruction shuts the worker down. The native picker ticket remains independent of this readback lifecycle. Pure Java tests exercise exact, corrupt, truncated, expanded, empty and failed-provider streams. This is not physical device or real SAF provider acceptance and does not enable CUBE semantic ROM writes.
+
+## Per-chunk source Blob integrity (29 October 2026)
+
+Before exporting each bounded 48 KiB Blob slice, the Android-only bridge computes its WebCrypto SHA-256. The native host independently hashes the decoded bytes and refuses mismatches before writing that chunk. The native end-to-end reopened-document digest still verifies the saved result. This avoids a full-ROM JS hash allocation while checking both source-to-native transfer and native-to-provider readback. Synthetic JS and pure Java tests cover matching and corrupted chunks. This is not proof of a trustworthy source ROM, provider atomicity, CUBE semantic writes or physical-device acceptance.

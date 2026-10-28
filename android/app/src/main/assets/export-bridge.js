@@ -59,6 +59,11 @@
     }
     const current = blob;
     const part = current.slice(offset, Math.min(current.size, offset + CHUNK));
+    // Hash the original Blob slice independently of the native stream.
+    // Only one <=48 KiB slice is buffered; no full-ROM digest allocation.
+    const digest = await window.crypto.subtle.digest('SHA-256', await part.arrayBuffer());
+    const sha256 = Array.from(new Uint8Array(digest), n =>
+      n.toString(16).padStart(2, '0')).join('');
     const base64 = await new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result).split(',')[1]);
@@ -68,7 +73,7 @@
     if (blob !== current || session !== active || waiting) return;
     chunkLength = part.size;
     waiting = true;
-    post({kind: 'chunk', session: active, index, data: base64});
+    post({kind: 'chunk', session: active, index, data: base64, sha256});
   }
   const fail = id => {
     if (id !== session) return;

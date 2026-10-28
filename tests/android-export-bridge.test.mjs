@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
+import {createHash} from 'node:crypto';
 
 let syntheticNonce = 0;
 const script = readFileSync(new URL('../android/app/src/main/assets/export-bridge.js', import.meta.url), 'utf8');
@@ -20,11 +21,17 @@ function harness(blob) {
     }
   }
   const window = {
-    crypto: {getRandomValues: words => {
-      words[0] = ++syntheticNonce;
-      words[1] = (syntheticNonce * 7919) >>> 0;
-      return words;
-    }},
+    crypto: {
+      getRandomValues: words => {
+        words[0] = ++syntheticNonce;
+        words[1] = (syntheticNonce * 7919) >>> 0;
+        return words;
+      },
+      subtle: {digest: async (algorithm, data) => {
+        assert.equal(algorithm, 'SHA-256');
+        return Uint8Array.from(createHash('sha256').update(Buffer.from(data)).digest()).buffer;
+      }}
+    },
     CubeExport: {postMessage: value => messages.push(JSON.parse(value))}
   };
   let cancelButton;
@@ -83,6 +90,8 @@ test('Android export bridge streams 48KiB chunks only after ACK and preserves by
     const item = chunks[index];
     const bytes = Buffer.from(item.data, 'base64');
     assert.ok(bytes.length > 0 && bytes.length <= 48 * 1024);
+    assert.equal(item.sha256, createHash('sha256').update(bytes).digest('hex'));
+    assert.match(item.sha256, /^[0-9a-f]{64}$/);
     received.push(bytes);
     h.window.__cubeNativeAck(h.messages[0].session, index);
   }
