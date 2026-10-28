@@ -1,0 +1,7 @@
+# CUBE custom event group and raw warp inspection
+
+Pinned source: [CUBHMA MapModel.cs](https://github.com/kcradi/CUBHMA/blob/3044393183e01af2ae1e907fb37e4a75eda6a8dc/src/HexManiac.Core/Models/Map/MapModel.cs) and [cube_emerald.toml](https://github.com/kcradi/CUBHMA/blob/3044393183e01af2ae1e907fb37e4a75eda6a8dc/src/HexManiac.Core/ViewModels/QuickEditItems/cube_emerald.toml).
+
+The new inspectHmaCubeMapEventWarps function uses an explicitly selected, bounded CUBE custom map from inspectHmaCubeMapEntry. It reads the 20-byte event group and validates all four pointer/count arrays (24-byte objects, 8-byte warps, 16-byte script triggers and 12-byte signposts) for bounds, alignment and overlapping allocations. Zero-count pointers are not followed. It returns raw warp coordinates, elevation, warp ID and target bank/map, flags out-of-declared-blockmap coordinates and identifies unresolved 0xFF target fields. It does not follow destination maps, interpret warp reachability, decode scripts or modify the ROM.
+
+**Evidence boundaries:** the metadata format is recognized from pinned upstream, but a genuine CUBE ROM and its matching metadata have not been independently authenticated. A manually supplied nested map count may be wrong. Collision high bits are not portable walkability semantics. All returned ROM authentication, layout acceptance and write-authorization flags remain false. Tests use synthetic ROM bytes and the pinned metadata excerpt only; genuine ROM roundtrip, emulator and Android acceptance remain outstanding.
