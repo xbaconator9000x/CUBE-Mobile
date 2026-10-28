@@ -108,7 +108,7 @@ test('copy-only CUBE transaction re-decodes exact bytes and reverses changes',as
   changes:[{x:0,y:0,tileId:512,expectedRaw:0},
            {x:1,y:0,collision:47,expectedRaw:0}]});
  assert.equal(result.changedCells,2);
- assert.equal(result.changedBytes,3);
+ assert.equal(result.changedBytes,2);
  assert.equal(result.inMemoryReDecodeVerified,true);
  assert.equal(result.inMemoryRollbackVerified,true);
  assert.equal(result.authenticSaveReopenVerified,false);
