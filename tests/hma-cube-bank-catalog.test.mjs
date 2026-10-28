@@ -40,7 +40,7 @@ test('CUBE catalog refuses unbounded counts, invalid bank, and stale map pointer
   assert.throws(()=>inspectHmaCubeBankCatalog(bytes,summary,{bankIndex:0,mapCount:count}),RangeError);
  assert.throws(()=>inspectHmaCubeBankCatalog(bytes,summary,{bankIndex:999,mapCount:1}),RangeError);
  const first=inspectHmaCubeBankCatalog(bytes,summary,{bankIndex:0,mapCount:2});
- bytes[0x104]=0;
+ u32(bytes,0x104,0);
  const second=inspectHmaCubeBankCatalog(bytes,summary,{bankIndex:0,mapCount:2});
  assert.notDeepEqual(first,second);
  assert.equal(second.rows[1].status,'invalid-or-unsupported');
