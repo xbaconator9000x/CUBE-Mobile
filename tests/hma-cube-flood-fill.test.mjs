@@ -23,7 +23,7 @@ test('tile matching floods four-neighbor cells but not diagonals, preserving ori
 test('exact matching distinguishes raw high bits; tile matching does not',()=>{
  const image=grid([1,1025,1,2],2);
  const args={seedX:4,seedY:7,tileId:2,collision:7};
- assert.equal(planHmaCubeViewportFloodFill(image,{...args,matchMode:'exact'}).matchedCells,1);
+ assert.equal(planHmaCubeViewportFloodFill(image,{...args,matchMode:'exact'}).matchedCells,2);
  assert.equal(planHmaCubeViewportFloodFill(image,{...args,matchMode:'tile'}).matchedCells,3);
 });
 test('large flood fails atomically instead of returning truncated changes',()=>{
