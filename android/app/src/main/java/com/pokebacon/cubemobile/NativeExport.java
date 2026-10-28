@@ -10,6 +10,9 @@ import androidx.webkit.WebMessageCompat;
 import androidx.webkit.WebViewCompat;
 import androidx.webkit.WebViewFeature;
 import java.io.InputStream;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.io.OutputStream;
 import java.io.IOException;
 import java.security.MessageDigest;
@@ -42,6 +45,11 @@ final class NativeExport {
     private Uri destination;
     private OutputStream output;
     private MessageDigest writingDigest;
+    // SAF providers can take seconds to read back large documents. Never
+    // hash up to 128 MiB on the Android UI/WebView message thread.
+    private final ExecutorService readbackWorker = Executors.newSingleThreadExecutor();
+    private Future<?> readbackTask;
+    private boolean verifying;
 
     NativeExport(Activity activity, WebView webView,
         Predicate<Uri> isImportedDocument) {
@@ -198,37 +206,59 @@ final class NativeExport {
     }
 
     private void finish() throws Exception {
-        if (!pending || output == null || written != expected)
+        if (!pending || output == null || written != expected || verifying)
             throw new IOException("Incomplete export");
         output.flush();
         output.close();
         output = null;
-        MessageDigest verified = MessageDigest.getInstance("SHA-256");
-        long count = 0;
-        try (InputStream input = activity.getContentResolver().openInputStream(destination)) {
-            if (input == null) throw new IOException("Cannot reopen export");
-            byte[] buffer = new byte[32768];
-            int read;
-            while ((read = input.read(buffer)) != -1) {
-                count += read;
-                if (count > expected) throw new IOException("Export length changed");
-                verified.update(buffer, 0, read);
-            }
+        verifying = true;
+        final Uri verifiedUri = destination;
+        final String verifiedSession = session;
+        final long verifiedLength = expected;
+        final byte[] expectedDigest = writingDigest.digest();
+        try {
+            readbackTask = readbackWorker.submit(() -> {
+                boolean valid = false;
+                try (InputStream input = activity.getContentResolver()
+                    .openInputStream(verifiedUri)) {
+                    valid = ExportReadback.verify(input, verifiedLength, expectedDigest);
+                } catch (Exception ignored) {
+                    // Refuse rather than claiming a provider's failed reopen passed.
+                }
+                final boolean passed = valid;
+                activity.runOnUiThread(() -> {
+                    // An abort, reload or newer session invalidates old results.
+                    if (!pending || !verifying || session == null ||
+                        !session.equals(verifiedSession) || destination == null ||
+                        !destination.equals(verifiedUri)) return;
+                    readbackTask = null;
+                    verifying = false;
+                    if (!passed) {
+                        abort("Export reopen verification failed");
+                        return;
+                    }
+                    destination = null;
+                    pending = false;
+                    writingDigest = null;
+                    session = null;
+                    callback("__cubeNativeComplete", verifiedSession);
+                    Toast.makeText(activity, "Export saved and verified",
+                        Toast.LENGTH_SHORT).show();
+                });
+            });
+        } catch (RuntimeException rejected) {
+            verifying = false;
+            throw new IOException("Unable to schedule export verification", rejected);
         }
-        if (count != expected ||
-            !MessageDigest.isEqual(writingDigest.digest(), verified.digest()))
-            throw new IOException("Export reopen verification failed");
-        destination = null;
-        pending = false;
-        writingDigest = null;
-        String completed = session;
-        session = null;
-        callback("__cubeNativeComplete", completed);
-        Toast.makeText(activity, "Export saved and verified", Toast.LENGTH_SHORT).show();
     }
 
     void abort(String message) {
         String cancelled = session;
+        verifying = false;
+        if (readbackTask != null) {
+            readbackTask.cancel(true);
+            readbackTask = null;
+        }
         try { if (output != null) output.close(); } catch (IOException ignored) { }
         output = null;
         boolean hadDestination = destination != null;
@@ -252,6 +282,11 @@ final class NativeExport {
     }
 
     void close() {
-        if (pending || output != null) abort("Export cancelled");
+        if (pending || output != null || verifying) abort("Export cancelled");
+    }
+
+    void dispose() {
+        close();
+        readbackWorker.shutdownNow();
     }
 }
