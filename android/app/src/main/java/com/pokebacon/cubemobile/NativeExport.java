@@ -61,6 +61,7 @@ final class NativeExport {
                         case "start": start(data); break;
                         case "chunk": chunk(data); break;
                         case "finish": finish(); break;
+                        case "abort": abort("Export cancelled; partial document removed"); break;
                         default: break;
                     }
                 } catch (Exception failure) {
