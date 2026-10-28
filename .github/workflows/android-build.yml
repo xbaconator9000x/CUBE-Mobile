@@ -38,9 +38,9 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
-      - name: Compile offline Android shell
+      - name: Compile Android shell and run native picker lifecycle unit tests
         working-directory: android
-        run: gradle --no-daemon --stacktrace :app:assembleDebug
+        run: gradle --no-daemon --stacktrace :app:assembleDebug :app:testDebugUnitTest
       - name: Inspect APK asset and ROM safety
         run: |
           APK=$(find android/app/build/outputs/apk/debug -name '*.apk' -print -quit)
