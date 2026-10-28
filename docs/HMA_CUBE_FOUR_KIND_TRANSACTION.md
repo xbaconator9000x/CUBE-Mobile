@@ -18,3 +18,8 @@ This checkpoint extends the pinned CUBHMA `MapModel.cs` raw CUBE connection form
 The fixture is synthetic and is **not** independent proof of compatibility with an authenticated CUBE Emerald ROM/TOML build. No copyrighted ROMs are stored. Full ROM identity, global ownership, save/reopen, emulator and Android-device acceptance remain unresolved; strict verified parity remains 0/30.
 
 This checkpoint does not itself change the 286-unit engineering estimate. Proportional completion should be reassessed alongside other substantial source-grounded work, not inflated by the number of tests or commits.
+
+
+## Script-reference transaction extension (2026-10-29)
+
+The combined copy-only rehearsal accepts `scripts` (1–32 bounded proposals) in addition to cells, warps, events and connections. Each pointer is copied from an existing same-map script-bearing event, stale-checked, and validated against the CUBHMA event record decoder. Hidden-item signpost unions are never treated as script pointers. A shared byte-claim registry rejects overlaps across all five kinds. The ownership-impact audit now counts changed script-pointer bytes as `script-reference`; this is **not** global pointer ownership or authorization to export a modified ROM. Synthetic fixture tests prove mixed event-position/script-pointer edits, stale-pointer rejection, full re-decode and in-memory rollback. Authentic ROM, emulator and device acceptance remain outstanding.
