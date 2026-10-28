@@ -17,12 +17,13 @@ import {renderHmaCubeMapViewport} from '../src/hma-cube-map-render.js';
 
 const SHA=/^[0-9a-f]{64}$/i;
 export function parseLocalCubeBankSmokeArgs(argv){
- if(!Array.isArray(argv)||argv.length<6||argv.length>16||argv.length%2!==0)
+ if(!Array.isArray(argv)||argv.length<6||argv.length>26||argv.length%2!==0)
   throw new RangeError('Usage: --rom <local.gba> --metadata <local.toml> --expected-sha256 <64 hex>');
  const options={};
  for(let i=0;i<argv.length;i+=2){
   const key=argv[i],value=argv[i+1];
-  if(!['--rom','--metadata','--expected-sha256','--target-words','--bank-index','--map-index','--map-count','--render-map'].includes(key)||
+  if(!['--rom','--metadata','--expected-sha256','--target-words','--bank-index','--map-index','--map-count','--render-map','--expected-render-sha256',
+      '--viewport-x','--viewport-y','--viewport-width','--viewport-height'].includes(key)||
      Object.hasOwn(options,key)||typeof value!=='string'||!value)
     throw new RangeError('Invalid local smoke arguments');
   options[key]=value;
@@ -34,6 +35,23 @@ export function parseLocalCubeBankSmokeArgs(argv){
   throw new RangeError('ROM, metadata and separately supplied exact SHA-256 are required');
  if(options['--render-map']!==undefined&&options['--render-map']!=='1')
   throw new RangeError('Use --render-map 1 for a bounded local render check');
+ const viewKeys=['--viewport-x','--viewport-y','--viewport-width','--viewport-height'];
+ if(options['--render-map']===undefined&&
+    (options['--expected-render-sha256']!==undefined||
+     viewKeys.some(key=>options[key]!==undefined)))
+  throw new RangeError('Viewport and reference require --render-map 1');
+ if(options['--expected-render-sha256']!==undefined&&
+    !SHA.test(options['--expected-render-sha256']))
+  throw new RangeError('Expected render reference must be a SHA-256 digest');
+ for(const key of viewKeys){
+  if(options[key]===undefined)continue;
+  if(!/^(?:0|[1-9][0-9]{0,3})$/.test(options[key]))
+   throw new RangeError('Invalid bounded viewport coordinate or dimension');
+  const n=Number(options[key]);
+  if(n>(key.endsWith('width')||key.endsWith('height')?32:1023)||
+     ((key.endsWith('width')||key.endsWith('height'))&&n<1))
+   throw new RangeError('Viewport exceeds 32-cell dimension or map coordinate budget');
+ }
  const keys=['--bank-index','--map-index','--map-count'];
  const present=keys.filter(k=>options[k]!==undefined);
  if(options['--render-map']!==undefined&&present.length!==3)
@@ -48,6 +66,18 @@ export function parseLocalCubeBankSmokeArgs(argv){
    throw new RangeError('Custom map selection exceeds bounded limits');
  }
  return options;
+}
+/** Domain-separated RGBA fingerprint; caller supplies independently obtained reference. */
+export function fingerprintHmaCubeRenderedViewport(image){
+ if(!image||!Number.isSafeInteger(image.width)||!Number.isSafeInteger(image.height)||
+    image.width<1||image.height<1||image.width>512||image.height>512||
+    !(image.pixels instanceof Uint8Array || image.pixels instanceof Uint8ClampedArray)||
+    image.pixels.length!==image.width*image.height*4)
+  throw new RangeError('Expected a bounded RGBA viewport');
+ const dims=Buffer.alloc(8);
+ dims.writeUInt32LE(image.width,0);dims.writeUInt32LE(image.height,4);
+ return createHash('sha256').update('cube-mobile-rgba-v1\\0')
+  .update(dims).update(image.pixels).digest('hex');
 }
 async function boundedRead(path,max){
  const before=await stat(path);
@@ -81,7 +111,14 @@ export async function inspectLocalCubeBankSmoke(argv){
  const events=customOptions?inspectHmaCubeMapEventWarps(reader,metadata,customOptions):null;
  const render=args['--render-map']===undefined?null:
    renderHmaCubeMapViewport(reader,metadata,{...customOptions,
-     x:0,y:0,viewportWidth:10,viewportHeight:8});
+     x:Number(args['--viewport-x']??0),
+     y:Number(args['--viewport-y']??0),
+     viewportWidth:Number(args['--viewport-width']??10),
+     viewportHeight:Number(args['--viewport-height']??8)});
+ const expectedRender=args['--expected-render-sha256'];
+ if(render&&expectedRender!==undefined&&
+    fingerprintHmaCubeRenderedViewport(render)!==expectedRender.toLowerCase())
+  throw new RangeError('CUBE render differs from supplied RGBA reference');
  return Object.freeze({
   schema:custom?'cube-mobile-local-cube-bank-table-smoke/3':'cube-mobile-local-cube-bank-table-smoke/2',
   hashMatchedUserDeclaration:true,
@@ -117,6 +154,9 @@ export async function inspectLocalCubeBankSmoke(argv){
     customRenderedMetatiles:render.columns*render.rows,
     customRenderedPixelCount:render.width*render.height,
     customRenderSupportedSubsetOnly:true,
+    customRenderReferenceCompared:expectedRender!==undefined,
+    customRenderReferenceMatched:expectedRender===undefined?null:true,
+    customRenderReferenceIndependent:false,
     customRenderedOutputExported:false
   }:{}),
   readOnly:true,romModified:false,romExported:false,
@@ -124,7 +164,7 @@ export async function inspectLocalCubeBankSmoke(argv){
   safeSemanticEditingVerified:false,romSaveReopenVerified:false,
   emulatorVerified:false,androidHardwareVerified:false,
   independentParityEvidence:false,
-  warning:'User-SHA-matched, metadata-declared evidence only. Optional explicit custom map structural reads do not authenticate CUBE ROMs, verify gameplay, or establish strict parity.'
+  warning:'User-SHA-matched metadata and optional RGBA reference comparisons are not independently authenticated. They do not verify gameplay, device compatibility or strict parity.'
  });
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
