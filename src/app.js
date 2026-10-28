@@ -45,12 +45,13 @@ import {inspectHmaDeclaredBankPointerTable} from './hma-map-bank-declared-table.
 import {inspectHmaDeclaredBankTargetWindows} from './hma-map-bank-target-windows.js';
 import {inspectHmaMapBankAnchorSources} from './hma-map-bank-metadata.js';
 import {inspectHmaCubeMapEntry} from './hma-cube-map-discovery.js';
+import {inspectHmaCubeMapEventWarps} from './hma-cube-map-events.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let pcsReference=null,pcsReferenceName='';
 let fingerprintResult=null,fingerprintAbort=null;
-let metadataFingerprints=[],metadataImportSerial=0,mapBankMetadataReport=null,mapBankRawPointerEvidence=null,mapBankRawWindowEvidence=null,mapBankDeclaredEvidence=null,mapBankTargetEvidence=null,mapBankCustomSummary=null,cubeMapEvidence=null;
+let metadataFingerprints=[],metadataImportSerial=0,mapBankMetadataReport=null,mapBankRawPointerEvidence=null,mapBankRawWindowEvidence=null,mapBankDeclaredEvidence=null,mapBankTargetEvidence=null,mapBankCustomSummary=null,cubeMapEvidence=null,cubeWarpEvidence=null;
 let inspectedWarpMap=null,selectedWarpPreview=null,selectedEventPreview=null,inspectedEventMap=null,inspectedMapAtlas=null,atlasBatchStart=0,atlasCoordinateBatchStart=0,atlasScriptAliasStart=0,atlasScriptCrossPageStart=0,atlasIncomingStart=0,atlasIncomingTarget=null;
 let activeRenderedMap=null,selectedRenderedHit=null;
 let mapReviewQueue=[],mapReviewRom=null,lastMapPreviews={cell:null,warp:null,event:null};
@@ -410,7 +411,7 @@ if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostn
 // engine, game fingerprints and pointer allocator have been ported and tested.
 let displayedAnchors=[], selectedInspection=null;
 const encodeHex=bytes=>Array.from(bytes).map((b,i)=>hex(b,2)+(i%16===15?'\n':' ')).join('').trim();
-function metadataReset(){metadataImportSerial++;metadataFingerprints=[];clearWarpInspection('Metadata reset; inspect warps again.');clearMapChangeReview();clearConnectionInspection('Metadata reset; inspect connections again.');clearMapGrid('Metadata reset; inspect map again.');metadata=[];metadataSources=[];mapBankMetadataReport=null;mapBankRawPointerEvidence=null;mapBankRawWindowEvidence=null;mapBankDeclaredEvidence=null;mapBankTargetEvidence=null;mapBankCustomSummary=null;cubeMapEvidence=null;metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
+function metadataReset(){metadataImportSerial++;metadataFingerprints=[];clearWarpInspection('Metadata reset; inspect warps again.');clearMapChangeReview();clearConnectionInspection('Metadata reset; inspect connections again.');clearMapGrid('Metadata reset; inspect map again.');metadata=[];metadataSources=[];mapBankMetadataReport=null;mapBankRawPointerEvidence=null;mapBankRawWindowEvidence=null;mapBankDeclaredEvidence=null;mapBankTargetEvidence=null;mapBankCustomSummary=null;cubeMapEvidence=null;cubeWarpEvidence=null;metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
 function snapshotMatchedWords(words=metadataMatchedWords){
   if(!model)return [];
   return words.map(word=>{
@@ -470,7 +471,7 @@ function metadataCommit(sources){
   metadataWordSnapshot=nextWordSnapshot;
   metadata=nextMetadata;metadataResolution=nextResolution;
   metadataSources=sources.map(({name})=>name);metadataLayoutKind=metadataCheck.layout.kind;
-  mapBankMetadataReport=nextMapBankReport;mapBankRawPointerEvidence=null;mapBankRawWindowEvidence=null;mapBankDeclaredEvidence=null;mapBankTargetEvidence=null;mapBankCustomSummary=nextMapBankCustomSummary;cubeMapEvidence=null;
+  mapBankMetadataReport=nextMapBankReport;mapBankRawPointerEvidence=null;mapBankRawWindowEvidence=null;mapBankDeclaredEvidence=null;mapBankTargetEvidence=null;mapBankCustomSummary=nextMapBankCustomSummary;cubeMapEvidence=null;cubeWarpEvidence=null;
   metadataFingerprints=nextFingerprints;
   clearWarpInspection('Metadata changed; re-inspect vanilla warps.');
   clearConnectionInspection('Metadata changed; re-inspect vanilla connections.');
@@ -895,9 +896,11 @@ function drawMapBankMetadataReport(){
 function drawCubeMapEvidence(){
   const status=$('cube-map-status'),details=$('cube-map-details');
   details.replaceChildren();
+  $('cube-map-warps').disabled=true;
   const snapshot=cubeMapEvidence;
   if(!snapshot){
     status.textContent='Select a CUBE bank/map and supply its explicit map count. The ROM and custom layout remain unverified.';
+    drawCubeWarpEvidence();
     return;
   }
   let fresh;
@@ -907,9 +910,12 @@ function drawCubeMapEvidence(){
       throw Error('CUBE map structure changed');
   }catch(_err){
     cubeMapEvidence=null;
+    cubeWarpEvidence=null;
     status.textContent='Custom map structure changed or expired. Inspect again before navigating.';
+    drawCubeWarpEvidence();
     return;
   }
+  $('cube-map-warps').disabled=false;
   const h=fresh.header,l=fresh.layout;
   status.textContent='CUBE custom-format candidate: bank '+fresh.bankIndex+
     ', map '+fresh.mapIndex+' · '+l.width+' × '+l.height+
@@ -972,6 +978,7 @@ function drawCubeMapEvidence(){
     }
     details.append(line);
   }
+  drawCubeWarpEvidence();
 }
 $('cube-map-inspect').addEventListener('click',()=>safeRun(()=>{
   ensureModel();
@@ -981,8 +988,70 @@ $('cube-map-inspect').addEventListener('click',()=>safeRun(()=>{
   if(!['cube-bank-index','cube-map-index','cube-map-count'].every(id=>/^[0-9]+$/.test($(id).value)))
     throw Error('Explicit integer bank/map indexes and map count required');
   const report=inspectHmaCubeMapEntry(model,mapBankCustomSummary,options);
-  cubeMapEvidence={options,report};
+  cubeMapEvidence={options,report};cubeWarpEvidence=null;
   drawCubeMapEvidence();
+}));
+
+
+function drawCubeWarpEvidence(){
+  const status=$('cube-warps-status'),list=$('cube-warps-list');
+  list.replaceChildren();
+  const snapshot=cubeWarpEvidence;
+  if(!snapshot){
+    status.textContent='No CUBE custom event arrays inspected. Select a map and inspect raw warps.';
+    return;
+  }
+  let fresh;
+  try{
+    if(!cubeMapEvidence||cubeMapEvidence.options!==snapshot.options)
+      throw Error('Selected CUBE map changed');
+    fresh=inspectHmaCubeMapEventWarps(ensureModel(),mapBankCustomSummary,snapshot.options);
+    if(JSON.stringify(fresh)!==JSON.stringify(snapshot.report))
+      throw Error('Event records changed');
+  }catch(_err){
+    cubeWarpEvidence=null;
+    status.textContent='CUBE event records changed or expired. Inspect again before navigation.';
+    return;
+  }
+  status.textContent='Event counts: '+fresh.counts.objects+' objects, '+fresh.counts.warps+
+    ' warps, '+fresh.counts.scripts+' triggers, '+fresh.counts.signposts+
+    ' signs. Raw records only; target map counts and gameplay access are unverified.';
+  if(fresh.eventsOffset===null)return;
+  const head=document.createElement('button');head.type='button';head.className='subtle-button';
+  head.textContent='Event group at 0x'+hex(fresh.eventsOffset);
+  head.addEventListener('click',()=>safeRun(()=>{
+    if(cubeWarpEvidence!==snapshot)throw Error('Event inspection expired');
+    const now=inspectHmaCubeMapEventWarps(ensureModel(),mapBankCustomSummary,snapshot.options);
+    if(JSON.stringify(now)!==JSON.stringify(snapshot.report))throw Error('Event group changed');
+    setPageForOffset(now.eventsOffset);gotoTab('hex');
+  }));
+  list.append(head);
+  for(const warp of fresh.warps){
+    const button=document.createElement('button');button.type='button';
+    button.className='subtle-button';
+    button.textContent='#'+warp.index+' ('+warp.x+','+warp.y+') → bank '+
+      warp.targetBank+', map '+warp.targetMap+', warp '+warp.warpId+
+      (warp.outsideDeclaredMap?' · outside map':'')+
+      (warp.specialTarget?' · special target':'');
+    button.addEventListener('click',()=>safeRun(()=>{
+      if(cubeWarpEvidence!==snapshot)throw Error('Event inspection expired');
+      const now=inspectHmaCubeMapEventWarps(ensureModel(),mapBankCustomSummary,snapshot.options);
+      if(JSON.stringify(now)!==JSON.stringify(snapshot.report))
+        throw Error('Raw warp record changed; inspect again');
+      setPageForOffset(now.warps[warp.index].offset);gotoTab('hex');
+    }));
+    list.append(button);
+  }
+}
+$('cube-map-warps').addEventListener('click',()=>safeRun(()=>{
+  if(!cubeMapEvidence)throw Error('Inspect a CUBE custom map first');
+  const options=cubeMapEvidence.options;
+  const map=inspectHmaCubeMapEntry(ensureModel(),mapBankCustomSummary,options);
+  if(JSON.stringify(map)!==JSON.stringify(cubeMapEvidence.report))
+    throw Error('Selected CUBE map changed; inspect again');
+  const report=inspectHmaCubeMapEventWarps(model,mapBankCustomSummary,options);
+  cubeWarpEvidence={options,report};
+  drawCubeWarpEvidence();
 }));
 
 function drawAnchors(){
