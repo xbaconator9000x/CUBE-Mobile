@@ -71,7 +71,10 @@
       "id": "scripts",
       "label": "Event script parsing and editing",
       "upstreamPath": "src/HexManiac.Core/Models/Code/ScriptParser.cs",
-      "status": "absent"
+      "status": "partial",
+      "localEvidence": [
+        "tests/hma-cube-script-retarget.test.mjs"
+      ]
     },
     {
       "id": "thumb",

@@ -9,6 +9,7 @@ import {previewHmaCubeConnectionBatch,verifyHmaCubeConnectionBatchDryRun} from '
 import {previewHmaCubeWarpBatch,verifyHmaCubeWarpBatchDryRun} from './hma-cube-warp-batch.js';
 import {previewHmaCubeEventPositionBatch,verifyHmaCubeEventPositionBatchDryRun} from './hma-cube-event-batch.js';
 import {verifyHmaCubeCombinedTransaction} from './hma-cube-combined-transaction.js';
+import {previewHmaCubeScriptRetargetBatch,verifyHmaCubeScriptRetargetDryRun} from './hma-cube-script-retarget.js';
 import {auditHmaCubeEditOwnershipImpact} from './hma-cube-edit-ownership-impact.js';
 import {auditHmaCubeRawPlacements} from './hma-cube-raw-placement-audit.js';
 
@@ -37,11 +38,16 @@ export function bindHmaCubeBatchEditors({getContext,getSelectedCell,safeRun}){
  let warpQueue=[],eventQueue=[],warpSelection=null,eventSelection=null;
  let connectionQueue=[],connectionSelection=null,connectionSnapshot=null,connectionBanks=null;
  let warpSnapshot=null,eventSnapshot=null,warpBanks=null,enabled=false;
+ let scriptQueue=[],scriptSnapshot=null,scriptSelection=null;
  const names=['warp','event'];
  function status(kind,text){$('cube-batch-'+kind+'-status').textContent=text;}
  function reset(){
   warpQueue=[];eventQueue=[];warpSelection=null;eventSelection=null;
   warpSnapshot=null;eventSnapshot=null;warpBanks=null;
+  scriptQueue=[];scriptSnapshot=null;scriptSelection=null;
+  $('cube-batch-script-list').replaceChildren();
+  for(const action of ['load','queue','preview','verify','clear'])$('cube-batch-script-'+action).disabled=true;
+  $('cube-batch-script-status').textContent='No script retargets queued.';
   connectionQueue=[];connectionSelection=null;connectionSnapshot=null;connectionBanks=null;
   $('cube-batch-connection-list').replaceChildren();
   for(const action of ['queue','preview','verify','clear','load'])
@@ -63,6 +69,7 @@ export function bindHmaCubeBatchEditors({getContext,getSelectedCell,safeRun}){
   reset();enabled=Boolean(value);
   for(const kind of names)$('cube-batch-'+kind+'-load').disabled=!enabled;
   $('cube-batch-connection-load').disabled=!enabled;
+  $('cube-batch-script-load').disabled=!enabled;
  }
  function current(snapshot){
   const ctx=getContext();
@@ -88,8 +95,8 @@ export function bindHmaCubeBatchEditors({getContext,getSelectedCell,safeRun}){
    ...(kind==='warp'?{targetBanks:warpBanks}:{})}};
  }
  function render(kind){
-  $('cube-batch-combined-verify').disabled=!(warpQueue.length||eventQueue.length||connectionQueue.length);
-  $('cube-batch-combined-ownership').disabled=!(warpQueue.length||eventQueue.length||connectionQueue.length);
+  $('cube-batch-combined-verify').disabled=!(warpQueue.length||eventQueue.length||connectionQueue.length||scriptQueue.length);
+  $('cube-batch-combined-ownership').disabled=!(warpQueue.length||eventQueue.length||connectionQueue.length||scriptQueue.length);
   $('cube-batch-combined-status').textContent='Queues changed; rerun cross-kind verification.';
   $('cube-batch-ownership-status').textContent='Queues changed; rerun ownership impact audit.';
   const queue=kind==='warp'?warpQueue:eventQueue;
@@ -232,8 +239,8 @@ export function bindHmaCubeBatchEditors({getContext,getSelectedCell,safeRun}){
  });
  on('cube-batch-event-clear',()=>{eventQueue=[];eventSnapshot=null;render('event');});
  function renderConnection(){
-  $('cube-batch-combined-verify').disabled=!(warpQueue.length||eventQueue.length||connectionQueue.length);
-  $('cube-batch-combined-ownership').disabled=!(warpQueue.length||eventQueue.length||connectionQueue.length);
+  $('cube-batch-combined-verify').disabled=!(warpQueue.length||eventQueue.length||connectionQueue.length||scriptQueue.length);
+  $('cube-batch-combined-ownership').disabled=!(warpQueue.length||eventQueue.length||connectionQueue.length||scriptQueue.length);
   $('cube-batch-combined-status').textContent='Queues changed; rerun four-kind verification.';
   $('cube-batch-ownership-status').textContent='Queues changed; rerun ownership impact audit.';
   const list=$('cube-batch-connection-list');list.replaceChildren();
@@ -323,16 +330,75 @@ export function bindHmaCubeBatchEditors({getContext,getSelectedCell,safeRun}){
  on('cube-batch-connection-clear',()=>{
   connectionQueue=[];connectionSnapshot=null;connectionBanks=null;renderConnection();
  });
+ function scriptStatus(message){$('cube-batch-script-status').textContent=message;}
+ function renderScript(){
+  const list=$('cube-batch-script-list');list.replaceChildren();
+  for(const action of ['preview','verify','clear'])$('cube-batch-script-'+action).disabled=!scriptQueue.length;
+  for(const c of scriptQueue){
+   const button=document.createElement('button');button.type='button';button.className='subtle-button';
+   button.textContent='Remove '+c.kind+' #'+c.index+' → '+c.targetKind+' #'+c.targetIndex;
+   button.addEventListener('click',()=>safeRun(()=>{
+    current(scriptSnapshot);scriptQueue=scriptQueue.filter(x=>x.kind!==c.kind||x.index!==c.index);
+    if(!scriptQueue.length)scriptSnapshot=null;renderScript();
+   }));list.append(button);
+  }
+  $('cube-batch-combined-verify').disabled=!(warpQueue.length||eventQueue.length||connectionQueue.length||scriptQueue.length);
+  $('cube-batch-combined-ownership').disabled=!(warpQueue.length||eventQueue.length||connectionQueue.length||scriptQueue.length);
+  $('cube-batch-combined-status').textContent='Queues changed; rerun combined rollback.';
+  $('cube-batch-ownership-status').textContent='Queues changed; rerun ownership impact.';
+  scriptStatus(scriptQueue.length+'/32 script references queued. Copy-only.');
+ }
+ on('cube-batch-script-load',()=>{
+  const ctx=getContext(),{fresh}=current(ctx?.snapshot);
+  const kind=$('cube-batch-script-kind').value;
+  if(!['objects','scripts','signposts'].includes(kind))throw RangeError('Unsupported script-reference kind');
+  const index=unsigned($('cube-batch-script-index').value,65535,'Script index');
+  const record=fresh.arrays[kind]?.[index];if(!record)throw RangeError('Script event outside array');
+  if(kind==='signposts'&&record.kind>=5)throw RangeError('Hidden-item signpost is not a script pointer');
+  const expectedRaw=kind==='signposts'?record.rawArgument:record.scriptPointer;
+  scriptSelection={snapshot:ctx.snapshot,kind,index,expectedRaw};
+  $('cube-batch-script-expected').textContent='Original pointer: 0x'+expectedRaw.toString(16).padStart(8,'0');
+  $('cube-batch-script-queue').disabled=false;
+ });
+ on('cube-batch-script-queue',()=>{
+  const s=scriptSelection;if(!s)throw Error('Load a script-bearing event first');
+  const {ctx}=current(s.snapshot);
+  if($('cube-batch-script-kind').value!==s.kind||
+   unsigned($('cube-batch-script-index').value,65535,'Script index')!==s.index)
+   throw Error('Source event selection changed; reload');
+  if(scriptQueue.length&&scriptSnapshot!==s.snapshot)throw Error('Script source changed; clear queue');
+  if(scriptQueue.length>=32||scriptQueue.some(c=>c.kind===s.kind&&c.index===s.index))
+   throw Error('Only 32 distinct script references');
+  const changes=[...scriptQueue,{kind:s.kind,index:s.index,expectedRaw:s.expectedRaw,
+   targetKind:$('cube-batch-script-target-kind').value,
+   targetIndex:unsigned($('cube-batch-script-target-index').value,65535,'Target index')}];
+  previewHmaCubeScriptRetargetBatch(ctx.rom,ctx.summary,{...s.snapshot.options,changes});
+  scriptQueue=changes;scriptSnapshot=s.snapshot;renderScript();
+ });
+ on('cube-batch-script-preview',()=>{
+  const {ctx}=current(scriptSnapshot);
+  const r=previewHmaCubeScriptRetargetBatch(ctx.rom,ctx.summary,{...scriptSnapshot.options,changes:scriptQueue});
+  scriptStatus('Preview: '+r.changedRecords+' pointers, '+r.changedBytes+' bytes; re-decode: '+
+   r.completeEventReDecodeVerified+'. No ROM writes.');
+ });
+ on('cube-batch-script-verify',()=>{
+  const {ctx}=current(scriptSnapshot);
+  const r=verifyHmaCubeScriptRetargetDryRun(ctx.rom,ctx.summary,{...scriptSnapshot.options,changes:scriptQueue});
+  scriptStatus('Copy-only rollback: '+r.inMemoryRollbackVerified+'; source preserved: '+r.sourceBytesPreserved);
+ });
+ on('cube-batch-script-clear',()=>{scriptQueue=[];scriptSnapshot=null;renderScript();});
  function combinedParams(){
   const ctx=getContext();
   const {fresh}=current(ctx?.snapshot);
-  if(!fresh||!(warpQueue.length||eventQueue.length||connectionQueue.length))
+  if(!fresh||!(warpQueue.length||eventQueue.length||connectionQueue.length||scriptQueue.length))
    throw Error('Queue a warp, event or connection change before combined rehearsal');
   if(warpQueue.length&&warpSnapshot!==ctx.snapshot)
    throw Error('Warp queue belongs to a different map inspection');
   if(eventQueue.length&&eventSnapshot!==ctx.snapshot)
    throw Error('Event queue belongs to a different map inspection');
-  if(connectionQueue.length&&connectionSnapshot!==ctx.snapshot)
+  if(scriptQueue.length&&scriptSnapshot!==ctx.snapshot)
+    throw Error('Script queue belongs to a different map inspection');
+   if(connectionQueue.length&&connectionSnapshot!==ctx.snapshot)
    throw Error('Connection queue belongs to a different map inspection');
   if(warpQueue.length&&connectionQueue.length&&
      JSON.stringify(warpBanks)!==JSON.stringify(connectionBanks))
@@ -346,7 +412,7 @@ export function bindHmaCubeBatchEditors({getContext,getSelectedCell,safeRun}){
    throw Error('Map-cell queue expired or belongs to another CUBE map; render again');
   return {ctx,params:{
    ...ctx.snapshot.options,cells,warps:warpQueue,events:eventQueue,
-   connections:connectionQueue,
+   connections:connectionQueue,scripts:scriptQueue,
    targetBanks:warpBanks??connectionBanks??[{bankIndex:ctx.snapshot.options.bankIndex,
     mapCount:ctx.snapshot.options.mapCount}],
    x:ctx.cellSnapshot?.x??0,y:ctx.cellSnapshot?.y??0,
@@ -358,7 +424,7 @@ export function bindHmaCubeBatchEditors({getContext,getSelectedCell,safeRun}){
   const r=verifyHmaCubeCombinedTransaction(ctx.rom,ctx.summary,params);
   $('cube-batch-combined-status').textContent='Combined copy-only transaction: '+
    r.cellChanges+' cells, '+r.warpChanges+' warps, '+r.eventChanges+
-   ' events, '+r.connectionChanges+' connections; '+r.changedBytes+' changed bytes; re-decode: '+r.combinedReDecodeVerified+
+   ' events, '+r.connectionChanges+' connections, '+r.scriptChanges+' script pointers; '+r.changedBytes+' changed bytes; re-decode: '+r.combinedReDecodeVerified+
    '; rollback: '+r.inMemoryRollbackVerified+'; source preserved: '+
    r.sourceBytesPreserved+'. No ROM file exported or write permission.';
  });

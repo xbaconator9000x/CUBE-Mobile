@@ -113,13 +113,15 @@
       "id": "scripts",
       "effortUnits": 10,
       "completion": {
-        "low": 0,
-        "mid": 0,
-        "high": 0
+        "low": 0.01,
+        "mid": 0.04,
+        "high": 0.08
       },
       "upstreamPath": "src/HexManiac.Core/Models/Code/ScriptParser.cs",
-      "localEvidence": [],
-      "rationale": "Full script parser/compiler/editor not evidenced."
+      "localEvidence": [
+        "tests/hma-cube-script-retarget.test.mjs"
+      ],
+      "rationale": "Bounded same-map CUBE event script-pointer retargeting and conditional map-script table inspection exist, including touch/offline queue and atomic copy-only rollback. This is a small fraction of full upstream ScriptParser/compiler/editor effort; no script bytecode edit, script execution validation, ROM export or emulator acceptance."
     },
     {
       "id": "thumb",
@@ -419,16 +421,16 @@
       "id": "transaction-platform",
       "effortUnits": 14,
       "completion": {
-        "low": 0.035,
-        "mid": 0.15,
-        "high": 0.26
+        "low": 0.04,
+        "mid": 0.155,
+        "high": 0.265
       },
       "sourceRefs": [
         "FULL_PORT_PLAN.md",
         "docs/HMA_CUBE_CELL_DRYRUN.md",
         "tests/hma-cube-combined-transaction.test.mjs"
       ],
-      "rationale": "Atomic copy-only cell/warp/event and cross-kind transaction rehearsal with full rollback now exists; no ownership-complete journal, persisted save/reopen or authenticated write authority. Changed-byte impact diagnostics now correlate staged edits with partial cross-bank structural ownership; no full alias proof or saved-ROM transaction."
+      "rationale": "Atomic copy-only cell/warp/event and cross-kind transaction rehearsal with full rollback now exists; no ownership-complete journal, persisted save/reopen or authenticated write authority. Changed-byte impact diagnostics now correlate staged edits with partial cross-bank structural ownership; no full alias proof or saved-ROM transaction. Five-kind script pointer changes now participate in shared byte-claim rollback; no global ownership proof."
     },
     {
       "id": "android-platform",
@@ -476,16 +478,16 @@
       "id": "mobile-ux-accessibility",
       "effortUnits": 8,
       "completion": {
-        "low": 0.095,
-        "mid": 0.2,
-        "high": 0.34
+        "low": 0.1,
+        "mid": 0.205,
+        "high": 0.345
       },
       "sourceRefs": [
         "src/app.js",
         "src/styles.css",
         "tests/mobile-cube-combined-transaction.test.mjs"
       ],
-      "rationale": "Touch-first navigation and atomic CUBE warp/event queues with combined rollback action; accessibility, Android packaging and device UX acceptance remain unverified. CUBE raw connection editing is now touch-accessible in modular/offline UI; no Android hardware acceptance."
+      "rationale": "Touch-first navigation and atomic CUBE warp/event queues with combined rollback action; accessibility, Android packaging and device UX acceptance remain unverified. CUBE raw connection editing is now touch-accessible in modular/offline UI; no Android hardware acceptance. Script-pointer retarget queue added to touch and offline UI; not device-validated."
     }
   ]
 }
