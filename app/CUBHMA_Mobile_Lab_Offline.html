@@ -158,6 +158,12 @@
   <div class="input-row"><button type="button" id="cube-map-catalog-scan" class="subtle-button" disabled>Discover CUBE bank maps (explicit count, max 128)</button></div>
   <output id="cube-map-catalog-status" class="palette-note" aria-live="polite">No CUBE bank catalog inspected. Supply a verified map count (max 128).</output>
   <div id="cube-map-catalog-list" class="anchor-list" aria-label="Read-only CUBE bank map catalog"></div>
+  <div class="input-row" aria-label="Read-only CUBE cross-bank ownership census">
+    <div class="input-wrap"><label for="cube-ownership-banks">Explicit CUBE bank:map-count pairs (up to 8 banks, 256 maps)</label><input id="cube-ownership-banks" type="text" value="0:1" placeholder="0:2,1:3" spellcheck="false"></div>
+    <button type="button" id="cube-ownership-scan" class="subtle-button" disabled>Audit cross-bank blockmap ownership</button>
+  </div>
+  <output id="cube-ownership-status" class="palette-note" aria-live="polite">No cross-bank census. Supply explicit bank:count pairs; results never authorize writes.</output>
+  <div id="cube-ownership-list" class="anchor-list" aria-label="Read-only CUBE cross-bank ownership overlaps"></div>
   <output id="cube-map-status" class="palette-note" aria-live="polite">Requires pinned CUBE custom map format and explicit nested map count; no ROM authenticity or write permissions.</output>
   <div id="cube-map-details" class="anchor-list" aria-label="Unverified custom CUBE map header, layout and raw cells"></div>
   <div class="input-row">
@@ -7187,6 +7193,82 @@ function traceHmaCubeConnectionDestination(source, summary, {
 
 return traceHmaCubeConnectionDestination;
 })();
+const auditHmaCubeCrossBankOwnership=(()=>{
+/**
+ * Bounded CUBE cross-bank map ownership census, read-only.
+ * Explicit counts only; partial census cannot prove exclusive ownership.
+ * Source: pinned CUBHMA MapModel.cs map pointers and custom layout.
+ */
+function asReader(source) {
+  if(source instanceof Uint8Array)return {length:source.length,read:i=>source[i]};
+  if(source&&Number.isSafeInteger(source.length)&&source.length>=0&&
+     typeof source.read==='function')return source;
+  throw new TypeError('Expected a bounded staged ROM reader');
+}
+function overlaps(a,b) {
+  return a.start < b.start+b.size && b.start < a.start+a.size;
+}
+function auditHmaCubeCrossBankOwnership(source,summary,{banks}={}) {
+  const rom=asReader(source);
+  if(!Array.isArray(banks)||banks.length<1||banks.length>8)
+    throw new RangeError('Provide 1–8 explicitly counted CUBE banks');
+  const seen=new Set();
+  let budget=0;
+  for(const entry of banks){
+    if(!entry||!Number.isSafeInteger(entry.bankIndex)||entry.bankIndex<0||
+       !Number.isSafeInteger(entry.mapCount)||entry.mapCount<1||entry.mapCount>128)
+      throw new RangeError('Each bank needs a nonnegative integer index and 1–128 maps');
+    if(seen.has(entry.bankIndex))throw new RangeError('Duplicate CUBE bank index');
+    seen.add(entry.bankIndex);budget+=entry.mapCount;
+    if(budget>256)throw new RangeError('CUBE census exceeds 256-map budget');
+  }
+  const maps=[],claims=[];
+  for(const {bankIndex,mapCount} of banks)for(let mapIndex=0;mapIndex<mapCount;mapIndex++){
+    const id=bankIndex+':'+mapIndex;
+    try{
+      const map=inspectHmaCubeMapEntry(rom,summary,{bankIndex,mapIndex,mapCount});
+      maps.push(Object.freeze({id,bankIndex,mapIndex,status:'decoded',
+        headerOffset:map.header.address,layoutOffset:map.layout.address,
+        blockmapOffset:map.layout.blockmapOffset,
+        blockmapBytes:map.layout.blockmapBytes,
+        width:map.layout.width,height:map.layout.height}));
+      for(const [kind,start,size] of [
+        ['header',map.header.address,28],
+        ['layout',map.layout.address,28],
+        ['blockmap',map.layout.blockmapOffset,map.layout.blockmapBytes]
+      ])claims.push({id,kind,start,size});
+    }catch(_error){
+      maps.push(Object.freeze({id,bankIndex,mapIndex,status:'invalid-or-unsupported'}));
+    }
+  }
+  const relationships=[];
+  for(let i=0;i<claims.length;i++)for(let j=i+1;j<claims.length;j++){
+    const a=claims[i],b=claims[j];
+    if(a.id===b.id||!overlaps(a,b))continue;
+    // Any overlap across different map records is important, even when
+    // the records use different semantic kinds.
+    relationships.push(Object.freeze({
+      first:a.id,second:b.id,firstKind:a.kind,secondKind:b.kind,
+      sameStart:a.start===b.start,
+      overlapStart:Math.max(a.start,b.start),
+      overlapBytes:Math.min(a.start+a.size,b.start+b.size)-Math.max(a.start,b.start)
+    }));
+  }
+  const invalid=maps.filter(m=>m.status!=='decoded').length;
+  const crossBank=relationships.filter(r=>r.first.split(':')[0]!==r.second.split(':')[0]);
+  return Object.freeze({
+    requestedBanks:Object.freeze(banks.map(x=>Object.freeze({...x}))),
+    requestedMaps:budget,decoded:budget-invalid,invalid,
+    maps:Object.freeze(maps),relationships:Object.freeze(relationships),
+    crossBankRelationshipCount:crossBank.length,
+    completeOwnershipProven:false,partialCoverage:true,
+    writeAuthorized:false,readOnly:true,romAuthenticated:false,
+    cubeLayoutAuthenticated:false
+  });
+}
+
+return auditHmaCubeCrossBankOwnership;
+})();
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let pcsReference=null,pcsReferenceName='';
@@ -7194,7 +7276,7 @@ let fingerprintResult=null,fingerprintAbort=null;
 let metadataFingerprints=[],metadataImportSerial=0,mapBankMetadataReport=null,mapBankRawPointerEvidence=null,mapBankRawWindowEvidence=null,mapBankDeclaredEvidence=null,mapBankTargetEvidence=null,mapBankCustomSummary=null,cubeMapEvidence=null,cubeWarpEvidence=null,cubeConnectionEvidence=null,cubeRenderEvidence=null,cubeRenderSelection=null,cubeCellPreview=null;
 let inspectedWarpMap=null,selectedWarpPreview=null,selectedEventPreview=null,inspectedEventMap=null,inspectedMapAtlas=null,atlasBatchStart=0,atlasCoordinateBatchStart=0,atlasScriptAliasStart=0,atlasScriptCrossPageStart=0,atlasIncomingStart=0,atlasIncomingTarget=null;
 let activeRenderedMap=null,selectedRenderedHit=null;
-let cubeCatalogEvidence=null,cubeWarpTraceEvidence=null,cubeConnectionTraceEvidence=null;
+let cubeCatalogEvidence=null,cubeWarpTraceEvidence=null,cubeConnectionTraceEvidence=null,cubeOwnershipEvidence=null;
 let mapReviewQueue=[],mapReviewRom=null,lastMapPreviews={cell:null,warp:null,event:null};
 let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
 const PER_PAGE=128;
@@ -8028,6 +8110,7 @@ function drawMapBankMetadataReport(){
   $('map-bank-target-scan').disabled=$('map-bank-declared-scan').disabled;
   $('cube-map-inspect').disabled=$('map-bank-declared-scan').disabled||report.status!=='custom-candidate';
   $('cube-map-catalog-scan').disabled=$('cube-map-inspect').disabled;
+  $('cube-ownership-scan').disabled=$('cube-map-inspect').disabled;
   drawMapBankRawPointerEvidence();
   drawMapBankRawWindowEvidence();
   drawMapBankDeclaredEvidence();
@@ -8040,6 +8123,7 @@ function clearCubeCatalog(message='No CUBE bank catalog inspected. Supply a veri
   $('cube-map-catalog-list').replaceChildren();
   $('cube-map-catalog-status').textContent=message;
   clearCubeWarpTrace();
+  clearCubeOwnership();
 }
 function clearCubeRenderedMap(message='CUBE render invalidated; render again.'){
   cubeRenderEvidence=null;cubeRenderSelection=null;cubeCellPreview=null;
@@ -8196,6 +8280,57 @@ for(const [id,axis,step] of [
     drawCubeMapEvidence();
   }));
 }
+function clearCubeOwnership(){
+  cubeOwnershipEvidence=null;
+  $('cube-ownership-list').replaceChildren();
+  $('cube-ownership-status').textContent=
+    'No cross-bank census. Supply explicit bank:count pairs; results never authorize writes.';
+}
+$('cube-ownership-scan').addEventListener('click',()=>safeRun(()=>{
+  ensureModel();
+  const input=$('cube-ownership-banks').value.trim();
+  if(!/^\d+:\d+(,\d+:\d+)*$/.test(input))
+    throw new RangeError('Enter explicit comma-separated bank:count pairs, e.g. 0:2,1:3');
+  const banks=input.split(',').map(part=>{
+    const [bankIndex,mapCount]=part.split(':').map(Number);
+    return {bankIndex,mapCount};
+  });
+  const report=auditHmaCubeCrossBankOwnership(model,mapBankCustomSummary,{banks});
+  const snapshot={rom:model,summary:mapBankCustomSummary,banks,report};
+  cubeOwnershipEvidence=snapshot;
+  const list=$('cube-ownership-list');list.replaceChildren();
+  $('cube-ownership-status').textContent=
+    report.decoded+'/'+report.requestedMaps+' maps decoded across '+
+    banks.length+' explicitly counted banks; '+report.crossBankRelationshipCount+
+    ' cross-bank overlap(s), '+report.invalid+' invalid. Partial census only; exclusive ownership and safe editing NOT proven.';
+  for(const relationship of report.relationships.slice(0,80)){
+    const button=document.createElement('button');button.type='button';
+    button.className='subtle-button';
+    button.textContent=relationship.first+' '+relationship.firstKind+' overlaps '+
+      relationship.second+' '+relationship.secondKind+' ('+
+      relationship.overlapBytes+' bytes) · inspect first map';
+    button.addEventListener('click',()=>safeRun(()=>{
+      if(cubeOwnershipEvidence!==snapshot||snapshot.rom!==model||
+         snapshot.summary!==mapBankCustomSummary)
+        throw Error('CUBE ownership census expired; scan again');
+      const fresh=auditHmaCubeCrossBankOwnership(model,mapBankCustomSummary,{banks});
+      if(JSON.stringify(fresh)!==JSON.stringify(snapshot.report))
+        throw Error('CUBE ownership source bytes changed; scan again');
+      const [bank,map]=relationship.first.split(':').map(Number);
+      const count=banks.find(x=>x.bankIndex===bank)?.mapCount;
+      if(!count||!fresh.maps.some(x=>x.id===relationship.first&&x.status==='decoded'))
+        throw Error('Selected map is no longer structurally decoded');
+      $('cube-bank-index').value=String(bank);
+      $('cube-map-index').value=String(map);
+      $('cube-map-count').value=String(count);
+      $('cube-map-inspect').click();
+    }));
+    list.append(button);
+  }
+  if(report.relationships.length>80)
+    list.append(semanticChild('p','Showing first 80 overlaps. Narrow explicit bank counts to inspect further.','palette-note'));
+}));
+
 $('cube-map-catalog-scan').addEventListener('click',()=>safeRun(()=>{
   ensureModel();
   const bankText=$('cube-bank-index').value,countText=$('cube-map-count').value;
