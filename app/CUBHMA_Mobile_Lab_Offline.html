@@ -180,6 +180,13 @@
   <div style="overflow-x:auto"><canvas id="cube-map-render-canvas" hidden aria-label="Read-only CUBE Emerald rendered metatile preview" style="max-width:none;image-rendering:pixelated"></canvas></div>
   <output id="cube-map-overlay-legend" class="palette-note" aria-live="polite">No CUBE raw overlay selected.</output>
   <output id="cube-map-render-selection" class="palette-note" aria-live="polite">Tap a rendered CUBE cell to inspect its raw blockmap and attribute offsets.</output>
+  <div class="input-row" aria-label="CUBE read-only cell visual proposal">
+    <div class="input-wrap"><label for="cube-map-proposed-tile">Proposed metatile ID (0–1023)</label><input id="cube-map-proposed-tile" type="number" min="0" max="1023" value="0"></div>
+    <div class="input-wrap"><label for="cube-map-proposed-high">Proposed raw collision/elevation (0–63)</label><input id="cube-map-proposed-high" type="number" min="0" max="63" value="0"></div>
+    <button type="button" id="cube-map-cell-preview" class="subtle-button" disabled>Preview selected CUBE cell (no save)</button>
+  </div>
+  <output id="cube-map-preview-status" class="palette-note" aria-live="polite">Select a rendered cell to preview a proposed change. No ROM writes.</output>
+  <div style="overflow-x:auto"><canvas id="cube-map-preview-after" hidden aria-label="Read-only proposed CUBE metatile canvas" style="max-width:none;image-rendering:pixelated"></canvas></div>
   <div class="input-row"><button type="button" id="cube-map-warps" class="subtle-button" disabled>Inspect CUBE custom event/warp records (read only)</button></div>
   <output id="cube-warps-status" class="palette-note" aria-live="polite">Inspect a custom CUBE map before reading its raw event arrays.</output>
   <div id="cube-warps-list" class="anchor-list" aria-label="Unverified CUBE event and warp records"></div>
@@ -6888,11 +6895,106 @@ function renderHmaCubeMapViewport(source,summary,{
 
 return renderHmaCubeMapViewport;
 })();
+const previewHmaCubeBlockmapVisualChange=(()=>{
+/**
+ * Source-grounded, read-only CUBE custom blockmap cell visual preflight.
+ * Pinned CUBHMA MapModel.cs BlockCell.Block = (Collision << 10) | Tile.
+ * No source mutation, saved ROM, authenticated layout, or walkability claims.
+ */
+function asReader(source) {
+  if (source instanceof Uint8Array) return {length:source.length,read:i=>source[i]};
+  if (source && Number.isSafeInteger(source.length) && source.length>=0 &&
+      typeof source.read==='function') return source;
+  throw new TypeError('Expected a bounded staged ROM reader');
+}
+function bounded(value,max,label) {
+  if (!Number.isSafeInteger(value)||value<0||value>max)
+    throw new RangeError(label+' must be an integer in 0–'+max);
+}
+function byte(source,at) {
+  const n=source.read(at);
+  if (!Number.isInteger(n)||n<0||n>255) throw new RangeError('Invalid staged ROM byte');
+  return n;
+}
+function overlayReader(source,at,raw) {
+  return Object.freeze({length:source.length,read:i=>{
+    if (!Number.isSafeInteger(i)||i<0||i>=source.length)
+      throw new RangeError('Overlay read outside ROM');
+    return i===at?raw&255:i===at+1?raw>>>8:byte(source,i);
+  }});
+}
+function imageCell(image,x,y) {
+  const row=image.cells.find(row=>row[0]?.y===y);
+  return row?.find(cell=>cell.x===x)??null;
+}
+/**
+ * Produce before/after RSE images using a two-byte virtual overlay.
+ * This deliberately cannot write to the ROM or export a modified ROM.
+ */
+function previewHmaCubeBlockmapVisualChange(source,summary,{
+  bankIndex,mapIndex,mapCount,x,y,tileId,collision,expectedRaw,
+  viewportX,viewportY,viewportWidth=10,viewportHeight=8
+}={}) {
+  const rom=asReader(source);
+  const options={bankIndex,mapIndex,mapCount};
+  const map=inspectHmaCubeMapEntry(rom,summary,options);
+  bounded(x,map.layout.width-1,'Cell X');
+  bounded(y,map.layout.height-1,'Cell Y');
+  if (tileId===undefined&&collision===undefined)
+    throw new RangeError('Specify tile ID or raw collision/elevation bits');
+  if (tileId!==undefined) bounded(tileId,1023,'Tile ID');
+  if (collision!==undefined) bounded(collision,63,'Raw collision/elevation');
+  if (expectedRaw!==undefined) bounded(expectedRaw,65535,'Expected original word');
+  const at=map.layout.blockmapOffset+(y*map.layout.width+x)*2;
+  const original=byte(rom,at)|(byte(rom,at+1)<<8);
+  if (expectedRaw!==undefined&&expectedRaw!==original)
+    throw new RangeError('Selected cell changed; inspect and preview again');
+  const next=((collision??(original>>>10))<<10)|(tileId??(original&1023));
+  const vx=viewportX??Math.floor(x/10)*10,vy=viewportY??Math.floor(y/8)*8;
+  bounded(vx,map.layout.width-1,'Viewport X');
+  bounded(vy,map.layout.height-1,'Viewport Y');
+  bounded(viewportWidth,32,'Viewport width');
+  bounded(viewportHeight,32,'Viewport height');
+  if (viewportWidth<1||viewportHeight<1||x<vx||y<vy||
+      x>=vx+viewportWidth||y>=vy+viewportHeight)
+    throw new RangeError('Selected cell must be inside the bounded preview viewport');
+  const renderOptions={...options,x:vx,y:vy,viewportWidth,viewportHeight};
+  const before=renderHmaCubeMapViewport(rom,summary,renderOptions);
+  const staged=overlayReader(rom,at,next);
+  const after=renderHmaCubeMapViewport(staged,summary,renderOptions);
+  if (before.width!==after.width||before.height!==after.height||
+      before.blockmapOffset!==after.blockmapOffset||
+      JSON.stringify(before.map)!==JSON.stringify(after.map))
+    throw new RangeError('CUBE structural map changed during virtual preview');
+  const a=imageCell(before,x,y),b=imageCell(after,x,y);
+  if (!a||!b||a.raw!==original||b.raw!==next||a.byteOffset!==at||b.byteOffset!==at)
+    throw new RangeError('CUBE blockmap preview failed typed decode/redecode');
+  let changedPixels=0;
+  for (let i=0;i<before.pixels.length;i+=4)
+    if (before.pixels[i]!==after.pixels[i]||
+        before.pixels[i+1]!==after.pixels[i+1]||
+        before.pixels[i+2]!==after.pixels[i+2]||
+        before.pixels[i+3]!==after.pixels[i+3]) changedPixels++;
+  const word=value=>Object.freeze({raw:value,tileId:value&1023,
+    collision:value>>>10,bytes:Object.freeze([value&255,value>>>8])});
+  return Object.freeze({
+    bankIndex,mapIndex,mapCount,x,y,byteOffset:at,
+    before:word(original),after:word(next),changed:original!==next,
+    changedPixels,viewportX:vx,viewportY:vy,
+    beforeImage:before,afterImage:after,
+    readOnly:true,previewOnly:true,writeAuthorized:false,
+    romAuthenticated:false,cubeLayoutAuthenticated:false,
+    walkabilityVerified:false,otherMapOwnershipUnknown:true
+  });
+}
+
+return previewHmaCubeBlockmapVisualChange;
+})();
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let pcsReference=null,pcsReferenceName='';
 let fingerprintResult=null,fingerprintAbort=null;
-let metadataFingerprints=[],metadataImportSerial=0,mapBankMetadataReport=null,mapBankRawPointerEvidence=null,mapBankRawWindowEvidence=null,mapBankDeclaredEvidence=null,mapBankTargetEvidence=null,mapBankCustomSummary=null,cubeMapEvidence=null,cubeWarpEvidence=null,cubeConnectionEvidence=null,cubeRenderEvidence=null,cubeRenderSelection=null;
+let metadataFingerprints=[],metadataImportSerial=0,mapBankMetadataReport=null,mapBankRawPointerEvidence=null,mapBankRawWindowEvidence=null,mapBankDeclaredEvidence=null,mapBankTargetEvidence=null,mapBankCustomSummary=null,cubeMapEvidence=null,cubeWarpEvidence=null,cubeConnectionEvidence=null,cubeRenderEvidence=null,cubeRenderSelection=null,cubeCellPreview=null;
 let inspectedWarpMap=null,selectedWarpPreview=null,selectedEventPreview=null,inspectedEventMap=null,inspectedMapAtlas=null,atlasBatchStart=0,atlasCoordinateBatchStart=0,atlasScriptAliasStart=0,atlasScriptCrossPageStart=0,atlasIncomingStart=0,atlasIncomingTarget=null;
 let activeRenderedMap=null,selectedRenderedHit=null;
 let mapReviewQueue=[],mapReviewRom=null,lastMapPreviews={cell:null,warp:null,event:null};
@@ -7735,7 +7837,10 @@ function drawMapBankMetadataReport(){
 }
 
 function clearCubeRenderedMap(message='CUBE render invalidated; render again.'){
-  cubeRenderEvidence=null;cubeRenderSelection=null;
+  cubeRenderEvidence=null;cubeRenderSelection=null;cubeCellPreview=null;
+  $('cube-map-cell-preview').disabled=true;
+  $('cube-map-preview-after').hidden=true;
+  $('cube-map-preview-status').textContent='Select a rendered cell to preview a proposed change. No ROM writes.';
   $('cube-map-render-canvas').hidden=true;
   $('cube-map-render-jump').disabled=true;
   $('cube-map-render-status').textContent=message;
@@ -7943,7 +8048,10 @@ $('cube-map-render').addEventListener('click',()=>safeRun(()=>{
   cubeRenderEvidence={rom:model,options,x,y,overlayMode,map:rendered.map,
     pixels:rendered.pixels.slice(),cellsJson:JSON.stringify(rendered.cells),
     attributesJson:JSON.stringify(rendered.attributes)};
-  cubeRenderSelection=null;$('cube-map-render-jump').disabled=true;
+  cubeRenderSelection=null;cubeCellPreview=null;$('cube-map-cell-preview').disabled=true;
+  $('cube-map-preview-after').hidden=true;
+  $('cube-map-preview-status').textContent='Tap a rendered cell to propose a visual-only change.';
+  $('cube-map-render-jump').disabled=true;
   $('cube-map-render-status').textContent='Rendered '+rendered.columns+' × '+
     rendered.rows+' CUBE RSE metatiles (16 × 16 pixels each). Unsupported custom light palettes and FRLG layouts are refused. ROM/layout and walkability remain unverified.';
   $('cube-map-render-selection').textContent='Tap a rendered cell to inspect raw source offsets.';
@@ -7971,13 +8079,47 @@ $('cube-map-render-canvas').addEventListener('click',event=>safeRun(()=>{
     (event.clientX-rect.left)*canvas.width/rect.width,
     (event.clientY-rect.top)*canvas.height/rect.height);
   if(!hit)return;
-  cubeRenderSelection={snapshot,cellOffset:hit.cell.byteOffset};
+  cubeRenderSelection={snapshot,cellOffset:hit.cell.byteOffset,x:hit.cell.x,y:hit.cell.y,raw:hit.cell.raw};
+  cubeCellPreview=null;$('cube-map-preview-after').hidden=true;
+  $('cube-map-preview-status').textContent='Selected cell is ready for a read-only visual proposal.';
+  $('cube-map-proposed-tile').value=String(hit.cell.tileId);
+  $('cube-map-proposed-high').value=String(hit.cell.collision);
+  $('cube-map-cell-preview').disabled=false;
   $('cube-map-render-jump').disabled=false;
   $('cube-map-render-selection').textContent='Cell ('+hit.cell.x+','+hit.cell.y+
     ') · tile '+hit.cell.tileId+' · raw high bits '+hit.cell.collision+
     ' · behavior 0x'+hex(hit.attribute.behavior,2)+' · layer '+hit.attribute.layer+
     ' · blockmap 0x'+hex(hit.cell.byteOffset)+' · attributes 0x'+
     hex(hit.attribute.attributeOffset)+'. Not verified walkability.';
+}));
+$('cube-map-cell-preview').addEventListener('click',()=>safeRun(()=>{
+  const selected=cubeRenderSelection,snapshot=selected?.snapshot;
+  if(!snapshot||snapshot!==cubeRenderEvidence||snapshot.rom!==model||
+     !cubeMapEvidence||cubeMapEvidence.options!==snapshot.options)
+    throw Error('Select a current rendered CUBE cell first');
+  const tileText=$('cube-map-proposed-tile').value,highText=$('cube-map-proposed-high').value;
+  if(!/^\\d+$/.test(tileText)||!/^\\d+$/.test(highText))
+    throw new RangeError('Proposed tile and raw high bits must be unsigned integers');
+  const proposal=previewHmaCubeBlockmapVisualChange(model,mapBankCustomSummary,{
+    ...snapshot.options,x:selected.x,y:selected.y,expectedRaw:selected.raw,
+    tileId:Number(tileText),collision:Number(highText),
+    viewportX:snapshot.x,viewportY:snapshot.y,viewportWidth:10,viewportHeight:8
+  });
+  if(JSON.stringify(proposal.beforeImage.map)!==JSON.stringify(snapshot.map)||
+     JSON.stringify(proposal.beforeImage.cells)!==snapshot.cellsJson||
+     JSON.stringify(proposal.beforeImage.attributes)!==snapshot.attributesJson||
+     proposal.beforeImage.pixels.length!==snapshot.pixels.length||
+     !proposal.beforeImage.pixels.every((value,i)=>value===snapshot.pixels[i]))
+    throw Error('CUBE rendering changed since selection; render again');
+  const after=proposal.afterImage,canvas=$('cube-map-preview-after');
+  canvas.width=after.width;canvas.height=after.height;
+  const ctx=canvas.getContext('2d'),image=ctx.createImageData(after.width,after.height);
+  image.data.set(after.pixels);ctx.putImageData(image,0,0);
+  canvas.style.width=(after.width*2)+'px';canvas.style.height=(after.height*2)+'px';
+  canvas.hidden=false;cubeCellPreview=proposal;
+  $('cube-map-preview-status').textContent='Visual-only CUBE cell ('+selected.x+','+selected.y+
+    '): raw '+proposal.before.raw+' → '+proposal.after.raw+'; '+
+    proposal.changedPixels+' changed pixels. No ROM writes, unknown shared ownership and no verified walkability.';
 }));
 $('cube-map-render-jump').addEventListener('click',()=>safeRun(()=>{
   const selection=cubeRenderSelection,snapshot=selection?.snapshot;

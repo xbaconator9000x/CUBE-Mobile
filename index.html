@@ -103,6 +103,13 @@
   <div style="overflow-x:auto"><canvas id="cube-map-render-canvas" hidden aria-label="Read-only CUBE Emerald rendered metatile preview" style="max-width:none;image-rendering:pixelated"></canvas></div>
   <output id="cube-map-overlay-legend" class="palette-note" aria-live="polite">No CUBE raw overlay selected.</output>
   <output id="cube-map-render-selection" class="palette-note" aria-live="polite">Tap a rendered CUBE cell to inspect its raw blockmap and attribute offsets.</output>
+  <div class="input-row" aria-label="CUBE read-only cell visual proposal">
+    <div class="input-wrap"><label for="cube-map-proposed-tile">Proposed metatile ID (0–1023)</label><input id="cube-map-proposed-tile" type="number" min="0" max="1023" value="0"></div>
+    <div class="input-wrap"><label for="cube-map-proposed-high">Proposed raw collision/elevation (0–63)</label><input id="cube-map-proposed-high" type="number" min="0" max="63" value="0"></div>
+    <button type="button" id="cube-map-cell-preview" class="subtle-button" disabled>Preview selected CUBE cell (no save)</button>
+  </div>
+  <output id="cube-map-preview-status" class="palette-note" aria-live="polite">Select a rendered cell to preview a proposed change. No ROM writes.</output>
+  <div style="overflow-x:auto"><canvas id="cube-map-preview-after" hidden aria-label="Read-only proposed CUBE metatile canvas" style="max-width:none;image-rendering:pixelated"></canvas></div>
   <div class="input-row"><button type="button" id="cube-map-warps" class="subtle-button" disabled>Inspect CUBE custom event/warp records (read only)</button></div>
   <output id="cube-warps-status" class="palette-note" aria-live="polite">Inspect a custom CUBE map before reading its raw event arrays.</output>
   <div id="cube-warps-list" class="anchor-list" aria-label="Unverified CUBE event and warp records"></div>
