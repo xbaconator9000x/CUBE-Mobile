@@ -11,6 +11,7 @@ import {readStableLocalFile} from './local-input-safety.mjs';
 import {inspectHmaMapBankAnchorSources} from '../src/hma-map-bank-metadata.js';
 import {verifyHmaCubeCombinedTransaction} from '../src/hma-cube-combined-transaction.js';
 import {auditHmaCubeEditOwnershipImpact} from '../src/hma-cube-edit-ownership-impact.js';
+import {auditHmaCubeGlobalEditPointerCandidates} from '../src/hma-cube-global-pointer-census.js';
 import {parseLocalCubeScriptTransactionArgs} from './local-cube-script-transaction.mjs';
 
 const KINDS=['cells','warps','events','connections','scripts'];
@@ -86,9 +87,8 @@ export async function inspectLocalCubeCombinedTransaction(argv){
  const {changes,viewport,count}=parsePlan(await readStableLocalFile(args['--plan'],64*1024));
  const options={bankIndex,mapIndex,mapCount,banks,targetBanks:banks,...changes,...viewport};
  const rehearsal=verifyHmaCubeCombinedTransaction(rom,summary,options);
- const ownership=auditHmaCubeEditOwnershipImpact(rom,summary,{
-  ...options,wholeRomPointerScan:true
- });
+ const ownership=auditHmaCubeEditOwnershipImpact(rom,summary,options);
+ const pointerCensus=auditHmaCubeGlobalEditPointerCandidates(rom,summary,options);
  if(!rehearsal.combinedReDecodeVerified||!rehearsal.inMemoryRollbackVerified||
     !rehearsal.sourceBytesPreserved||!ownership.copyOnlyRehearsalVerified||
     rehearsal.changedBytes!==ownership.changedBytes||sha(rom)!==originalHash)
@@ -107,7 +107,7 @@ export async function inspectLocalCubeCombinedTransaction(argv){
   ownershipConflicts:ownership.conflicts.length,
   ownershipCensusIncomplete:ownership.censusIncomplete,
   mapScriptOwnershipIssues:ownership.mapScriptIssueCount,
-  globalPointerCensus:ownership.globalPointerCandidates,
+  globalPointerCensus:pointerCensus,
   partialOwnershipCoverage:true,globalPointerOwnershipProven:false,
   romModified:false,romExported:false,patchExported:false,
   independentlyAuthenticated:false,exclusiveOwnershipProven:false,
