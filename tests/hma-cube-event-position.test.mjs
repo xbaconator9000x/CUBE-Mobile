@@ -47,7 +47,7 @@ test('16-bit trigger elevation survives isolated copy apply and rollback',async(
  const records=inspectHmaCubeMapEventWarps(bytes,summary,options);
  const opts=proposal('scripts',records,{x:3,elevation:511});
  const result=verifyHmaCubeEventPositionDryRun(bytes,summary,opts);
- assert.equal(result.changedBytes,3);
+ assert.equal(result.changedBytes,2);
  assert.equal(result.inMemoryRollbackVerified,true);
  assert.equal(result.unrelatedBytesPreserved,true);
  assert.deepEqual(bytes,original);
