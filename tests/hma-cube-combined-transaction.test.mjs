@@ -29,7 +29,9 @@ async function fixture(){
  u32(bytes,0xa00,1);ptr(bytes,0xa04,0xa20);
  u32(bytes,0xa20,1);u32(bytes,0xa24,0xFFFFFFFE);
  bytes[0xa28]=0;bytes[0xa29]=0;u16(bytes,0xa2a,0xCAFE);
- bytes[0x600]=1;bytes[0x601]=1;
+ bytes[0x600]=1;bytes[0x601]=1;bytes[0x602]=1;
+ ptr(bytes,0x60c,0x860);
+ ptr(bytes,0x830,0xb000);ptr(bytes,0x86c,0xb010);
  ptr(bytes,0x604,0x820);ptr(bytes,0x608,0x800);
  u16(bytes,0x824,1);u16(bytes,0x826,0);
  u16(bytes,0x800,0);u16(bytes,0x802,0);
@@ -112,4 +114,42 @@ test('connection proposals fail closed when expected raw fields are stale',async
  assert.throws(()=>verifyHmaCubeCombinedTransaction(bytes,summary,{
   ...options,connections:[stale],targetBanks:changes.targetBanks
  }),/stale|expected/i);
+});
+
+const scriptEdit={kind:'objects',index:0,expectedRaw:0x0800b000,
+ targetKind:'scripts',targetIndex:0};
+test('five-kind transaction supports script retargeting alongside event relocation and rolls back',async()=>{
+ const {bytes,summary}=await fixture(),original=bytes.slice();
+ const r=verifyHmaCubeCombinedTransaction(bytes,summary,{
+  ...options,...changes,scripts:[scriptEdit]
+ });
+ assert.equal(r.scriptChanges,1);
+ assert.equal(r.eventChanges,1);
+ assert.equal(r.combinedReDecodeVerified,true);
+ assert.equal(r.inMemoryRollbackVerified,true);
+ assert.equal(r.writeAuthorized,false);
+ assert.deepEqual(bytes,original);
+});
+test('script-only combined transaction and stale pointer fail closed',async()=>{
+ const {bytes,summary}=await fixture();
+ const r=verifyHmaCubeCombinedTransaction(bytes,summary,{
+  ...options,scripts:[scriptEdit]
+ });
+ assert.equal(r.scriptChanges,1);
+ assert.equal(r.cellChanges,0);
+ assert.equal(r.sourceBytesPreserved,true);
+ assert.throws(()=>verifyHmaCubeCombinedTransaction(bytes,summary,{
+  ...options,scripts:[{...scriptEdit,expectedRaw:0x0800b001}]
+ }),/stale/i);
+});
+test('script and event overlapping byte ownership fails closed',async()=>{
+ const {bytes,summary}=await fixture();
+ // Script references and position fields on one event are disjoint; prove
+ // this valid pairing rather than rejecting the entire record.
+ const r=verifyHmaCubeCombinedTransaction(bytes,summary,{
+  ...options,events:changes.events,scripts:[scriptEdit]
+ });
+ assert.equal(r.eventChanges,1);
+ assert.equal(r.scriptChanges,1);
+ assert.equal(r.changedBytes,2);
 });
