@@ -14,7 +14,7 @@ test('touchscreen and offline expose bounded second-hop raw HMA target inspectio
  assert.match(app,/inspectHmaDeclaredBankTargetWindows\(ensureModel\(\),mapBankMetadataReport/);
  assert.match(app,/JSON\.stringify\(now\.rows\)!==JSON\.stringify\(report\.rows\)/);
  assert.match(app,/mapBankTargetEvidence=null/);
- assert.match(app,/mapBankRawWindowEvidence=null,mapBankDeclaredEvidence=null,mapBankTargetEvidence=null;/);
+ assert.match(app,/mapBankRawWindowEvidence=null,mapBankDeclaredEvidence=null,mapBankTargetEvidence=null;mapBankCustomSummary=null;cubeMapEvidence=null;/);
  assert.doesNotMatch(app,/;mapBankDeclaredEvidence=null,mapBankTargetEvidence=null;/);
  assert.match(app,/drawMapBankTargetEvidence\(\)/);
  assert.match(build,/stripHmaMapTargetWindows/);
