@@ -59,3 +59,36 @@ test('rejects duplicate, unbounded and malformed bank count requests',async()=>{
  assert.throws(()=>run(Array.from({length:9},(_,i)=>({bankIndex:i,mapCount:1}))),RangeError);
  assert.throws(()=>run([{bankIndex:0,mapCount:128},{bankIndex:1,mapCount:128},{bankIndex:2,mapCount:1}]),RangeError);
 });
+
+test('optional event claims reveal shared group and warp array across banks',async()=>{
+ const {bytes,summary}=await fixture(),original=bytes.slice();
+ ptr(bytes,0x204,0x600);ptr(bytes,0x244,0x600);
+ bytes[0x601]=1;ptr(bytes,0x608,0x700);
+ u16(bytes,0x700,1);u16(bytes,0x702,1);
+ const report=auditHmaCubeCrossBankOwnership(bytes,summary,{banks,includeEvents:true});
+ assert.equal(report.decoded,2);
+ assert.equal(report.invalid,0);
+ assert.equal(report.eventIssues.length,0);
+ assert.equal(report.eventClaimsInspected,4);
+ assert.equal(report.crossBankRelationshipCount,3);
+ assert.deepEqual(new Set(report.relationships.map(r=>r.firstKind)),
+  new Set(['blockmap','events-group','event-warps']));
+ assert.equal(report.sameMapRelationships.length,0);
+ assert.equal(report.completeOwnershipProven,false);
+ assert.equal(report.writeAuthorized,false);
+ assert.deepEqual(bytes.slice(0x10,0x200),original.slice(0x10,0x200));
+});
+test('invalid event arrays remain visible without hiding decoded map slots',async()=>{
+ const {bytes,summary}=await fixture();
+ ptr(bytes,0x204,0x600);bytes[0x601]=1;ptr(bytes,0x608,0x300);
+ const report=auditHmaCubeCrossBankOwnership(bytes,summary,{banks,includeEvents:true});
+ assert.equal(report.decoded,2);
+ assert.equal(report.invalid,0);
+ assert.equal(report.eventIssues.length,1);
+ assert.equal(report.eventIssues[0].id,'0:0');
+ assert.match(report.eventIssues[0].reason,/overlap/i);
+ assert.equal(report.completeOwnershipProven,false);
+ assert.throws(()=>auditHmaCubeCrossBankOwnership(bytes,summary,{
+  banks,includeEvents:'yes'
+ }),/boolean/);
+});
