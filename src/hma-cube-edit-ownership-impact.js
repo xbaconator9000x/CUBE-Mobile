@@ -104,7 +104,7 @@ export function auditHmaCubeEditOwnershipImpact(source,summary,options={}) {
  if(changes.size!==rehearsal.changedBytes)
   throw new RangeError('Ownership edit bytes disagree with combined rollback');
  const census=auditHmaCubeCrossBankOwnership(source,summary,{
-  banks,includeEvents:true,includeConnections:true
+  banks,includeEvents:true,includeConnections:true,includeMapScripts:true
  });
  const relevant=[...census.relationships,...census.sameMapRelationships];
  const conflicts=[];
@@ -124,12 +124,14 @@ export function auditHmaCubeEditOwnershipImpact(source,summary,options={}) {
  }
  const sourceDecoded=census.maps.some(m=>m.id===sourceId&&m.status==='decoded');
  const incomplete=census.invalid>0||census.eventIssues.length>0||
-  census.connectionIssues.length>0||!sourceDecoded;
+  census.connectionIssues.length>0||census.mapScriptIssues.length>0||!sourceDecoded;
  return Object.freeze({
   sourceMap:sourceId,changedBytes:changes.size,
   inspectedMaps:census.requestedMaps,decodedMaps:census.decoded,
   invalidMaps:census.invalid,eventIssueCount:census.eventIssues.length,
   connectionIssueCount:census.connectionIssues.length,
+  mapScriptIssueCount:census.mapScriptIssues.length,
+  mapScriptClaimsInspected:census.mapScriptClaimsInspected,
   conflicts:Object.freeze(conflicts),
   changedBytesTouchSharedClaims:conflicts.length>0,
   censusIncomplete:incomplete,
