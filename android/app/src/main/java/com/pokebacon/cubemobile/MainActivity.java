@@ -26,12 +26,14 @@ public final class MainActivity extends Activity {
         "https://appassets.androidplatform.net/assets/index.html";
     private WebView webView;
     private ValueCallback<Uri[]> fileCallback;
+    private NativeExport nativeExport;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         WebView.setWebContentsDebuggingEnabled(false);
         webView = new WebView(this);
         setContentView(webView);
+        nativeExport = new NativeExport(this, webView);
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
@@ -45,7 +47,11 @@ public final class MainActivity extends Activity {
         final WebViewAssetLoader assets = new WebViewAssetLoader.Builder()
             .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
             .build();
+        nativeExport.install();
         webView.setWebViewClient(new WebViewClient() {
+            @Override public void onPageFinished(WebView view, String url) {
+                if (APP_URL.equals(url)) nativeExport.inject();
+            }
             @Override public WebResourceResponse shouldInterceptRequest(
                 WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
@@ -100,6 +106,10 @@ public final class MainActivity extends Activity {
     @Override protected void onActivityResult(int requestCode,
         int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == NativeExport.REQUEST) {
+            nativeExport.onResult(resultCode, data);
+            return;
+        }
         if (requestCode != PICK_FILE || fileCallback == null) return;
         ValueCallback<Uri[]> callback = fileCallback;
         fileCallback = null;
@@ -124,6 +134,7 @@ public final class MainActivity extends Activity {
             fileCallback.onReceiveValue(null);
             fileCallback = null;
         }
+        if (nativeExport != null) nativeExport.close();
         if (webView != null) {
             webView.destroy();
             webView = null;
