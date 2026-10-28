@@ -23,3 +23,7 @@ The host also records exact content URIs selected through its import picker and 
 ## Android picker lifecycle and session isolation (29 October 2026)
 
 A cancelled WebView export does not imply that the external Android document picker has returned. The native host now retains a one-result picker ticket across WebView reload/cancel, rejects new exports while that result is outstanding, and consumes stale results without binding them to a later session. Cryptographically randomized 16-digit per-export session identifiers avoid reuse across page loads. Plain Java unit tests exercise picker-ticket reuse and duplicate rejection; the JS protocol tests exercise cross-page session uniqueness. These are source/CI tests, **not** physical Android or emulator acceptance. No ROM edit permission is granted.
+
+## Nonblocking Android SAF readback verification (29 October 2026)
+
+The Android export host now streams the final document readback and SHA-256 verification on a dedicated worker rather than the WebView/UI callback thread. It accepts only an exact-length, matching digest; truncated, expanded, corrupted or unreadable documents fail closed. A cancelled/reloaded export invalidates the worker result, and activity destruction shuts the worker down. The native picker ticket remains independent of this readback lifecycle. Pure Java tests exercise exact, corrupt, truncated, expanded, empty and failed-provider streams. This is not physical device or real SAF provider acceptance and does not enable CUBE semantic ROM writes.

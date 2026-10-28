@@ -165,7 +165,7 @@ public final class MainActivity extends Activity {
             fileCallback.onReceiveValue(null);
             fileCallback = null;
         }
-        if (nativeExport != null) nativeExport.close();
+        if (nativeExport != null) nativeExport.dispose();
         if (webView != null) {
             webView.destroy();
             webView = null;
