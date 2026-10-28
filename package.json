@@ -15,7 +15,8 @@
     "smoke:cube-manifest": "node scripts/local-hma-manifest-smoke.mjs",
     "engineering:check": "node scripts/engineering-audit.mjs",
     "smoke:cube-scripts": "node scripts/local-cube-script-transaction.mjs",
-    "rom:saveas:local": "node scripts/local-rom-atomic-saveas.mjs"
+    "rom:saveas:local": "node scripts/local-rom-atomic-saveas.mjs",
+    "smoke:cube-combined": "node scripts/local-cube-combined-transaction.mjs"
   },
   "license": "MIT"
 }
