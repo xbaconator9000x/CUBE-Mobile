@@ -436,7 +436,8 @@ export function bindHmaCubeBatchEditors({getContext,getSelectedCell,safeRun}){
    r.changedBytes+' changed bytes, '+r.decodedMaps+'/'+r.inspectedMaps+
    ' declared maps decoded, '+r.conflicts.length+' edited-byte overlap(s), '+
    r.eventIssueCount+' invalid event array(s), '+r.connectionIssueCount+
-   ' invalid connection array(s), '+r.invalidMaps+
+   ' invalid connection array(s), '+r.mapScriptIssueCount+
+   ' invalid map-script table(s), '+r.invalidMaps+
    ' invalid map(s). '+(r.changedBytesTouchSharedClaims?
     'SHARED MAP CLAIM DETECTED. ':'')+
    (r.censusIncomplete?'Census incomplete. ':'')+

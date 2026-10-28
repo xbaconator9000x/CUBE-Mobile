@@ -13,3 +13,7 @@ This is an intentionally **incomplete** census: declared banks may omit other ow
 ## Map-script ownership extension (29 October 2026)
 
 The bounded cross-bank census now optionally claims the five-byte, type-0-terminated map-script table and each type 2/4 conditional table (8 bytes per condition plus the two-byte terminator), using the pinned CUBHMA `MapModel.cs` / `MapScriptCollection.cs` formats. A malformed table is recorded separately as `mapScriptIssues` rather than silently treated as unowned. The changed-byte impact audit **always** includes map-script claims, so a warp/event/cell/connection/script-reference edit aliasing these structures is reported as a conflict. Missing or invalid script tables make the census incomplete, never safe. The bounded census still does not prove global ownership, ROM authenticity, or write permission.
+
+## Mobile ownership inspector (29 October 2026)
+
+The touch-first cross-bank ownership inspector now **always** includes bounded map-script table and conditional table claims, even when the optional event/connection toggles are off. It displays invalid map-script table counts separately, and its stale-result click guard rechecks the same coverage before navigating. The combined editing ownership report also surfaces map-script failures. The offline HTML is regenerated from the same source. No inferred bank map counts, global pointer exclusivity, ROM authentication or write authorization are claimed.

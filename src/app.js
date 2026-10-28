@@ -1190,7 +1190,8 @@ $('cube-ownership-scan').addEventListener('click',()=>safeRun(()=>{
   });
   const includeEvents=$('cube-ownership-events').checked;
   const includeConnections=$('cube-ownership-connections').checked;
-   const report=auditHmaCubeCrossBankOwnership(model,mapBankCustomSummary,{banks,includeEvents,includeConnections});
+  const includeMapScripts=true; // Always include script-table ownership claims.
+   const report=auditHmaCubeCrossBankOwnership(model,mapBankCustomSummary,{banks,includeEvents,includeConnections,includeMapScripts});
   const snapshot={rom:model,summary:mapBankCustomSummary,banks,includeEvents,includeConnections,report};
   cubeOwnershipEvidence=snapshot;
   const list=$('cube-ownership-list');list.replaceChildren();
@@ -1199,7 +1200,8 @@ $('cube-ownership-scan').addEventListener('click',()=>safeRun(()=>{
     banks.length+' explicitly counted banks; '+report.crossBankRelationshipCount+
     ' cross-bank overlap(s), '+report.sameMapRelationships.length+' within-map overlap(s), '+
      report.eventIssues.length+' invalid event array(s), '+report.connectionIssues.length+
-     ' invalid connection array(s), '+report.invalid+
+     ' invalid connection array(s), '+report.mapScriptIssues.length+
+     ' invalid map-script table(s), '+report.invalid+
      ' invalid maps. Partial census only; exclusive ownership and safe editing NOT proven.';
   for(const relationship of [...report.relationships,...report.sameMapRelationships].slice(0,80)){
     const button=document.createElement('button');button.type='button';
@@ -1214,7 +1216,7 @@ $('cube-ownership-scan').addEventListener('click',()=>safeRun(()=>{
       if($('cube-ownership-events').checked!==snapshot.includeEvents||
          $('cube-ownership-connections').checked!==snapshot.includeConnections)
          throw Error('Event coverage setting changed; scan again');
-       const fresh=auditHmaCubeCrossBankOwnership(model,mapBankCustomSummary,{banks,includeEvents,includeConnections});
+       const fresh=auditHmaCubeCrossBankOwnership(model,mapBankCustomSummary,{banks,includeEvents,includeConnections,includeMapScripts});
       if(JSON.stringify(fresh)!==JSON.stringify(snapshot.report))
         throw Error('CUBE ownership source bytes changed; scan again');
       const [bank,map]=relationship.first.split(':').map(Number);

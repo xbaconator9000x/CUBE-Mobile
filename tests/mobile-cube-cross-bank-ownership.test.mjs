@@ -12,6 +12,10 @@ test('CUBE cross-bank ownership inspector is available in mobile and offline UI'
  assert.match(app,/auditHmaCubeCrossBankOwnership\(model,mapBankCustomSummary/);
  assert.match(app,/JSON\.stringify\(fresh\)!==JSON\.stringify\(snapshot\.report\)/);
  assert.match(app,/exclusive ownership and safe editing NOT proven/);
+ assert.match(app,/includeMapScripts=true/);
+ assert.match(app,/mapScriptIssues.length/);
+ assert.match(offline,/includeMapScripts=true/);
+ assert.match(offline,/mapScriptIssues.length/);
  assert.match(build,/stripHmaCubeCrossBankOwnership/);
  assert.match(offline,/const auditHmaCubeCrossBankOwnership=\(\(\)=>/);
  assert.doesNotMatch(offline,/src\/app\.js/);
