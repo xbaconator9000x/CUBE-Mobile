@@ -27,7 +27,7 @@ test('ownership button is disabled on reset and stale queue, without exposing sa
   read('src/hma-cube-batch-mobile.js'),read('index.html')
  ]);
  assert.match(controller,/\$\('cube-batch-combined-ownership'\)\.disabled=true/);
- assert.match(controller,/\$\('cube-batch-combined-ownership'\)\.disabled=!\(warpQueue\.length\|\|eventQueue\.length\)/);
+ assert.match(controller,/\$\('cube-batch-combined-ownership'\)\.disabled=!\(warpQueue\.length\|\|eventQueue\.length\|\|connectionQueue\.length\)/);
  assert.match(index,/id="cube-batch-combined-ownership"[^>]*disabled/);
  assert.doesNotMatch(controller,/\.saveAs\(|\.writeFile\(/);
 });
