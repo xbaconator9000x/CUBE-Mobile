@@ -62,7 +62,7 @@ test('supports one kind while refusing empty, stale and out-of-map proposals',as
  assert.throws(()=>verifyHmaCubeCombinedTransaction(bytes,summary,options),/at least one kind/);
  assert.throws(()=>verifyHmaCubeCombinedTransaction(bytes,summary,{
   ...options,cells:[{x:0,y:0,tileId:1,expectedRaw:7}]
- }),/stale|original/i);
+ }),/changed|stale|original/i);
  assert.throws(()=>verifyHmaCubeCombinedTransaction(bytes,summary,{
   ...options,warps:[{...changes.warps[0],proposed:{x:99}}],
   targetBanks:changes.targetBanks
