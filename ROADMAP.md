@@ -1,3 +1,8 @@
+## Checkpoint — CUBE multi-cell touchscreen virtual previews (28 October 2026)
+- [x] Queue and remove up to 32 typed CUBE cell proposals, stale-byte-checked against the selected rendered viewport.
+- [x] Preview an atomic virtual before/after RSE canvas with optional cross-bank overlap warnings; modular and standalone offline UI.
+- [ ] Authentic CUBE ROM/metadata, emulator, Android, full ownership and safe save/reopen remain unverified; semantic writes disabled and strict parity unchanged.
+
 ## Checkpoint — CUBE custom spatial inspection and RSE rendering (28 October 2026)
 - [x] Decode bounded CUBE custom connections, all four event arrays and raw script pointer field provenance, with touch-first navigation.
 - [x] Add 10×8 panning raw cell grid, event coordinate markers, and conservative 16×16 RSE metatile rendering with raw high-bit/behavior overlays.
