@@ -1,3 +1,9 @@
+## Checkpoint — ordered exact CUBHMA TOML manifests (28 October 2026)
+- [x] Add strict, immutable, source-pinned ordered multi-file manifest identity checks for ROM digest/header and exact TOML filenames, byte lengths and SHA-256 digests.
+- [x] Reject reordered, missing, renamed, duplicate, oversized, stale or changed inputs; keep curated registry empty and all semantic writes disabled.
+- [x] Add synthetic regression tests and source-grounded documentation; no ROM assets or strict parity credit.
+- [ ] Independently curate genuine CUBE ROM and matching TOML manifests, wire safe mobile diagnostics, and verify authentic save/reopen, emulator and Android acceptance. See [manifest documentation](docs/HMA_ORDERED_METADATA_MANIFEST.md).
+
 ## Checkpoint — opt-in local CUBE second-hop raw target census (28 October 2026)
 - [x] Add bounded `--target-words 1–16` to SHA-256-matched local CUBE bank smoke, reporting aggregate nested pointer-shaped evidence without bytes, offsets, hashes or paths.
 - [x] Preserve immutable ROM inputs and reject invalid budgets; add synthetic CLI and safety regressions.
