@@ -94,3 +94,16 @@ test('rejects missing source bank, stale records and overlapping unsafe inputs',
   ...opts,warps:[opts.warps[0],opts.warps[0]]
  }),/duplicate/i);
 });
+
+test('cross-kind impact catches a connection record aliasing the edited warp',async()=>{
+ const {bytes,summary}=await fixture();
+ ptr(bytes,0x24c,0x640);
+ u32(bytes,0x640,1);ptr(bytes,0x644,0x700);
+ const result=auditHmaCubeEditOwnershipImpact(bytes,summary,opts);
+ assert.equal(result.connectionIssueCount,0);
+ assert.equal(result.changedBytesTouchSharedClaims,true);
+ assert.ok(result.conflicts.some(c=>
+  c.firstKind==='event-warps'&&c.secondKind==='connection-records'&&
+  c.changedKinds.includes('event-warps')));
+ assert.equal(result.writeAuthorized,false);
+});
