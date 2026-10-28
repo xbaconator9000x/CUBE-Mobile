@@ -44,6 +44,11 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
+      - name: Require and enable KVM acceleration
+        run: |
+          test -e /dev/kvm || { echo 'KVM unavailable on this runner'; exit 1; }
+          sudo chmod a+rw /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
       - name: Boot Android emulator and run real WebView smoke
         uses: reactivecircus/android-emulator-runner@v2
         with:
