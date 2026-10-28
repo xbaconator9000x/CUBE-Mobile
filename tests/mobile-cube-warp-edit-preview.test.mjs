@@ -21,7 +21,7 @@ test('CUBE warp record preflight is wired to modular and offline mobile interfac
  assert.match(app,/readCubeWarpEditProposal\(\)/);
  assert.match(offline,/verifyHmaCubeWarpRecordDryRun/);
  assert.match(build,/stripHmaCubeWarpEditPreview/);
- assert.match(offline,/const previewHmaCubeWarpRecordChange=\(\(\)=>/);
+ assert.match(offline,/const \{previewHmaCubeWarpRecordChange,verifyHmaCubeWarpRecordDryRun\}=\(\(\)=>/);
  assert.match(offline,/function clearCubeWarpEditPreview\(/);
  assert.doesNotMatch(offline,/src\/app\.js/);
  assert.match(doc,/mobile and offline interfaces/);
