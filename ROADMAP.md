@@ -1,3 +1,8 @@
+## Checkpoint — CUBE rectangular paint preflight (28 October 2026)
+- [x] Queue a bounded 1–8 × 1–8 rectangular brush (maximum 32 cells) from a rendered CUBE map cell, preserving expected originals for every cell.
+- [x] Revalidate the full combined queue before accepting a brush; preview-only and no ROM mutation, with modular/offline UI coverage.
+- [ ] Authentic ROM, collision policy, save/reopen and device acceptance remain outstanding. Strict parity unchanged.
+
 ## Checkpoint — CUBE multi-cell touchscreen virtual previews (28 October 2026)
 - [x] Queue and remove up to 32 typed CUBE cell proposals, stale-byte-checked against the selected rendered viewport.
 - [x] Preview an atomic virtual before/after RSE canvas with optional cross-bank overlap warnings; modular and standalone offline UI.
