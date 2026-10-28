@@ -51,6 +51,14 @@ test('clean bounded census identifies changed warp bytes but never authorizes wr
  assert.equal(result.noDetectedOverlapInInspectedMaps,true);
  assert.equal(result.copyOnlyRehearsalVerified,true);
  assert.equal(result.partialCoverage,true);
+ assert.equal(result.globalPointerCandidates,null);
+ const full=auditHmaCubeEditOwnershipImpact(bytes,summary,{
+  ...opts,wholeRomPointerScan:true
+ });
+ assert.ok(full.globalPointerCandidates.scannedAlignedWords>0);
+ assert.ok(full.globalPointerCandidates.canonicalPointerCandidates>=1);
+ assert.equal(full.globalPointerCandidates.globalOwnershipProven,false);
+ assert.equal(full.writeAuthorized,false);
  assert.equal(result.globalPointerOwnershipProven,false);
  assert.equal(result.exclusiveOwnershipProven,false);
  assert.equal(result.writeAuthorized,false);
