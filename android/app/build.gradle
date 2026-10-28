@@ -1,0 +1,31 @@
+plugins {
+    id 'com.android.application'
+}
+android {
+    namespace 'com.pokebacon.cubemobile'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'com.pokebacon.cubemobile'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '0.5.9'
+    }
+    sourceSets {
+        main {
+            assets.srcDirs += ["$buildDir/generated/cubeAssets"]
+        }
+    }
+}
+dependencies {
+    implementation 'androidx.webkit:webkit:1.12.1'
+}
+tasks.register('prepareCubeAssets', Copy) {
+    from('../../app/CUBHMA_Mobile_Lab_Offline.html') {
+        rename { 'index.html' }
+    }
+    into(layout.buildDirectory.dir('generated/cubeAssets'))
+}
+tasks.named('preBuild').configure {
+    dependsOn('prepareCubeAssets')
+}

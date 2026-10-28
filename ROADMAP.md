@@ -1,3 +1,8 @@
+## Checkpoint — native Android offline APK and document IO (29 October 2026)
+- [x] Compile Android debug APK from the checked-in generated offline HTML using WebViewAssetLoader; preserve source identity and exclude ROM assets.
+- [x] Add Android SAF file imports, Back navigation, bounded user-selected blob export, SHA-256 document reopen verification and JS protocol tests.
+- [ ] Validate the debug APK on physical Android devices, authenticate genuine CUBE ROM/TOML, and verify emulator/semantic save-reopen before strict parity credit.
+
 ## Checkpoint — CUBE visible-cell replacement preview (28 October 2026)
 - [x] Add bounded noncontiguous tile/high-bit/exact matching across rendered CUBE viewport cells.
 - [x] Integrate touch queue replacement with original-byte validation, offline HTML and tests.

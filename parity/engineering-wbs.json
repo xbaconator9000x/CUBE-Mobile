@@ -436,15 +436,19 @@
       "id": "android-platform",
       "effortUnits": 13,
       "completion": {
-        "low": 0,
-        "mid": 0.04,
-        "high": 0.12
+        "low": 0.07,
+        "mid": 0.2,
+        "high": 0.34
       },
       "sourceRefs": [
         "FULL_PORT_PLAN.md",
-        "manifest.webmanifest"
+        "manifest.webmanifest",
+        "android/app/src/main/java/com/pokebacon/cubemobile/MainActivity.java",
+        "android/app/src/main/java/com/pokebacon/cubemobile/NativeExport.java",
+        ".github/workflows/android-build.yml",
+        "tests/android-export-bridge.test.mjs"
       ],
-      "rationale": "APK packaging, SAF, Back, lifecycle, performance and real device validation, beyond mobile web."
+      "rationale": "Initial Android debug APK now compiles in CI from the exact standalone offline HTML. WebViewAssetLoader shell, SAF ROM/TOML import, Back navigation, and user-selected bounded blob export with streaming/reopen verification have code and synthetic protocol tests. No physical-device lifecycle, performance, accessibility, real CUBE ROM/TOML or emulator acceptance; not a production release."
     },
     {
       "id": "emulator-interoperability",

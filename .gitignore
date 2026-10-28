@@ -29,3 +29,11 @@ coverage/
 Thumbs.db
 __pycache__/
 *.pyc
+
+# Android build artifacts and signing credentials
+android/.gradle/
+android/**/build/
+*.apk
+*.aab
+*.keystore
+*.jks

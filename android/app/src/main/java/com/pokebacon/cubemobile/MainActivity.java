@@ -1,0 +1,144 @@
+package com.pokebacon.cubemobile;
+
+import android.app.Activity;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Bundle;
+import android.webkit.ValueCallback;
+import android.webkit.WebChromeClient;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.widget.Toast;
+import androidx.webkit.WebViewAssetLoader;
+import java.io.ByteArrayInputStream;
+
+/**
+ * Offline-only Android host for the generated, source-controlled CUBE web app.
+ * No ROMs, metadata, network permission or proprietary assets are packaged.
+ * The native file picker grants only user-selected content URIs to WebView.
+ */
+public final class MainActivity extends Activity {
+    private static final int PICK_FILE = 1001;
+    private static final String APP_URL =
+        "https://appassets.androidplatform.net/assets/index.html";
+    private WebView webView;
+    private ValueCallback<Uri[]> fileCallback;
+    private NativeExport nativeExport;
+
+    @Override public void onCreate(Bundle state) {
+        super.onCreate(state);
+        WebView.setWebContentsDebuggingEnabled(false);
+        webView = new WebView(this);
+        setContentView(webView);
+        nativeExport = new NativeExport(this, webView);
+        WebSettings settings = webView.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setAllowFileAccess(false);
+        settings.setAllowContentAccess(true);
+        settings.setAllowFileAccessFromFileURLs(false);
+        settings.setAllowUniversalAccessFromFileURLs(false);
+        settings.setJavaScriptCanOpenWindowsAutomatically(false);
+        settings.setSupportMultipleWindows(false);
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        final WebViewAssetLoader assets = new WebViewAssetLoader.Builder()
+            .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
+            .build();
+        nativeExport.install();
+        webView.setWebViewClient(new WebViewClient() {
+            @Override public void onPageFinished(WebView view, String url) {
+                if (APP_URL.equals(url)) nativeExport.inject();
+            }
+            @Override public WebResourceResponse shouldInterceptRequest(
+                WebView view, WebResourceRequest request) {
+                Uri uri = request.getUrl();
+                if (!"https".equals(uri.getScheme()) ||
+                    !"appassets.androidplatform.net".equals(uri.getHost()) ||
+                    !uri.getPath().startsWith("/assets/")) {
+                    return new WebResourceResponse("text/plain", "utf-8",
+                        new ByteArrayInputStream(new byte[0]));
+                }
+                WebResourceResponse result = assets.shouldInterceptRequest(uri);
+                return result == null
+                    ? new WebResourceResponse("text/plain", "utf-8",
+                        new ByteArrayInputStream(new byte[0]))
+                    : result;
+            }
+            @Override public boolean shouldOverrideUrlLoading(
+                WebView view, WebResourceRequest request) {
+                Uri uri = request.getUrl();
+                return !("https".equals(uri.getScheme()) &&
+                    "appassets.androidplatform.net".equals(uri.getHost()) &&
+                    uri.getPath().startsWith("/assets/"));
+            }
+        });
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override public boolean onShowFileChooser(WebView view,
+                ValueCallback<Uri[]> callback, FileChooserParams params) {
+                if (fileCallback != null) fileCallback.onReceiveValue(null);
+                fileCallback = callback;
+                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent.setType("*/*");
+                intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE,
+                    params.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE);
+                try {
+                    startActivityForResult(intent, PICK_FILE);
+                } catch (RuntimeException ex) {
+                    fileCallback.onReceiveValue(null);
+                    fileCallback = null;
+                    Toast.makeText(MainActivity.this,
+                        "No document picker available", Toast.LENGTH_SHORT).show();
+                }
+                return true;
+            }
+        });
+        webView.setDownloadListener((url, userAgent, disposition, mime, size) ->
+            Toast.makeText(this,
+                "This build does not yet support native downloads",
+                Toast.LENGTH_LONG).show());
+        webView.loadUrl(APP_URL);
+    }
+
+    @Override protected void onActivityResult(int requestCode,
+        int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == NativeExport.REQUEST) {
+            nativeExport.onResult(resultCode, data);
+            return;
+        }
+        if (requestCode != PICK_FILE || fileCallback == null) return;
+        ValueCallback<Uri[]> callback = fileCallback;
+        fileCallback = null;
+        callback.onReceiveValue(WebChromeClient.FileChooserParams
+            .parseResult(resultCode, data));
+    }
+
+    @Override public void onBackPressed() {
+        if (webView != null && webView.canGoBack()) {
+            webView.goBack();
+        } else if (webView != null) {
+            webView.evaluateJavascript(
+                "(function(){var b=document.getElementById('home-button');" +
+                "if(b&&!b.hidden){b.click();return true;}return false;})()", null);
+        } else {
+            super.onBackPressed();
+        }
+    }
+
+    @Override protected void onDestroy() {
+        if (fileCallback != null) {
+            fileCallback.onReceiveValue(null);
+            fileCallback = null;
+        }
+        if (nativeExport != null) nativeExport.close();
+        if (webView != null) {
+            webView.destroy();
+            webView = null;
+        }
+        super.onDestroy();
+    }
+}
