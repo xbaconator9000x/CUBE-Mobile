@@ -15,6 +15,6 @@ test('CUBE raw warp trace and destination map navigation exist in modular and of
  assert.match(app,/cube-warp-trace-open/);
  assert.match(app,/Gameplay travel and walkability NOT verified/);
  assert.match(build,/stripHmaCubeWarpArrival/);
- assert.match(offline,/const traceHmaCubeWarpArrival=\(\(\)=>/);
+ assert.match(offline,/const \{traceHmaCubeWarpArrival,auditHmaCubeWarpTopology\}=\(\(\)=>/);
  assert.doesNotMatch(offline,/src\/app\.js/);
 });
