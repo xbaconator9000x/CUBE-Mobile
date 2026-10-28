@@ -60,10 +60,11 @@ export function inspectHmaCubeMapScripts(source,summary,{
   scriptSemanticsVerified:false,writeAuthorized:false
  });
  const rawEntries=[];let terminatorOffset=null;
- for(let i=0;i<maxEntries;i++){
+ for(let i=0;i<=maxEntries;i++){
   const at=start+i*5;
   const type=u8(rom,at);
   if(type===0){terminatorOffset=at;break;}
+  if(i===maxEntries)throw RangeError('Map-script table has no zero terminator within budget');
   if(type>7)throw RangeError('Unsupported CUBHMA map-script type');
   const rawPointer=u32(rom,at+1);
   rawEntries.push({index:i,type,sourceOffset:at,pointerSource:at+1,
@@ -83,9 +84,10 @@ export function inspectHmaCubeMapScripts(source,summary,{
    conditionalTableCount++;
    const conditionStart=entry.targetOffset;
    let terminated=false;
-   for(let i=0;i<maxConditions;i++){
+   for(let i=0;i<=maxConditions;i++){
     const at=conditionStart+i*8,variable=u16(rom,at);
     if(variable===0||variable===0xffff){terminated=true;break;}
+    if(i===maxConditions)throw RangeError('Conditional map-script table has no terminator within budget');
     const value=u16(rom,at+2),rawPointer=u32(rom,at+4);
     conditions.push(Object.freeze({index:i,sourceOffset:at,
      variable,value,rawPointer,targetOffset:pointer(rom,rawPointer,'Conditional script target')}));
