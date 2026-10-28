@@ -63,6 +63,9 @@
   <div class="input-row"><button type="button" id="map-bank-metadata-jump" class="subtle-button" disabled>Inspect anchor bytes in hex</button></div>
   <div class="input-row"><button type="button" id="map-bank-raw-inspect" class="subtle-button" disabled>Inspect raw anchor word</button><button type="button" id="map-bank-raw-follow" class="subtle-button" disabled>Follow raw pointer</button></div>
   <output id="map-bank-raw-status" class="palette-note" aria-live="polite">No raw anchor word inspected. The declaration is not a verified map-bank structure.</output>
+  <div class="input-row"><button type="button" id="map-bank-raw-window-scan" class="subtle-button" disabled>Inspect 16 raw words</button></div>
+  <output id="map-bank-raw-window-status" class="palette-note" aria-live="polite">No raw word window inspected. No bank entries or map counts are inferred.</output>
+  <div id="map-bank-raw-window-list" class="anchor-list"></div>
   <p class="palette-note">Metadata format hints are not proof of CUBE compatibility, collision semantics or safe ROM editing.</p>
  </div>
  <div class="toolbar-card"><div class="input-wrap"><label for="anchor-find">Search named anchors</label><input id="anchor-find" placeholder="e.g. pokemon.stats, maps, trainers, sound…" spellcheck="false"></div><div class="input-wrap"><label for="anchor-group">Category</label><select id="anchor-group"><option value="all">All categories</option></select></div></div>

@@ -1,3 +1,9 @@
+## Checkpoint — bounded raw map-bank pointer window (28 October 2026)
+- [x] Inspect 1–32 raw little-endian words at an unambiguous TOML-declared map-bank anchor with exact ROM offsets, conventional pointer-shaped counts and fail-closed bounds.
+- [x] Expose a 16-word mobile/offline touchscreen explorer with source/target hex navigation, stale-byte revalidation and ROM/metadata reset invalidation.
+- [x] Add synthetic immutability, bounds, stale-reader and UI regression tests. No custom map interpretation, semantic writes or strict parity credit.
+- [ ] Independently authenticate CUBE metadata/ROM fingerprints and implement actual custom bank/layout decoding before interpreting raw words as bank entries. See [raw window checkpoint](docs/MOBILE_MAP_BANK_RAW_WINDOW.md).
+
 ## Checkpoint — raw CUBHMA map-bank anchor pointer evidence (28 October 2026)
 - [x] Read exactly four staged ROM bytes at an unambiguous imported `data.maps.banks` anchor, classify conventional GBA pointer range and in-ROM target without inferring a map-bank layout.
 - [x] Add touchscreen/offline raw word inspection and stale-byte-checked target navigation; invalidate on metadata/ROM changes.
