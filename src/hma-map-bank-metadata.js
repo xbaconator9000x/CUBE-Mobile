@@ -9,6 +9,7 @@
 import {parseHmaNamedAnchors} from './semantic.js';
 import {inspectHmaMapFormatHierarchy} from './hma-map-format-hierarchy.js';
 import {auditHmaMapPointerMultiplicity} from './hma-map-format-ambiguity.js';
+import {inspectHmaDeclaredBankTableShape} from './hma-map-bank-declared-table.js';
 
 const MAP_BANK_ANCHOR='data.maps.banks';
 const MAX_SOURCES=64;
@@ -80,5 +81,8 @@ export function inspectHmaMapBankAnchorSources(sources,{romSize=Infinity}={}){
     return result('ambiguous-format',declarations,{...common,hierarchy:null,multiplicity});
   const status=hierarchy.status==='custom-candidate'?'custom-candidate':
     hierarchy.status==='vanilla-marker'?'vanilla-marker':'unresolved-format';
-  return result(status,declarations,{...common,hierarchy,multiplicity});
+  const tableShape=inspectHmaDeclaredBankTableShape(first.format);
+  return result(status,declarations,{...common,hierarchy,multiplicity,
+    declaredBankCount:tableShape?.declaredBankCount??null,
+    declaredTableByteLength:tableShape?.tableByteLength??null});
 }
