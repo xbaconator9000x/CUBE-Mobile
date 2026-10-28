@@ -72,6 +72,14 @@
   <div class="input-row"><button type="button" id="map-bank-target-scan" class="subtle-button" disabled>Inspect raw bank target windows</button></div>
   <output id="map-bank-target-status" class="palette-note" aria-live="polite">No second-hop raw target windows inspected. No map counts or CUBE structures inferred.</output>
   <div id="map-bank-target-list" class="anchor-list"></div>
+  <div class="input-row">
+    <div class="input-wrap"><label for="cube-bank-index">CUBE bank index (0-based)</label><input id="cube-bank-index" type="number" min="0" max="255" value="0"></div>
+    <div class="input-wrap"><label for="cube-map-count">Maps in selected bank (explicit, not discovered)</label><input id="cube-map-count" type="number" min="1" max="1024" value="1"></div>
+    <div class="input-wrap"><label for="cube-map-index">Map index (0-based)</label><input id="cube-map-index" type="number" min="0" max="1023" value="0"></div>
+  </div>
+  <div class="input-row"><button type="button" id="cube-map-inspect" class="subtle-button" disabled>Inspect declared CUBE custom map (read only)</button></div>
+  <output id="cube-map-status" class="palette-note" aria-live="polite">Requires pinned CUBE custom map format and explicit nested map count; no ROM authenticity or write permissions.</output>
+  <div id="cube-map-details" class="anchor-list" aria-label="Unverified custom CUBE map header, layout and raw cells"></div>
   <p class="palette-note">Metadata format hints are not proof of CUBE compatibility, collision semantics or safe ROM editing.</p>
  </div>
  <div class="toolbar-card"><div class="input-wrap"><label for="anchor-find">Search named anchors</label><input id="anchor-find" placeholder="e.g. pokemon.stats, maps, trainers, sound…" spellcheck="false"></div><div class="input-wrap"><label for="anchor-group">Category</label><select id="anchor-group"><option value="all">All categories</option></select></div></div>
