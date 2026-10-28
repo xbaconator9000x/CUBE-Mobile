@@ -78,7 +78,8 @@ function safeRun(fn){try{const result=fn();if(result?.catch) result.catch(err=>t
 function confirmAction(title,description){return new Promise(resolve=>{const d=$('confirm-dialog');$('confirm-title').textContent=title;$('confirm-text').textContent=description;d.showModal();d.addEventListener('close',()=>resolve(d.returnValue==='yes'),{once:true});});}
 function ensureModel(){if(!model)throw Error('Open a GBA ROM first');return model;}
 const cubeBatchEditors=bindHmaCubeBatchEditors({
- getContext:()=>({rom:model,summary:mapBankCustomSummary,snapshot:cubeWarpEvidence}),
+ getContext:()=>({rom:model,summary:mapBankCustomSummary,snapshot:cubeWarpEvidence,
+  cellQueue:cubeCellBatchQueue,cellSnapshot:cubeCellBatchSnapshot,cellEvidence:cubeRenderEvidence}),
  safeRun
 });
 let cubeBatchReadySnapshot=null;
