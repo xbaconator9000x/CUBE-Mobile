@@ -5,7 +5,7 @@
  * This is filesystem transaction evidence, not CUBE compatibility acceptance.
  */
 import {constants} from 'node:fs';
-import {open,lstat,realpath,readFile,link,unlink} from 'node:fs/promises';
+import {open,lstat,realpath,link,unlink} from 'node:fs/promises';
 import {createHash,randomBytes} from 'node:crypto';
 import {resolve,dirname,basename,join} from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -16,6 +16,28 @@ function digest(bytes){return createHash('sha256').update(bytes).digest('hex');}
 function sameIdentity(a,b){
  return a.dev===b.dev&&a.ino===b.ino&&a.size===b.size&&
   a.mtimeMs===b.mtimeMs&&a.ctimeMs===b.ctimeMs;
+}
+function sameInode(a,b){return a.dev===b.dev&&a.ino===b.ino&&a.size===b.size;}
+/**
+ * Reopen the exact staged inode without following symlinks. A matching hash
+ * alone is insufficient: another process could swap the pathname for a
+ * symlink or unrelated inode between staging and publication.
+ */
+async function verifySavedInode(path,expectedInode,expectedBytes,expectedHash){
+ const pathInfo=await lstat(path);
+ if(!pathInfo.isFile()||pathInfo.isSymbolicLink()||
+    !sameInode(pathInfo,expectedInode))
+  throw RangeError('Saved ROM pathname changed identity');
+ const file=await open(path,constants.O_RDONLY|constants.O_NOFOLLOW);
+ try{
+  const before=await file.stat();
+  if(!sameInode(before,expectedInode)||!sameIdentity(before,pathInfo))
+   throw RangeError('Saved ROM inode changed before reopen');
+  const bytes=await file.readFile(),after=await file.stat();
+  if(!sameIdentity(before,after)||!sameInode(after,expectedInode)||
+     !bytes.equals(Buffer.from(expectedBytes))||digest(bytes)!==expectedHash)
+   throw RangeError('Saved ROM inode or bytes changed during reopen');
+ }finally{await file.close();}
 }
 async function noDestination(path){
  try{await lstat(path);throw RangeError('Destination already exists');}
@@ -64,17 +86,18 @@ export async function saveUnmodifiedRomAs({sourcePath,destinationPath,expectedSh
   try{await handle.writeFile(bytes);await handle.sync();}
   finally{await handle.close();}
   tempIdentity=await lstat(temp);
-  const reopened=await readFile(temp);
-  if(digest(reopened)!==expected||!reopened.equals(Buffer.from(bytes)))
-   throw RangeError('Staged ROM failed exact byte reopen');
+  await verifySavedInode(temp,tempIdentity,bytes,expected);
   const originalAgain=await verifiedSource(source,expected);
   if(!originalAgain.equals(Buffer.from(bytes)))
    throw RangeError('Source changed during Save As');
   await link(temp,destination); // EEXIST is atomic and cannot overwrite.
   createdDestination=true;
-  const saved=await readFile(destination);
-  if(digest(saved)!==expected||!saved.equals(Buffer.from(bytes)))
-   throw RangeError('Saved ROM failed exact byte reopen');
+  // Linking updates inode ctime; compare stable device/inode/size instead.
+  const linked=await lstat(destination),stageAfterLink=await lstat(temp);
+  if(!linked.isFile()||linked.isSymbolicLink()||
+     !sameInode(linked,tempIdentity)||!sameInode(stageAfterLink,tempIdentity))
+   throw RangeError('Published ROM is not the staged regular-file inode');
+  await verifySavedInode(destination,linked,bytes,expected);
   await verifiedSource(source,expected);
   const dir=await open(parent,constants.O_RDONLY);
   try{await dir.sync();}finally{await dir.close();}

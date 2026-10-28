@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,writeFile,readFile,readdir,rm,symlink} from 'node:fs/promises';
+import {mkdtemp,writeFile,readFile,readdir,rm,symlink,link,mkdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createHash} from 'node:crypto';
@@ -66,5 +66,30 @@ test('local CLI returns aggregate-only report and refuses existing destination',
   assert.equal(second.status,2);
   assert.ok(!second.stderr.includes(args.dir));
   assert.deepEqual(await readFile(args.destinationPath),args.bytes);
+ });
+});
+
+test('preexisting hardlink and symlink destinations are never overwritten',async()=>{
+ await fixture(async args=>{
+  await link(args.sourcePath,args.destinationPath);
+  await assert.rejects(saveUnmodifiedRomAs(args),/already exists/);
+  assert.deepEqual(await readFile(args.destinationPath),args.bytes);
+  assert.deepEqual(await readFile(args.sourcePath),args.bytes);
+ });
+ await fixture(async args=>{
+  await symlink(args.sourcePath,args.destinationPath);
+  await assert.rejects(saveUnmodifiedRomAs(args),/already exists/);
+  assert.deepEqual(await readFile(args.sourcePath),args.bytes);
+ });
+});
+test('destination directory symlink traversal fails closed before staging',async()=>{
+ await fixture(async args=>{
+  const actual=join(args.dir,'actual'),alias=join(args.dir,'alias');
+  await mkdir(actual);await symlink(actual,alias);
+  await assert.rejects(saveUnmodifiedRomAs({
+   ...args,destinationPath:join(alias,'copy.bin')
+  }),/symlink/);
+  assert.deepEqual(await readdir(actual),[]);
+  assert.deepEqual(await readFile(args.sourcePath),args.bytes);
  });
 });
