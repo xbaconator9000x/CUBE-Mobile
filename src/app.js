@@ -53,7 +53,7 @@ import {inspectHmaCubeBankCatalog} from './hma-cube-bank-catalog.js';
 import {traceHmaCubeWarpArrival} from './hma-cube-warp-arrival.js';
 import {traceHmaCubeConnectionDestination} from './hma-cube-connection-trace.js';
 import {auditHmaCubeCrossBankOwnership} from './hma-cube-cross-bank-ownership.js';
-import {previewHmaCubeCellBatch,planHmaCubeViewportFloodFill,planHmaCubeViewportStamp} from './hma-cube-cell-batch.js';
+import {previewHmaCubeCellBatch,planHmaCubeViewportFloodFill,planHmaCubeViewportStamp,planHmaCubeViewportReplace} from './hma-cube-cell-batch.js';
 
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
@@ -977,6 +977,7 @@ function clearCubeBatchQueue(){
   $('cube-map-batch-brush').disabled=true;
   $('cube-map-batch-flood').disabled=true;
   $('cube-map-batch-stamp').disabled=true;
+  $('cube-map-batch-replace').disabled=true;
   $('cube-map-batch-preview').disabled=true;
   $('cube-map-batch-clear').disabled=true;
   $('cube-map-batch-list').replaceChildren();
@@ -1325,6 +1326,7 @@ $('cube-map-render-canvas').addEventListener('click',event=>safeRun(()=>{
   $('cube-map-batch-brush').disabled=false;
   $('cube-map-batch-flood').disabled=false;
   $('cube-map-batch-stamp').disabled=false;
+  $('cube-map-batch-replace').disabled=false;
   $('cube-map-stamp-target-x').value=String(hit.cell.x);
   $('cube-map-stamp-target-y').value=String(hit.cell.y);
   $('cube-map-preview-status').textContent='Selected cell is ready for a read-only visual proposal.';
@@ -1408,6 +1410,21 @@ $('cube-map-batch-stamp').addEventListener('click',()=>safeRun(()=>{
   $('cube-map-batch-status').textContent=plan.copiedCells+
     ' source-pattern cells queued ('+plan.fields+' fields). '+
     (plan.sourceOverlapsDestination?'Overlapping copy uses original snapshot. ':'')+
+    'Preview only; no ROM writes.';
+}));
+$('cube-map-batch-replace').addEventListener('click',()=>safeRun(()=>{
+  const selected=cubeRenderSelection,snapshot=selected?.snapshot;
+  if(!snapshot||snapshot!==cubeRenderEvidence||snapshot.rom!==model||
+     !cubeMapEvidence||cubeMapEvidence.options!==snapshot.options)
+    throw Error('Select a current rendered CUBE cell first');
+  const proposal=cubeBatchProposalInputs();
+  const matchMode=$('cube-map-flood-match').value;
+  const plan=planHmaCubeViewportReplace({cells:JSON.parse(snapshot.cellsJson)},{
+    seedX:selected.x,seedY:selected.y,...proposal,matchMode
+  });
+  appendCubeBatchProposals(snapshot,plan.changes);
+  $('cube-map-batch-status').textContent=plan.matchedCells+
+    ' visible CUBE cells queued ('+matchMode+' match, including disconnected cells). '+
     'Preview only; no ROM writes.';
 }));
 $('cube-map-batch-clear').addEventListener('click',()=>safeRun(()=>{

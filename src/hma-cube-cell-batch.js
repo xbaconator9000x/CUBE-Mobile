@@ -251,3 +251,57 @@ export function planHmaCubeViewportStamp(image,{
     readOnly:true,previewOnly:true,writeAuthorized:false,
     romAuthenticated:false,walkabilityVerified:false});
 }
+
+/**
+ * Replace all visible cells matching a selected raw tile, six-bit high field,
+ * or exact raw word. Unlike flood fill, disconnected matches are included.
+ * The 32-cell budget is atomic and the original snapshot remains immutable.
+ */
+export function planHmaCubeViewportReplace(image,{
+  seedX,seedY,tileId,collision,matchMode='tile',maxCells=32
+}={}){
+  if(!image||!Array.isArray(image.cells)||!image.cells.length||
+     image.cells.length>32||!Array.isArray(image.cells[0])||
+     !image.cells[0].length||image.cells[0].length>32)
+    throw new RangeError('Expected bounded rendered CUBE viewport');
+  if(tileId===undefined&&collision===undefined)
+    throw new RangeError('Specify a replacement tile or raw high bits');
+  if(tileId!==undefined)integer(tileId,0,1023,'Replacement tile ID');
+  if(collision!==undefined)integer(collision,0,63,'Replacement high bits');
+  integer(maxCells,1,32,'Visible replacement budget');
+  if(!['tile','high','exact'].includes(matchMode))
+    throw new RangeError('Unsupported visible replacement match mode');
+  const rows=image.cells,width=rows[0].length,height=rows.length;
+  const left=rows[0][0]?.x,top=rows[0][0]?.y;
+  integer(left,0,1023,'Viewport X');integer(top,0,1023,'Viewport Y');
+  integer(seedX,left,left+width-1,'Selected X');
+  integer(seedY,top,top+height-1,'Selected Y');
+  const all=[];
+  for(let y=0;y<height;y++){
+    if(!Array.isArray(rows[y])||rows[y].length!==width)
+      throw new RangeError('Visible replacement grid is not rectangular');
+    for(let x=0;x<width;x++){
+      const c=rows[y][x];
+      if(!c||c.x!==left+x||c.y!==top+y||
+         !Number.isSafeInteger(c.raw)||c.raw<0||c.raw>65535||
+         c.tileId!==(c.raw&1023)||c.collision!==(c.raw>>>10))
+        throw new RangeError('Visible replacement has invalid or stale cells');
+      all.push(c);
+    }
+  }
+  const seed=rows[seedY-top][seedX-left];
+  const match=c=>matchMode==='exact'?c.raw===seed.raw:
+    matchMode==='high'?c.collision===seed.collision:c.tileId===seed.tileId;
+  const changes=[];
+  for(const c of all)if(match(c)){
+    changes.push(Object.freeze({x:c.x,y:c.y,
+      ...(tileId===undefined?{}:{tileId}),
+      ...(collision===undefined?{}:{collision}),expectedRaw:c.raw}));
+    if(changes.length>maxCells)
+      throw new RangeError('Visible replacement exceeds 32-cell budget; no proposals queued');
+  }
+  return Object.freeze({changes:Object.freeze(changes),
+    matchedCells:changes.length,matchMode,viewportOnly:true,
+    readOnly:true,previewOnly:true,writeAuthorized:false,
+    walkabilityVerified:false,romAuthenticated:false});
+}

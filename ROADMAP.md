@@ -1,3 +1,8 @@
+## Checkpoint — CUBE visible-cell replacement preview (28 October 2026)
+- [x] Add bounded noncontiguous tile/high-bit/exact matching across rendered CUBE viewport cells.
+- [x] Integrate touch queue replacement with original-byte validation, offline HTML and tests.
+- [ ] Genuine CUBE ROM/metadata and emulator/Android save-reopen acceptance remain unverified; no semantic writes or parity credit.
+
 ## Checkpoint — CUBE touch pattern stamp preview (28 October 2026)
 - [x] Copy bounded 1–8 × 1–8 rendered source regions to target cells with original-snapshot overlap semantics.
 - [x] Support tile-only, raw high-bit-only and both-field stamps with stale-checked atomic queue integration and offline UI.
