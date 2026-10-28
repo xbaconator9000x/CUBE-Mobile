@@ -85,6 +85,12 @@
     <div class="input-wrap"><label for="cube-map-y">Raw grid Y origin</label><input id="cube-map-y" type="number" min="0" max="1023" value="0"></div>
     <button type="button" id="cube-map-page" class="subtle-button" disabled>Show 10 × 8 raw spatial grid</button>
   </div>
+  <div class="input-row" aria-label="Pan CUBE raw map grid">
+    <button type="button" id="cube-map-left" class="subtle-button" disabled>Left 10</button>
+    <button type="button" id="cube-map-right" class="subtle-button" disabled>Right 10</button>
+    <button type="button" id="cube-map-up" class="subtle-button" disabled>Up 8</button>
+    <button type="button" id="cube-map-down" class="subtle-button" disabled>Down 8</button>
+  </div>
   <div class="input-row"><button type="button" id="cube-map-warps" class="subtle-button" disabled>Inspect CUBE custom event/warp records (read only)</button></div>
   <output id="cube-warps-status" class="palette-note" aria-live="polite">Inspect a custom CUBE map before reading its raw event arrays.</output>
   <div id="cube-warps-list" class="anchor-list" aria-label="Unverified CUBE event and warp records"></div>
