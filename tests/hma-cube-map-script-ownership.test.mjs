@@ -99,3 +99,32 @@ test('invalid map-script list fails closed in ownership impact',async()=>{
  assert.equal(impact.noDetectedOverlapInInspectedMaps,false);
  assert.equal(impact.writeAuthorized,false);
 });
+
+test('same-map event and map-script table alias makes ownership census incomplete',async()=>{
+ const {bytes,summary}=await fixture();
+ // Both the first map's script table and warp array claim the same bytes.
+ // Those bytes are valid in both decoders, but not uniquely owned.
+ ptr(bytes,0x204,0x620);bytes[0x621]=1;ptr(bytes,0x628,0x740);
+ const census=auditHmaCubeCrossBankOwnership(bytes,summary,{
+  banks,includeEvents:true,includeMapScripts:true
+ });
+ assert.equal(census.invalid,0);
+ assert.equal(census.mapScriptIssues.length,0);
+ assert.equal(census.eventIssues.length,0);
+ assert.equal(census.sameMapStructuralAmbiguityDetected,true);
+ assert.ok(census.sameMapStructuralOverlapCount>0);
+ assert.ok(census.sameMapRelationships.some(r=>
+  r.first==='0:0'&&r.second==='0:0'&&
+  [r.firstKind,r.secondKind].includes('map-scripts-table')&&
+  [r.firstKind,r.secondKind].includes('event-warps')));
+ const impact=auditHmaCubeEditOwnershipImpact(bytes,summary,{
+  bankIndex:1,mapIndex:0,mapCount:1,banks,targetBanks:banks,
+  warps:[{warpIndex:0,expected:{
+   x:1,y:11,elevation:8,warpId:0,targetMap:0,targetBank:0
+  },proposed:{x:2}}]
+ });
+ assert.equal(impact.censusIncomplete,true);
+ assert.ok(impact.sameMapStructuralOverlapCount>0);
+ assert.equal(impact.noDetectedOverlapInInspectedMaps,false);
+ assert.equal(impact.writeAuthorized,false);
+});
