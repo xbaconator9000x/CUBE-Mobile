@@ -209,9 +209,11 @@
     <button type="button" id="cube-map-batch-stamp" class="subtle-button" disabled>Copy selected pattern to target (max 32)</button>
     <button type="button" id="cube-map-batch-replace" class="subtle-button" disabled>Replace all matching visible cells (max 32)</button>
     <button type="button" id="cube-map-batch-preview" class="subtle-button" disabled>Preview queued changes</button>
+    <button type="button" id="cube-map-batch-dryrun" class="subtle-button" disabled>Verify reversible in-memory transaction</button>
     <button type="button" id="cube-map-batch-clear" class="subtle-button" disabled>Clear queue</button>
   </div>
   <output id="cube-map-batch-status" class="palette-note" aria-live="polite">No queued CUBE changes. ROM remains unchanged.</output>
+  <output id="cube-map-dryrun-status" class="palette-note" aria-live="polite">No copy-only transaction rehearsal performed. No ROM file will be written.</output>
   <div id="cube-map-batch-list" class="anchor-list" aria-label="Read-only queued CUBE cell proposals"></div>
   <output id="cube-map-preview-status" class="palette-note" aria-live="polite">Select a rendered cell to preview a proposed change. No ROM writes.</output>
   <div style="overflow-x:auto"><canvas id="cube-map-preview-after" hidden aria-label="Read-only proposed CUBE metatile canvas" style="max-width:none;image-rendering:pixelated"></canvas></div>
@@ -7371,7 +7373,7 @@ function auditHmaCubeCrossBankOwnership(source,summary,{banks}={}) {
 
 return auditHmaCubeCrossBankOwnership;
 })();
-const {previewHmaCubeCellBatch,planHmaCubeViewportFloodFill,planHmaCubeViewportStamp,planHmaCubeViewportReplace}=(()=>{
+const {previewHmaCubeCellBatch,planHmaCubeViewportFloodFill,planHmaCubeViewportStamp,planHmaCubeViewportReplace,verifyHmaCubeCellBatchDryRun}=(()=>{
 /**
  * Multi-cell, read-only CUBE Emerald visual preflight.
  * Source: pinned kcradi/CUBHMA MapModel.cs BlockCell encoding and
@@ -7703,7 +7705,76 @@ function planHmaCubeViewportReplace(image,{
     walkabilityVerified:false,romAuthenticated:false});
 }
 
-return {previewHmaCubeCellBatch,planHmaCubeViewportFloodFill,planHmaCubeViewportStamp,planHmaCubeViewportReplace};
+/**
+ * Reversible copy-only transaction rehearsal. Applies validated raw cell
+ * deltas to an isolated in-memory ROM snapshot, decodes the resulting map,
+ * checks every changed byte and reverses the deltas. No patched ROM or
+ * patch bytes escape this function; no file is saved or write authorized.
+ *
+ * This is NOT a genuine CUBE save/reopen or emulator acceptance test.
+ */
+function verifyHmaCubeCellBatchDryRun(source,summary,options={}){
+ const rom=reader(source);
+ if(rom.length<1||rom.length>64*1024*1024)
+  throw new RangeError('Copy-only dry run requires a ROM of 1–64 MiB');
+ const preview=previewHmaCubeCellBatch(rom,summary,options);
+ const original=new Uint8Array(rom.length);
+ for(let i=0;i<original.length;i++)original[i]=byte(rom,i);
+ const freshBefore=renderHmaCubeMapViewport(original,summary,{
+  bankIndex:options.bankIndex,mapIndex:options.mapIndex,mapCount:options.mapCount,
+  x:preview.x,y:preview.y,viewportWidth:preview.viewportWidth,
+  viewportHeight:preview.viewportHeight
+ });
+ if(JSON.stringify(freshBefore.cells)!==JSON.stringify(preview.beforeImage.cells)||
+    JSON.stringify(freshBefore.attributes)!==JSON.stringify(preview.beforeImage.attributes)||
+    freshBefore.pixels.length!==preview.beforeImage.pixels.length||
+    !freshBefore.pixels.every((value,i)=>value===preview.beforeImage.pixels[i]))
+  throw new RangeError('Source changed during copy-only transaction rehearsal');
+ const staged=original.slice(),expected=new Map();
+ for(const record of preview.changes){
+  const at=record.byteOffset;
+  if((staged[at]|staged[at+1]<<8)!==record.before.raw)
+   throw new RangeError('Original cell changed during transaction rehearsal');
+  const raw=record.after.raw;
+  staged[at]=raw&255;staged[at+1]=raw>>>8;
+  expected.set(at,raw&255);expected.set(at+1,raw>>>8);
+ }
+ let changedBytes=0;
+ for(let i=0;i<staged.length;i++){
+  if(staged[i]!==original[i]){
+   if(!expected.has(i)||expected.get(i)!==staged[i])
+    throw new RangeError('Transaction touched an unplanned ROM byte');
+   changedBytes++;
+  }
+ }
+ const reopened=renderHmaCubeMapViewport(staged,summary,{
+  bankIndex:options.bankIndex,mapIndex:options.mapIndex,mapCount:options.mapCount,
+  x:preview.x,y:preview.y,viewportWidth:preview.viewportWidth,
+  viewportHeight:preview.viewportHeight
+ });
+ if(JSON.stringify(reopened.cells)!==JSON.stringify(preview.afterImage.cells)||
+    JSON.stringify(reopened.attributes)!==JSON.stringify(preview.afterImage.attributes)||
+    reopened.pixels.length!==preview.afterImage.pixels.length||
+    !reopened.pixels.every((value,i)=>value===preview.afterImage.pixels[i]))
+  throw new RangeError('Re-decoded transaction differs from virtual preview');
+ for(const record of preview.changes){
+  staged[record.byteOffset]=record.before.bytes[0];
+  staged[record.byteOffset+1]=record.before.bytes[1];
+ }
+ for(let i=0;i<staged.length;i++)
+  if(staged[i]!==original[i])
+   throw new RangeError('Copy-only transaction rollback failed');
+ return Object.freeze({
+  changedCells:preview.changedCells,changedBytes,
+  inMemoryReDecodeVerified:true,inMemoryRollbackVerified:true,
+  sourceBytesExported:false,patchedRomExported:false,
+  authenticSaveReopenVerified:false,romAuthenticated:false,
+  exclusiveOwnershipProven:false,writeAuthorized:false,
+  readOnly:true,copyOnly:true
+ });
+}
+
+return {previewHmaCubeCellBatch,planHmaCubeViewportFloodFill,planHmaCubeViewportStamp,planHmaCubeViewportReplace,verifyHmaCubeCellBatchDryRun};
 })();
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
@@ -8597,11 +8668,13 @@ function appendCubeBatchProposals(snapshot,additions){
   $('cube-map-preview-after').hidden=true;
 }
 function drawCubeCellBatchQueue(){
+  $('cube-map-dryrun-status').textContent='Queue changed; rerun copy-only verification. No ROM file will be written.';
   const list=$('cube-map-batch-list');list.replaceChildren();
   const current=cubeCellBatchSnapshot&&cubeCellBatchSnapshot===cubeRenderEvidence&&
     cubeCellBatchSnapshot.rom===model;
   if(!current&&cubeCellBatchQueue.length){clearCubeBatchQueue();return;}
   $('cube-map-batch-preview').disabled=!cubeCellBatchQueue.length;
+  $('cube-map-batch-dryrun').disabled=!cubeCellBatchQueue.length;
   $('cube-map-batch-clear').disabled=!cubeCellBatchQueue.length;
   $('cube-map-batch-status').textContent=cubeCellBatchQueue.length+
     '/32 CUBE cell proposals queued for virtual preview. No ROM writes or save authorization.';
@@ -8629,6 +8702,8 @@ function clearCubeBatchQueue(){
   $('cube-map-batch-stamp').disabled=true;
   $('cube-map-batch-replace').disabled=true;
   $('cube-map-batch-preview').disabled=true;
+  $('cube-map-batch-dryrun').disabled=true;
+  $('cube-map-dryrun-status').textContent='No copy-only transaction rehearsal performed. No ROM file will be written.';
   $('cube-map-batch-clear').disabled=true;
   $('cube-map-batch-list').replaceChildren();
   $('cube-map-batch-status').textContent='No queued CUBE changes. ROM remains unchanged.';
@@ -9079,6 +9154,21 @@ $('cube-map-batch-replace').addEventListener('click',()=>safeRun(()=>{
 }));
 $('cube-map-batch-clear').addEventListener('click',()=>safeRun(()=>{
   clearCubeBatchQueue();$('cube-map-preview-after').hidden=true;
+}));
+$('cube-map-batch-dryrun').addEventListener('click',()=>safeRun(()=>{
+  const snapshot=cubeCellBatchSnapshot;
+  if(!snapshot||snapshot!==cubeRenderEvidence||snapshot.rom!==model||
+     !cubeMapEvidence||cubeMapEvidence.options!==snapshot.options||
+     !cubeCellBatchQueue.length)
+    throw Error('CUBE cell queue expired; render and select again');
+  const result=verifyHmaCubeCellBatchDryRun(model,mapBankCustomSummary,{
+    ...snapshot.options,x:snapshot.x,y:snapshot.y,
+    viewportWidth:10,viewportHeight:8,changes:cubeCellBatchQueue
+  });
+  $('cube-map-dryrun-status').textContent='Copy-only rehearsal verified '+
+    result.changedCells+' cell(s), '+result.changedBytes+
+    ' changed byte(s), re-decode and rollback. No patched ROM exported. '+
+    'Authentic save/reopen, ownership and emulator acceptance remain unverified.';
 }));
 $('cube-map-batch-preview').addEventListener('click',()=>safeRun(()=>{
   const snapshot=cubeCellBatchSnapshot;

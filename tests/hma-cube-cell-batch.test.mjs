@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {inspectHmaMapBankAnchorSources} from '../src/hma-map-bank-metadata.js';
-import {previewHmaCubeCellBatch} from '../src/hma-cube-cell-batch.js';
+import {previewHmaCubeCellBatch,verifyHmaCubeCellBatchDryRun} from '../src/hma-cube-cell-batch.js';
 function u16(b,i,v){b[i]=v&255;b[i+1]=v>>>8;}
 function u32(b,i,v){u16(b,i,v&65535);u16(b,i+2,v>>>16);}
 function ptr(b,i,at){u32(b,i,0x08000000+at);}
@@ -100,4 +100,28 @@ test('invalid event array never masquerades as a clean edit impact report',async
  assert.equal(result.eventInspectionStatus,'unavailable');
  assert.equal(result.eventRecordsAffected,0);
  assert.equal(result.writeAuthorized,false);
+});
+
+test('copy-only CUBE transaction re-decodes exact bytes and reverses changes',async()=>{
+ const {bytes,summary}=await fixture(),original=bytes.slice();
+ const result=verifyHmaCubeCellBatchDryRun(bytes,summary,{...options,
+  changes:[{x:0,y:0,tileId:512,expectedRaw:0},
+           {x:1,y:0,collision:47,expectedRaw:0}]});
+ assert.equal(result.changedCells,2);
+ assert.equal(result.changedBytes,2);
+ assert.equal(result.inMemoryReDecodeVerified,true);
+ assert.equal(result.inMemoryRollbackVerified,true);
+ assert.equal(result.authenticSaveReopenVerified,false);
+ assert.equal(result.patchedRomExported,false);
+ assert.equal(result.writeAuthorized,false);
+ assert.deepEqual(bytes,original);
+});
+test('copy-only CUBE transaction refuses stale originals and invalid ROM bytes',async()=>{
+ const {bytes,summary}=await fixture();
+ const changes=[{x:0,y:0,tileId:512,expectedRaw:0}];
+ assert.throws(()=>verifyHmaCubeCellBatchDryRun(bytes,summary,{
+  ...options,changes:[{...changes[0],expectedRaw:1}]}),/changed/i);
+ const reader={length:bytes.length,read:i=>i===0x300?300:bytes[i]};
+ assert.throws(()=>verifyHmaCubeCellBatchDryRun(reader,summary,{...options,changes}),RangeError);
+ assert.throws(()=>verifyHmaCubeCellBatchDryRun(new Uint8Array(0),summary,{...options,changes}),RangeError);
 });
