@@ -17,6 +17,8 @@ export function summarizeHmaMapBankSources(sources,{romSize=Infinity}={}){
     status:report.status,anchorName:report.anchorName,
     declarationCount:report.declarationCount,
     uniqueDeclarationCount:report.uniqueDeclarationCount,
+    declaredBankCount:report.declaredBankCount??null,
+    declaredTableByteLength:report.declaredTableByteLength??null,
     declarations:Object.freeze(declarations),
     sectionNames:Object.freeze(sections),
     vanillaMarker:report.hierarchy?.vanillaMarker===true,
