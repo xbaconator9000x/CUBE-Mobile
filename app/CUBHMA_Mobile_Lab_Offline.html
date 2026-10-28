@@ -246,6 +246,51 @@
   </div>
   <output id="cube-warp-edit-status" class="palette-note" aria-live="polite">Inspect CUBE warps, then load a record. This tool never writes ROM bytes.</output>
   <output id="cube-warp-edit-dryrun-status" class="palette-note" aria-live="polite">No isolated warp rehearsal performed.</output>
+
+  <section class="sub-panel" aria-label="CUBE atomic multi-record preview tools">
+   <h3>Atomic CUBE warp batch (copy-only)</h3>
+   <p class="palette-note">Queue up to 32 distinct raw warp records against one original snapshot. Destination bank counts must be explicitly declared. Preview, topology re-decode and rollback never save a ROM.</p>
+   <div class="input-row">
+    <div class="input-wrap"><label for="cube-batch-warp-index">Warp index</label><input id="cube-batch-warp-index" type="number" min="0" value="0"></div>
+    <button type="button" id="cube-batch-warp-load" class="subtle-button" disabled>Load warp</button>
+   </div>
+   <div class="input-row">
+    <div class="input-wrap"><label for="cube-batch-warp-x">X</label><input id="cube-batch-warp-x" type="number" min="0" max="65535" value="0"></div>
+    <div class="input-wrap"><label for="cube-batch-warp-y">Y</label><input id="cube-batch-warp-y" type="number" min="0" max="65535" value="0"></div>
+    <div class="input-wrap"><label for="cube-batch-warp-elevation">Elevation</label><input id="cube-batch-warp-elevation" type="number" min="0" max="255" value="0"></div>
+    <div class="input-wrap"><label for="cube-batch-warp-warpId">Destination warp</label><input id="cube-batch-warp-warpId" type="number" min="0" max="255" value="0"></div>
+    <div class="input-wrap"><label for="cube-batch-warp-targetMap">Destination map</label><input id="cube-batch-warp-targetMap" type="number" min="0" max="255" value="0"></div>
+    <div class="input-wrap"><label for="cube-batch-warp-targetBank">Destination bank</label><input id="cube-batch-warp-targetBank" type="number" min="0" max="255" value="0"></div>
+   </div>
+   <div class="input-row">
+    <div class="input-wrap"><label for="cube-batch-warp-banks">Explicit bank:map counts</label><input id="cube-batch-warp-banks" type="text" placeholder="0:12,1:9" spellcheck="false"></div>
+    <button type="button" id="cube-batch-warp-queue" class="subtle-button" disabled>Queue warp</button>
+    <button type="button" id="cube-batch-warp-preview" class="subtle-button" disabled>Preview batch</button>
+    <button type="button" id="cube-batch-warp-verify" class="subtle-button" disabled>Verify rollback</button>
+    <button type="button" id="cube-batch-warp-clear" class="subtle-button" disabled>Clear queue</button>
+   </div>
+   <output id="cube-batch-warp-status" class="palette-note" aria-live="polite">No queued warp proposals.</output>
+   <div id="cube-batch-warp-list" class="anchor-list" aria-label="Queued CUBE warp changes"></div>
+   <h3>Atomic CUBE event relocation (copy-only)</h3>
+   <p class="palette-note">Move object, script-trigger and signpost coordinates/elevation only. Unknown fields and script pointers are retained. Shared destination cells are reported, not assumed safe.</p>
+   <div class="input-row">
+    <div class="input-wrap"><label for="cube-batch-event-kind">Event kind</label><select id="cube-batch-event-kind"><option value="objects">Object</option><option value="scripts">Script trigger</option><option value="signposts">Signpost</option></select></div>
+    <div class="input-wrap"><label for="cube-batch-event-index">Event index</label><input id="cube-batch-event-index" type="number" min="0" value="0"></div>
+    <button type="button" id="cube-batch-event-load" class="subtle-button" disabled>Load event</button>
+   </div>
+   <div class="input-row">
+    <div class="input-wrap"><label for="cube-batch-event-x">X</label><input id="cube-batch-event-x" type="number" min="0" max="65535" value="0"></div>
+    <div class="input-wrap"><label for="cube-batch-event-y">Y</label><input id="cube-batch-event-y" type="number" min="0" max="65535" value="0"></div>
+    <div class="input-wrap"><label for="cube-batch-event-elevation">Elevation</label><input id="cube-batch-event-elevation" type="number" min="0" max="65535" value="0"></div>
+    <button type="button" id="cube-batch-event-queue" class="subtle-button" disabled>Queue event</button>
+    <button type="button" id="cube-batch-event-preview" class="subtle-button" disabled>Preview batch</button>
+    <button type="button" id="cube-batch-event-verify" class="subtle-button" disabled>Verify rollback</button>
+    <button type="button" id="cube-batch-event-clear" class="subtle-button" disabled>Clear queue</button>
+   </div>
+   <output id="cube-batch-event-status" class="palette-note" aria-live="polite">No queued event relocations.</output>
+   <div id="cube-batch-event-list" class="anchor-list" aria-label="Queued CUBE event changes"></div>
+  </section>
+
   <div class="input-row" aria-label="Bounded CUBE raw warp topology audit">
     <div class="input-wrap"><label for="cube-warp-audit-banks">Destination bank:map-count declarations</label><input id="cube-warp-audit-banks" type="text" value="0:1" placeholder="0:12,1:9" spellcheck="false"></div>
     <button type="button" id="cube-warp-audit" class="subtle-button" disabled>Audit all raw map warps (max 32)</button>
@@ -7975,6 +8020,687 @@ function verifyHmaCubeCellBatchDryRun(source,summary,options={}){
 
 return {previewHmaCubeCellBatch,planHmaCubeViewportFloodFill,planHmaCubeViewportStamp,planHmaCubeViewportReplace,verifyHmaCubeCellBatchDryRun};
 })();
+const {previewHmaCubeWarpBatch,verifyHmaCubeWarpBatchDryRun}=(()=>{
+/**
+ * Atomic, multi-record CUBE Emerald warp transaction rehearsal.
+ * Pinned upstream: kcradi/CUBHMA@3044393183e01af2ae1e907fb37e4a75eda6a8dc,
+ * MapModel.cs WarpsFormat (8 bytes: x/y u16, elevation, warp ID, map, bank).
+ * This module NEVER exports or persists a modified ROM. Matching a metadata
+ * shape does not authenticate a CUBE ROM or grant semantic write authority.
+ */
+const fields=['x','y','elevation','warpId','targetMap','targetBank'];
+function reader(source){
+ if(source instanceof Uint8Array)return {length:source.length,read:i=>source[i]};
+ if(source&&Number.isSafeInteger(source.length)&&source.length>=0&&
+    typeof source.read==='function')return source;
+ throw new TypeError('Expected bounded staged ROM reader');
+}
+function byte(rom,offset){
+ if(!Number.isSafeInteger(offset)||offset<0||offset>=rom.length)
+  throw new RangeError('Warp byte outside ROM');
+ const n=rom.read(offset);
+ if(!Number.isInteger(n)||n<0||n>255)
+  throw new RangeError('Invalid ROM accessor byte');
+ return n;
+}
+function bytesOf(warp){
+ return [warp.x&255,warp.x>>>8,warp.y&255,warp.y>>>8,
+  warp.elevation,warp.warpId,warp.targetMap,warp.targetBank];
+}
+function equalFields(a,b){return fields.every(field=>a[field]===b[field]);}
+function sameTopology(a,b){return JSON.stringify(a)===JSON.stringify(b);}
+function validateBanks(targetBanks,bankIndex,mapCount){
+ if(!Array.isArray(targetBanks)||targetBanks.length<1||targetBanks.length>8)
+  throw new RangeError('Declare 1–8 destination banks for topology audit');
+ const seen=new Set();
+ for(const entry of targetBanks){
+  if(!entry||!Number.isSafeInteger(entry.bankIndex)||entry.bankIndex<0||
+     entry.bankIndex>255||!Number.isSafeInteger(entry.mapCount)||
+     entry.mapCount<1||entry.mapCount>1024||seen.has(entry.bankIndex))
+   throw new RangeError('Invalid or duplicate destination bank declaration');
+  seen.add(entry.bankIndex);
+ }
+ if(!targetBanks.some(entry=>entry.bankIndex===bankIndex&&entry.mapCount===mapCount))
+  throw new RangeError('Destination declarations must include exact source bank count');
+}
+/**
+ * Preview up to 32 distinct warp records as one atomic overlay. Each proposal
+ * is independently checked against the ORIGINAL bytes, never earlier changes
+ * in the same batch. Combined destination traces are then recomputed, so
+ * two edited warps pointing at each other are evaluated together.
+ */
+function previewHmaCubeWarpBatch(source,summary,{
+ bankIndex,mapIndex,mapCount,changes,targetBanks
+}={}){
+ const rom=reader(source);
+ if(!Array.isArray(changes)||changes.length<1||changes.length>32)
+  throw new RangeError('Provide 1–32 warp record proposals');
+ validateBanks(targetBanks,bankIndex,mapCount);
+ const opts={bankIndex,mapIndex,mapCount};
+ const original=inspectHmaCubeMapEventWarps(rom,summary,opts);
+ if(original.warps.length>64)
+  throw new RangeError('Warp topology exceeds 64-record audit budget');
+ const overlay=new Map(),indices=new Set(),records=[];
+ for(const change of changes){
+  if(!change||!Number.isSafeInteger(change.warpIndex)||
+     indices.has(change.warpIndex))
+   throw new RangeError('Duplicate or invalid warp index in batch');
+  indices.add(change.warpIndex);
+  const preview=previewHmaCubeWarpRecordChange(rom,summary,{
+   ...opts,...change,targetBanks
+  });
+  const oldBytes=bytesOf(preview.before),newBytes=bytesOf(preview.after);
+  for(let j=0;j<8;j++){
+   const offset=preview.sourceOffset+j;
+   if(overlay.has(offset))
+    throw new RangeError('Overlapping warp records in batch');
+   if(byte(rom,offset)!==oldBytes[j])
+    throw new RangeError('Warp source changed during batch validation');
+   overlay.set(offset,newBytes[j]);
+  }
+  records.push(Object.freeze({
+   warpIndex:change.warpIndex,sourceOffset:preview.sourceOffset,
+   before:preview.before,after:preview.after,
+   changedFields:preview.changedFields
+  }));
+ }
+ // Ensure a mutable reader cannot change the source between validations.
+ for(const record of records){
+  const originalBytes=bytesOf(record.before);
+  for(let j=0;j<8;j++)
+   if(byte(rom,record.sourceOffset+j)!==originalBytes[j])
+    throw new RangeError('Warp source changed before combined preview');
+ }
+ const staged=Object.freeze({length:rom.length,
+  read:i=>overlay.has(i)?overlay.get(i):byte(rom,i)});
+ const combined=inspectHmaCubeMapEventWarps(staged,summary,opts);
+ if(combined.warps.length!==original.warps.length||
+    combined.map.layout.blockmapOffset!==original.map.layout.blockmapOffset)
+  throw new RangeError('Warp batch changed source map structure');
+ const byIndex=new Map(records.map(record=>[record.warpIndex,record]));
+ for(let i=0;i<original.warps.length;i++){
+  const expected=byIndex.get(i)?.after??original.warps[i];
+  if(combined.warps[i].offset!==original.warps[i].offset||
+     !equalFields(combined.warps[i],expected))
+   throw new RangeError('Combined warp re-decode differs from proposed records');
+ }
+ const beforeTopology=auditHmaCubeWarpTopology(rom,summary,{
+  ...opts,targetBanks,maxWarps:64
+ });
+ const afterTopology=auditHmaCubeWarpTopology(staged,summary,{
+  ...opts,targetBanks,maxWarps:64
+ });
+ return Object.freeze({
+  bankIndex,mapIndex,mapCount,
+  changes:Object.freeze(records),changedRecords:records.filter(r=>r.changedFields.length).length,
+  changedBytes:records.reduce((n,r)=>{
+   const a=bytesOf(r.before),b=bytesOf(r.after);
+   return n+a.filter((v,i)=>v!==b[i]).length;
+  },0),
+  beforeTopology,afterTopology,
+  topologyChanged:!sameTopology(beforeTopology.records,afterTopology.records),
+  unrelatedWarpsPreserved:true,combinedReDecodeVerified:true,
+  readOnly:true,previewOnly:true,writeAuthorized:false,
+  romAuthenticated:false,cubeLayoutAuthenticated:false,
+  exclusiveOwnershipProven:false,authenticSaveReopenVerified:false
+ });
+}
+/**
+ * Apply the complete batch to an isolated copy, re-decode and audit it,
+ * reverse every byte, and verify the original source was never modified.
+ * A successful rehearsal is NOT a persisted ROM roundtrip or emulator test.
+ */
+function verifyHmaCubeWarpBatchDryRun(source,summary,options={}){
+ const rom=reader(source);
+ if(rom.length<1||rom.length>64*1024*1024)
+  throw new RangeError('Warp batch rehearsal requires a 1–64 MiB ROM');
+ const original=new Uint8Array(rom.length);
+ for(let i=0;i<original.length;i++)original[i]=byte(rom,i);
+ for(let i=0;i<original.length;i++)
+  if(byte(rom,i)!==original[i])
+   throw new RangeError('Source changed during ROM snapshot');
+ const plan=previewHmaCubeWarpBatch(original,summary,options);
+ const staged=original.slice();
+ for(const record of plan.changes){
+  const before=bytesOf(record.before),after=bytesOf(record.after);
+  for(let i=0;i<8;i++){
+   if(staged[record.sourceOffset+i]!==before[i])
+    throw new RangeError('Stale warp record during atomic rehearsal');
+   staged[record.sourceOffset+i]=after[i];
+  }
+ }
+ const replay=previewHmaCubeWarpBatch(staged,summary,{
+  ...options,changes:plan.changes.map(r=>({
+   warpIndex:r.warpIndex,expected:r.after,proposed:r.after
+  }))
+ });
+ if(!sameTopology(replay.beforeTopology.records,plan.afterTopology.records)||
+    !replay.combinedReDecodeVerified)
+  throw new RangeError('Applied batch topology differs from preview');
+ const allowed=new Set();
+ for(const record of plan.changes)
+  for(let i=0;i<8;i++)allowed.add(record.sourceOffset+i);
+ let changed=0;
+ for(let i=0;i<staged.length;i++)if(staged[i]!==original[i]){
+  if(!allowed.has(i))
+   throw new RangeError('Batch changed an unrelated ROM byte');
+  changed++;
+ }
+ if(changed!==plan.changedBytes)
+  throw new RangeError('Changed-byte count differs from preflight');
+ for(const record of plan.changes){
+  const before=bytesOf(record.before);
+  for(let i=0;i<8;i++)staged[record.sourceOffset+i]=before[i];
+ }
+ for(let i=0;i<original.length;i++)
+  if(staged[i]!==original[i]||byte(rom,i)!==original[i])
+   throw new RangeError('Warp batch rollback or source preservation failed');
+ return Object.freeze({
+  changedRecords:plan.changedRecords,changedBytes:changed,
+  inMemoryReDecodeVerified:true,inMemoryRollbackVerified:true,
+  unrelatedBytesPreserved:true,sourceBytesPreserved:true,
+  beforeTopology:plan.beforeTopology,afterTopology:plan.afterTopology,
+  sourceBytesExported:false,patchedRomExported:false,
+  authenticSaveReopenVerified:false,writeAuthorized:false,
+  romAuthenticated:false,exclusiveOwnershipProven:false,
+  readOnly:true,copyOnly:true
+ });
+}
+
+return {previewHmaCubeWarpBatch,verifyHmaCubeWarpBatchDryRun};
+})();
+const previewHmaCubeEventPositionChange=(()=>{
+/**
+ * Conservative CUBE Emerald event-position preflight.
+ * Pinned kcradi/CUBHMA@3044393183e01af2ae1e907fb37e4a75eda6a8dc
+ * MapModel.cs: objects 24 bytes, script triggers 16, signposts 12.
+ * Only x/y and the exact elevation field are understood. All unknown
+ * event bytes, pointers, scripts, and flags are preserved byte-for-byte.
+ * No semantic ROM writes or compatibility claims.
+ */
+const kinds=Object.freeze({
+ objects:Object.freeze({coordOffset:4,elevationOffset:8,elevationBytes:1}),
+ scripts:Object.freeze({coordOffset:0,elevationOffset:4,elevationBytes:2}),
+ signposts:Object.freeze({coordOffset:0,elevationOffset:4,elevationBytes:1})
+});
+function reader(source){
+ if(source instanceof Uint8Array)return {length:source.length,read:i=>source[i]};
+ if(source&&Number.isSafeInteger(source.length)&&source.length>=0&&
+    typeof source.read==='function')return source;
+ throw new TypeError('Expected staged ROM reader');
+}
+function byte(rom,offset){
+ if(!Number.isSafeInteger(offset)||offset<0||offset>=rom.length)
+  throw new RangeError('Event record byte outside ROM');
+ const v=rom.read(offset);
+ if(!Number.isInteger(v)||v<0||v>255)
+  throw new RangeError('Invalid ROM byte in event preflight');
+ return v;
+}
+function integer(value,max,name){
+ if(!Number.isSafeInteger(value)||value<0||value>max)
+  throw new RangeError(name+' outside supported raw field range');
+}
+function recordFields(record){
+ return Object.freeze({x:record.x,y:record.y,elevation:record.elevation});
+}
+function same(a,b){return a.x===b.x&&a.y===b.y&&a.elevation===b.elevation;}
+function encoded(value,count){
+ return Array.from({length:count},(_,i)=>(value>>>(8*i))&255);
+}
+/** Preview exactly one source-grounded event position change. */
+function previewHmaCubeEventPositionChange(source,summary,{
+ bankIndex,mapIndex,mapCount,kind,index,expected,proposed
+}={}){
+ const rom=reader(source),opts={bankIndex,mapIndex,mapCount};
+ if(!Object.hasOwn(kinds,kind))
+  throw new RangeError('Only objects, scripts and signposts support position edits');
+ const spec=kinds[kind];
+ const before=inspectHmaCubeMapEventWarps(rom,summary,opts);
+ if(!Number.isSafeInteger(index)||index<0||index>=before.arrays[kind].length)
+  throw new RangeError('Event index outside decoded array');
+ const record=before.arrays[kind][index];
+ if(!expected||Object.keys(expected).length!==3||
+    !['x','y','elevation'].every(k=>Object.hasOwn(expected,k)))
+  throw new RangeError('Exact x/y/elevation expected fields required');
+ integer(expected.x,65535,'Expected x');
+ integer(expected.y,65535,'Expected y');
+ integer(expected.elevation,spec.elevationBytes===2?65535:255,'Expected elevation');
+ if(!same(record,expected))
+  throw new RangeError('Event position changed since selection');
+ if(!proposed||typeof proposed!=='object'||!Object.keys(proposed).length||
+    Object.keys(proposed).some(k=>!['x','y','elevation'].includes(k)))
+  throw new RangeError('Specify supported position fields');
+ const next={...recordFields(record),...proposed};
+ integer(next.x,65535,'Proposed x');
+ integer(next.y,65535,'Proposed y');
+ integer(next.elevation,spec.elevationBytes===2?65535:255,'Proposed elevation');
+ if(next.x>=before.map.layout.width||next.y>=before.map.layout.height)
+  throw new RangeError('Proposed event position outside declared map');
+ const start=record.offset,original=new Map(),overlay=new Map();
+ for(const [offset,bytes] of [
+  [start+spec.coordOffset,encoded(record.x,2)],
+  [start+spec.coordOffset+2,encoded(record.y,2)],
+  [start+spec.elevationOffset,encoded(record.elevation,spec.elevationBytes)]
+ ])bytes.forEach((v,i)=>original.set(offset+i,v));
+ for(const [offset,bytes] of [
+  [start+spec.coordOffset,encoded(next.x,2)],
+  [start+spec.coordOffset+2,encoded(next.y,2)],
+  [start+spec.elevationOffset,encoded(next.elevation,spec.elevationBytes)]
+ ])bytes.forEach((v,i)=>overlay.set(offset+i,v));
+ for(const [offset,v] of original)
+  if(byte(rom,offset)!==v)
+   throw new RangeError('Event bytes changed during position preflight');
+ const staged=Object.freeze({length:rom.length,
+  read:i=>overlay.has(i)?overlay.get(i):byte(rom,i)});
+ const after=inspectHmaCubeMapEventWarps(staged,summary,opts);
+ if(after.arrays[kind].length!==before.arrays[kind].length||
+    !same(after.arrays[kind][index],next))
+  throw new RangeError('Virtual event position failed re-decode');
+ for(const name of Object.keys(before.arrays)){
+  if(before.arrays[name].length!==after.arrays[name].length)
+   throw new RangeError('Virtual edit changed event array length');
+  for(let i=0;i<before.arrays[name].length;i++){
+   if(name===kind&&i===index)continue;
+   if(JSON.stringify(before.arrays[name][i])!==JSON.stringify(after.arrays[name][i]))
+    throw new RangeError('Virtual edit modified an unrelated event');
+  }
+ }
+ const conflicts=[];
+ for(const [name,items] of Object.entries(after.arrays))
+  for(const item of items)
+   if(!(name===kind&&item.index===index)&&
+      item.x===next.x&&item.y===next.y)
+    conflicts.push(Object.freeze({kind:name,index:item.index,offset:item.offset}));
+ return Object.freeze({
+  kind,index,sourceOffset:start,before:recordFields(record),
+  after:recordFields(after.arrays[kind][index]),
+  changedFields:Object.freeze(['x','y','elevation'].filter(k=>record[k]!==next[k])),
+  rawBytes:Object.freeze([...overlay].sort((a,b)=>a[0]-b[0]).map(([offset,value])=>
+   Object.freeze({offset,expected:original.get(offset),value}))),
+  colocatedEvents:Object.freeze(conflicts),
+  unrelatedEventsPreserved:true,virtualReDecodeVerified:true,
+  readOnly:true,previewOnly:true,writeAuthorized:false,
+  romAuthenticated:false,cubeLayoutAuthenticated:false,
+  exclusiveOwnershipProven:false,authenticSaveReopenVerified:false
+ });
+}
+/** Isolated copy-only apply, re-decode and full rollback of an event move. */
+function verifyHmaCubeEventPositionDryRun(source,summary,options={}){
+ const rom=reader(source);
+ if(rom.length<1||rom.length>64*1024*1024)
+  throw new RangeError('Event rehearsal requires a 1–64 MiB ROM');
+ const original=new Uint8Array(rom.length);
+ for(let i=0;i<rom.length;i++)original[i]=byte(rom,i);
+ for(let i=0;i<rom.length;i++)
+  if(byte(rom,i)!==original[i])
+   throw new RangeError('Source changed during ROM snapshot');
+ const plan=previewHmaCubeEventPositionChange(original,summary,options);
+ const staged=original.slice();
+ for(const change of plan.rawBytes){
+  if(staged[change.offset]!==change.expected)
+   throw new RangeError('Event byte changed before isolated apply');
+  staged[change.offset]=change.value;
+ }
+ const after=inspectHmaCubeMapEventWarps(staged,summary,options);
+ if(!same(after.arrays[plan.kind][plan.index],plan.after))
+  throw new RangeError('Isolated event re-decode failed');
+ let changed=0;
+ const allowed=new Set(plan.rawBytes.map(b=>b.offset));
+ for(let i=0;i<staged.length;i++)if(staged[i]!==original[i]){
+  if(!allowed.has(i))throw new RangeError('Unrelated ROM byte modified');
+  changed++;
+ }
+ for(const change of plan.rawBytes)staged[change.offset]=change.expected;
+ for(let i=0;i<original.length;i++)
+  if(staged[i]!==original[i]||byte(rom,i)!==original[i])
+   throw new RangeError('Event rollback or source preservation failed');
+ return Object.freeze({
+  kind:plan.kind,index:plan.index,changedBytes:changed,
+  colocatedEvents:plan.colocatedEvents,
+  inMemoryReDecodeVerified:true,inMemoryRollbackVerified:true,
+  unrelatedBytesPreserved:true,sourceBytesPreserved:true,
+  patchedRomExported:false,authenticSaveReopenVerified:false,
+  romAuthenticated:false,writeAuthorized:false,readOnly:true,copyOnly:true
+ });
+}
+
+return previewHmaCubeEventPositionChange;
+})();
+const {previewHmaCubeEventPositionBatch,verifyHmaCubeEventPositionBatchDryRun}=(()=>{
+/**
+ * Atomic multi-kind CUBE Emerald event-position preview and copy-only rollback.
+ * Source-grounded in pinned CUBHMA MapModel.cs fixed-width event arrays.
+ * Never exports a ROM, interprets scripts, or authorizes semantic writes.
+ */
+function reader(source){
+ if(source instanceof Uint8Array)return {length:source.length,read:i=>source[i]};
+ if(source&&Number.isSafeInteger(source.length)&&source.length>=0&&
+    typeof source.read==='function')return source;
+ throw new TypeError('Expected bounded staged ROM reader');
+}
+function byte(rom,i){
+ if(!Number.isSafeInteger(i)||i<0||i>=rom.length)
+  throw new RangeError('Event byte outside ROM');
+ const n=rom.read(i);
+ if(!Number.isInteger(n)||n<0||n>255)
+  throw new RangeError('Invalid staged ROM byte');
+ return n;
+}
+function positionEqual(a,b){
+ return a.x===b.x&&a.y===b.y&&a.elevation===b.elevation;
+}
+function key(kind,index){return kind+':'+index;}
+/**
+ * Validate all proposals against the SAME original snapshot, overlay all
+ * changed position fields and re-decode every event kind. This supports
+ * coordinated relocations without falsely rejecting temporary overlaps.
+ */
+function previewHmaCubeEventPositionBatch(source,summary,{
+ bankIndex,mapIndex,mapCount,changes
+}={}){
+ const rom=reader(source),opts={bankIndex,mapIndex,mapCount};
+ if(!Array.isArray(changes)||changes.length<1||changes.length>32)
+  throw new RangeError('Provide 1–32 event position proposals');
+ const original=inspectHmaCubeMapEventWarps(rom,summary,opts);
+ const seen=new Set(),overlay=new Map(),expectedBytes=new Map(),records=[];
+ for(const change of changes){
+  if(!change||seen.has(key(change.kind,change.index)))
+   throw new RangeError('Duplicate or invalid event proposal');
+  seen.add(key(change.kind,change.index));
+  const plan=previewHmaCubeEventPositionChange(rom,summary,{
+   ...opts,...change
+  });
+  for(const patch of plan.rawBytes){
+   if(overlay.has(patch.offset))
+    throw new RangeError('Overlapping event position fields');
+   overlay.set(patch.offset,patch.value);
+   expectedBytes.set(patch.offset,patch.expected);
+  }
+  records.push(Object.freeze({
+   kind:plan.kind,index:plan.index,sourceOffset:plan.sourceOffset,
+   before:plan.before,after:plan.after,changedFields:plan.changedFields
+  }));
+ }
+ for(const [offset,expected] of expectedBytes)
+  if(byte(rom,offset)!==expected)
+   throw new RangeError('Source event bytes changed before combined preview');
+ const staged=Object.freeze({length:rom.length,
+  read:i=>overlay.has(i)?overlay.get(i):byte(rom,i)});
+ const after=inspectHmaCubeMapEventWarps(staged,summary,opts);
+ const edits=new Map(records.map(r=>[key(r.kind,r.index),r]));
+ for(const kind of Object.keys(original.arrays)){
+  if(original.arrays[kind].length!==after.arrays[kind].length)
+   throw new RangeError('Combined edit changed event array count');
+  for(let i=0;i<original.arrays[kind].length;i++){
+   const beforeRecord=original.arrays[kind][i];
+   const afterRecord=after.arrays[kind][i];
+   const edit=edits.get(key(kind,i));
+   if(edit){
+    if(afterRecord.offset!==beforeRecord.offset||
+       !positionEqual(afterRecord,edit.after))
+     throw new RangeError('Combined event position re-decode failed');
+   }else if(JSON.stringify(beforeRecord)!==JSON.stringify(afterRecord))
+    throw new RangeError('Combined edit modified an unrelated event');
+  }
+ }
+ const collisions=[];
+ const coordinates=new Map();
+ for(const [kind,items] of Object.entries(after.arrays))
+  for(const item of items){
+   const pos=item.x+':'+item.y;
+   if(!coordinates.has(pos))coordinates.set(pos,[]);
+   coordinates.get(pos).push(Object.freeze({kind,index:item.index,offset:item.offset}));
+  }
+ for(const [position,occupants] of coordinates)
+  if(occupants.length>1&&occupants.some(o=>edits.has(key(o.kind,o.index))))
+   collisions.push(Object.freeze({position,occupants:Object.freeze(occupants)}));
+ const rawBytes=Object.freeze([...overlay].sort((a,b)=>a[0]-b[0])
+  .map(([offset,value])=>Object.freeze({
+   offset,expected:expectedBytes.get(offset),value
+  })));
+ return Object.freeze({
+  bankIndex,mapIndex,mapCount,
+  changes:Object.freeze(records),rawBytes,
+  changedRecords:records.filter(r=>r.changedFields.length).length,
+  changedBytes:rawBytes.filter(b=>b.expected!==b.value).length,
+  colocatedDestinations:Object.freeze(collisions),
+  unrelatedEventsPreserved:true,combinedReDecodeVerified:true,
+  readOnly:true,previewOnly:true,writeAuthorized:false,
+  romAuthenticated:false,cubeLayoutAuthenticated:false,
+  exclusiveOwnershipProven:false,authenticSaveReopenVerified:false
+ });
+}
+/** Copy-only transaction of all event relocations with full rollback. */
+function verifyHmaCubeEventPositionBatchDryRun(source,summary,options={}){
+ const rom=reader(source);
+ if(rom.length<1||rom.length>64*1024*1024)
+  throw new RangeError('Event batch rehearsal requires a 1–64 MiB ROM');
+ const original=new Uint8Array(rom.length);
+ for(let i=0;i<original.length;i++)original[i]=byte(rom,i);
+ for(let i=0;i<original.length;i++)
+  if(byte(rom,i)!==original[i])
+   throw new RangeError('Source changed during ROM snapshot');
+ const plan=previewHmaCubeEventPositionBatch(original,summary,options);
+ const staged=original.slice();
+ for(const patch of plan.rawBytes){
+  if(staged[patch.offset]!==patch.expected)
+   throw new RangeError('Stale event position byte during rehearsal');
+  staged[patch.offset]=patch.value;
+ }
+ const after=inspectHmaCubeMapEventWarps(staged,summary,options);
+ for(const record of plan.changes)
+  if(!positionEqual(after.arrays[record.kind][record.index],record.after))
+   throw new RangeError('Applied event batch differs from preflight');
+ const allowed=new Set(plan.rawBytes.map(p=>p.offset));
+ let changed=0;
+ for(let i=0;i<staged.length;i++)if(staged[i]!==original[i]){
+  if(!allowed.has(i))throw new RangeError('Event batch modified unrelated byte');
+  changed++;
+ }
+ if(changed!==plan.changedBytes)
+  throw new RangeError('Applied event batch changed-byte count mismatch');
+ for(const patch of plan.rawBytes)staged[patch.offset]=patch.expected;
+ for(let i=0;i<staged.length;i++)
+  if(staged[i]!==original[i]||byte(rom,i)!==original[i])
+   throw new RangeError('Event batch rollback or source preservation failed');
+ return Object.freeze({
+  changedRecords:plan.changedRecords,changedBytes:changed,
+  colocatedDestinations:plan.colocatedDestinations,
+  inMemoryReDecodeVerified:true,inMemoryRollbackVerified:true,
+  unrelatedBytesPreserved:true,sourceBytesPreserved:true,
+  patchedRomExported:false,authenticSaveReopenVerified:false,
+  romAuthenticated:false,writeAuthorized:false,readOnly:true,copyOnly:true
+ });
+}
+
+return {previewHmaCubeEventPositionBatch,verifyHmaCubeEventPositionBatchDryRun};
+})();
+const bindHmaCubeBatchEditors=(()=>{
+/**
+ * Touch-first, copy-only CUBE Emerald warp and event batch editor.
+ * Uses the pinned CUBHMA record decoders; never mutates or exports ROM data.
+ * Context must be revalidated against the exact inspected source on every action.
+ */
+const warpFields=['x','y','elevation','warpId','targetMap','targetBank'];
+const positionFields=['x','y','elevation'];
+function unsigned(value,max,label){
+ if(!/^[0-9]+$/.test(String(value).trim()))throw new RangeError(label+' must be unsigned');
+ const n=Number(value);
+ if(!Number.isSafeInteger(n)||n>max)throw new RangeError(label+' outside raw field range');
+ return n;
+}
+function declaredBanks(text){
+ const parts=text.trim().split(',').map(x=>x.trim());
+ if(parts.length<1||parts.length>8||parts.some(p=>!/^[0-9]+:[0-9]+$/.test(p)))
+  throw new RangeError('Declare 1–8 bank:map-count pairs');
+ const banks=parts.map(p=>{
+  const [bankIndex,mapCount]=p.split(':').map(Number);
+  return {bankIndex:unsigned(bankIndex,255,'Bank'),mapCount:unsigned(mapCount,1024,'Map count')};
+ });
+ if(banks.some(b=>b.mapCount<1)||new Set(banks.map(b=>b.bankIndex)).size!==banks.length)
+  throw new RangeError('Invalid or duplicate bank counts');
+ return banks;
+}
+function bindHmaCubeBatchEditors({getContext,safeRun}){
+ const $=id=>document.getElementById(id);
+ let warpQueue=[],eventQueue=[],warpSelection=null,eventSelection=null;
+ let warpSnapshot=null,eventSnapshot=null,warpBanks=null,enabled=false;
+ const names=['warp','event'];
+ function status(kind,text){$('cube-batch-'+kind+'-status').textContent=text;}
+ function reset(){
+  warpQueue=[];eventQueue=[];warpSelection=null;eventSelection=null;
+  warpSnapshot=null;eventSnapshot=null;warpBanks=null;
+  for(const kind of names){
+   $('cube-batch-'+kind+'-list').replaceChildren();
+   for(const action of ['load','queue','preview','verify','clear'])
+    $('cube-batch-'+kind+'-'+action).disabled=true;
+   status(kind,'No queued '+kind+' proposals. ROM unchanged; no export.');
+  }
+ }
+ function ready(value){
+  reset();enabled=Boolean(value);
+  for(const kind of names)$('cube-batch-'+kind+'-load').disabled=!enabled;
+ }
+ function current(snapshot){
+  const ctx=getContext();
+  if(!enabled||!ctx||!snapshot||snapshot!==ctx.snapshot||
+     !ctx.rom||!ctx.summary)
+   throw Error('CUBE event source expired; inspect map records again');
+  const fresh=inspectHmaCubeMapEventWarps(ctx.rom,ctx.summary,snapshot.options);
+  if(JSON.stringify(fresh)!==JSON.stringify(snapshot.report))
+   throw Error('CUBE event records changed; reinspect before editing');
+  return {ctx,fresh};
+ }
+ function readFields(kind,fields){
+  return Object.fromEntries(fields.map(key=>[
+   key,unsigned($('cube-batch-'+kind+'-'+key).value,
+    key==='x'||key==='y'?65535:key==='elevation'&&kind==='event'?65535:255,key)
+  ]));
+ }
+ function options(kind){
+  const snapshot=kind==='warp'?warpSnapshot:eventSnapshot;
+  const {ctx}=current(snapshot);
+  return {ctx,params:{...snapshot.options,
+   changes:kind==='warp'?warpQueue:eventQueue,
+   ...(kind==='warp'?{targetBanks:warpBanks}:{})}};
+ }
+ function render(kind){
+  const queue=kind==='warp'?warpQueue:eventQueue;
+  const list=$('cube-batch-'+kind+'-list');list.replaceChildren();
+  for(const action of ['preview','verify','clear'])
+   $('cube-batch-'+kind+'-'+action).disabled=!queue.length;
+  status(kind,queue.length+'/32 '+kind+' proposals. Preview/copy-only rollback; no ROM export.');
+  for(const entry of queue){
+   const button=document.createElement('button');
+   button.type='button';button.className='subtle-button';
+   button.textContent=kind==='warp'?'Remove warp #'+entry.warpIndex+
+    ' → '+entry.proposed.targetBank+':'+entry.proposed.targetMap+':'+entry.proposed.warpId:
+    'Remove '+entry.kind+' #'+entry.index+' → ('+entry.proposed.x+','+entry.proposed.y+')';
+   button.addEventListener('click',()=>safeRun(()=>{
+    current(kind==='warp'?warpSnapshot:eventSnapshot);
+    if(kind==='warp')warpQueue=warpQueue.filter(x=>x.warpIndex!==entry.warpIndex);
+    else eventQueue=eventQueue.filter(x=>x.kind!==entry.kind||x.index!==entry.index);
+    if(!warpQueue.length){warpSnapshot=null;warpBanks=null;}
+    if(!eventQueue.length)eventSnapshot=null;
+    render(kind);
+   }));
+   list.append(button);
+  }
+ }
+ function on(id,fn){$(id).addEventListener('click',()=>safeRun(fn));}
+ on('cube-batch-warp-load',()=>{
+  const ctx=getContext(),{fresh}=current(ctx?.snapshot);
+  const warpIndex=unsigned($('cube-batch-warp-index').value,65535,'Warp index');
+  if(warpIndex>=fresh.warps.length)throw RangeError('Warp index outside source array');
+  const record=fresh.warps[warpIndex];
+  warpSelection={snapshot:ctx.snapshot,warpIndex,
+   expected:Object.fromEntries(warpFields.map(key=>[key,record[key]]))};
+  for(const key of warpFields)$('cube-batch-warp-'+key).value=String(record[key]);
+  if(!$('cube-batch-warp-banks').value.trim())
+   $('cube-batch-warp-banks').value=ctx.snapshot.options.bankIndex+':'+ctx.snapshot.options.mapCount;
+  $('cube-batch-warp-queue').disabled=false;
+  status('warp','Loaded warp #'+warpIndex+'. Edit raw fields and queue; ROM unchanged.');
+ });
+ on('cube-batch-warp-queue',()=>{
+  const selection=warpSelection;
+  if(!selection)throw Error('Load a warp first');
+  const {ctx}=current(selection.snapshot);
+  if(unsigned($('cube-batch-warp-index').value,65535,'Warp index')!==selection.warpIndex)
+   throw Error('Warp index changed; reload');
+  const proposed=readFields('warp',warpFields);
+  const banks=declaredBanks($('cube-batch-warp-banks').value);
+  if(warpQueue.length&&(warpSnapshot!==selection.snapshot||
+     JSON.stringify(banks)!==JSON.stringify(warpBanks)))
+   throw Error('Batch source or bank counts changed; clear queue');
+  if(warpQueue.length>=32||warpQueue.some(x=>x.warpIndex===selection.warpIndex))
+   throw Error('Only 32 distinct warps; remove a duplicate first');
+  const changes=[...warpQueue,{warpIndex:selection.warpIndex,expected:selection.expected,proposed}];
+  previewHmaCubeWarpBatch(ctx.rom,ctx.summary,{...selection.snapshot.options,changes,targetBanks:banks});
+  warpQueue=changes;warpSnapshot=selection.snapshot;warpBanks=banks;render('warp');
+ });
+ on('cube-batch-warp-preview',()=>{
+  const {ctx,params}=options('warp'),r=previewHmaCubeWarpBatch(ctx.rom,ctx.summary,params);
+  status('warp','Atomic preview: '+r.changedRecords+' records, '+r.changedBytes+
+   ' bytes; topology changed: '+r.topologyChanged+'; re-decode: '+r.combinedReDecodeVerified+
+   '. No ownership proof, ROM write or emulator acceptance.');
+ });
+ on('cube-batch-warp-verify',()=>{
+  const {ctx,params}=options('warp'),r=verifyHmaCubeWarpBatchDryRun(ctx.rom,ctx.summary,params);
+  status('warp','Isolated copy: '+r.changedRecords+' records, '+r.changedBytes+
+   ' bytes; re-decode: '+r.inMemoryReDecodeVerified+'; rollback: '+r.inMemoryRollbackVerified+
+   '; source preserved: '+r.sourceBytesPreserved+'. No ROM exported.');
+ });
+ on('cube-batch-warp-clear',()=>{warpQueue=[];warpSnapshot=null;warpBanks=null;render('warp');});
+ on('cube-batch-event-load',()=>{
+  const ctx=getContext(),{fresh}=current(ctx?.snapshot);
+  const kind=$('cube-batch-event-kind').value;
+  if(!['objects','scripts','signposts'].includes(kind))throw RangeError('Unsupported event kind');
+  const index=unsigned($('cube-batch-event-index').value,65535,'Event index');
+  if(index>=fresh.arrays[kind].length)throw RangeError('Event index outside source array');
+  const record=fresh.arrays[kind][index];
+  eventSelection={snapshot:ctx.snapshot,kind,index,
+   expected:Object.fromEntries(positionFields.map(key=>[key,record[key]]))};
+  for(const key of positionFields)$('cube-batch-event-'+key).value=String(record[key]);
+  $('cube-batch-event-queue').disabled=false;
+  status('event','Loaded '+kind+' #'+index+'. Only position fields are editable.');
+ });
+ on('cube-batch-event-queue',()=>{
+  const selection=eventSelection;
+  if(!selection)throw Error('Load an event first');
+  const {ctx}=current(selection.snapshot);
+  if($('cube-batch-event-kind').value!==selection.kind||
+     unsigned($('cube-batch-event-index').value,65535,'Event index')!==selection.index)
+   throw Error('Event kind/index changed; reload');
+  const proposed=readFields('event',positionFields);
+  if(eventQueue.length&&eventSnapshot!==selection.snapshot)
+   throw Error('Batch source changed; clear queue');
+  if(eventQueue.length>=32||eventQueue.some(x=>x.kind===selection.kind&&x.index===selection.index))
+   throw Error('Only 32 distinct events; remove a duplicate first');
+  const changes=[...eventQueue,{kind:selection.kind,index:selection.index,
+   expected:selection.expected,proposed}];
+  previewHmaCubeEventPositionBatch(ctx.rom,ctx.summary,{...selection.snapshot.options,changes});
+  eventQueue=changes;eventSnapshot=selection.snapshot;render('event');
+ });
+ on('cube-batch-event-preview',()=>{
+  const {ctx,params}=options('event'),r=previewHmaCubeEventPositionBatch(ctx.rom,ctx.summary,params);
+  status('event','Atomic preview: '+r.changedRecords+' records, '+r.changedBytes+
+   ' bytes, '+r.colocatedDestinations.length+' shared destinations; re-decode: '+
+   r.combinedReDecodeVerified+'. Script pointers preserved; no ROM writes.');
+ });
+ on('cube-batch-event-verify',()=>{
+  const {ctx,params}=options('event'),r=verifyHmaCubeEventPositionBatchDryRun(ctx.rom,ctx.summary,params);
+  status('event','Isolated copy: '+r.changedRecords+' records, '+r.changedBytes+
+   ' bytes; rollback: '+r.inMemoryRollbackVerified+
+   '; source preserved: '+r.sourceBytesPreserved+'. No ROM exported.');
+ });
+ on('cube-batch-event-clear',()=>{eventQueue=[];eventSnapshot=null;render('event');});
+ reset();
+ return Object.freeze({reset,ready});
+}
+
+return bindHmaCubeBatchEditors;
+})();
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let pcsReference=null,pcsReferenceName='';
@@ -7995,6 +8721,11 @@ function toast(message,bad=false){const t=$('toast');t.textContent=message;t.cla
 function safeRun(fn){try{const result=fn();if(result?.catch) result.catch(err=>toast(err.message||String(err),true));}catch(err){toast(err.message||String(err),true);}}
 function confirmAction(title,description){return new Promise(resolve=>{const d=$('confirm-dialog');$('confirm-title').textContent=title;$('confirm-text').textContent=description;d.showModal();d.addEventListener('close',()=>resolve(d.returnValue==='yes'),{once:true});});}
 function ensureModel(){if(!model)throw Error('Open a GBA ROM first');return model;}
+const cubeBatchEditors=bindHmaCubeBatchEditors({
+ getContext:()=>({rom:model,summary:mapBankCustomSummary,snapshot:cubeWarpEvidence}),
+ safeRun
+});
+let cubeBatchReadySnapshot=null;
 // A fragment route works both in an HTTPS-installed PWA and in a locally opened
 // file:// standalone HTML app. Each tab change creates a real history entry,
 // allowing Android's system Back gesture/button to return to the previous tab.
@@ -8071,7 +8802,7 @@ function updateIndicators(){
   drawMapBankRawPointerEvidence();
   drawMapBankRawWindowEvidence();
 }
-function installModel(name,bytes){clearCubeRenderedMap('ROM replaced; render again.');clearCubeCatalog();clearMapChangeReview();clearMapAtlas('ROM replaced; declared atlas invalidated.');metadataImportSerial++;metadataFingerprints=[];mapBankMetadataReport=null;mapBankRawPointerEvidence=null;mapBankRawWindowEvidence=null;mapBankDeclaredEvidence=null;mapBankTargetEvidence=null;mapBankCustomSummary=null;cubeMapEvidence=null;cubeWarpEvidence=null;cubeConnectionEvidence=null;clearRenderedMap('ROM replaced. Select vanilla header again.');$('map-grid').innerHTML='<div class="empty-state">No blockmap inspected.</div>';$('map-bank-status').textContent='ROM replaced. Re-enter independently verified vanilla bank location and counts.';clearWarpInspection('ROM replaced. Select a vanilla map header again.');clearConnectionInspection('ROM replaced. Select a vanilla map header again.');$('map-layout-status').textContent='ROM replaced. No vanilla-format layout inspected.';$('map-status').textContent='ROM replaced. Enter a verified offset and inspect again.';pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
+function installModel(name,bytes){cubeBatchEditors.ready(false);cubeBatchReadySnapshot=null;clearCubeRenderedMap('ROM replaced; render again.');clearCubeCatalog();clearMapChangeReview();clearMapAtlas('ROM replaced; declared atlas invalidated.');metadataImportSerial++;metadataFingerprints=[];mapBankMetadataReport=null;mapBankRawPointerEvidence=null;mapBankRawWindowEvidence=null;mapBankDeclaredEvidence=null;mapBankTargetEvidence=null;mapBankCustomSummary=null;cubeMapEvidence=null;cubeWarpEvidence=null;cubeConnectionEvidence=null;clearRenderedMap('ROM replaced. Select vanilla header again.');$('map-grid').innerHTML='<div class="empty-state">No blockmap inspected.</div>';$('map-bank-status').textContent='ROM replaced. Re-enter independently verified vanilla bank location and counts.';clearWarpInspection('ROM replaced. Select a vanilla map header again.');clearConnectionInspection('ROM replaced. Select a vanilla map header again.');$('map-layout-status').textContent='ROM replaced. No vanilla-format layout inspected.';$('map-status').textContent='ROM replaced. Enter a verified offset and inspect again.';pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
 $('rom-picker').addEventListener('change',async e=>{
   const file=e.target.files?.[0];e.target.value='';if(!file)return;
   if(file.size<0xC0 || file.size>MAX_BYTES)return toast('ROM must be 192 bytes to 128 MiB',true);
@@ -8341,7 +9072,7 @@ if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostn
 // engine, game fingerprints and pointer allocator have been ported and tested.
 let displayedAnchors=[], selectedInspection=null;
 const encodeHex=bytes=>Array.from(bytes).map((b,i)=>hex(b,2)+(i%16===15?'\n':' ')).join('').trim();
-function metadataReset(){metadataImportSerial++;metadataFingerprints=[];clearWarpInspection('Metadata reset; inspect warps again.');clearMapChangeReview();clearCubeRenderedMap('Metadata reset; render again.');clearCubeCatalog();clearConnectionInspection('Metadata reset; inspect connections again.');clearMapGrid('Metadata reset; inspect map again.');metadata=[];metadataSources=[];mapBankMetadataReport=null;mapBankRawPointerEvidence=null;mapBankRawWindowEvidence=null;mapBankDeclaredEvidence=null;mapBankTargetEvidence=null;mapBankCustomSummary=null;cubeMapEvidence=null;cubeWarpEvidence=null;cubeConnectionEvidence=null;metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
+function metadataReset(){metadataImportSerial++;metadataFingerprints=[];clearWarpInspection('Metadata reset; inspect warps again.');clearMapChangeReview();clearCubeRenderedMap('Metadata reset; render again.');cubeBatchEditors.ready(false);cubeBatchReadySnapshot=null;clearCubeCatalog();clearConnectionInspection('Metadata reset; inspect connections again.');clearMapGrid('Metadata reset; inspect map again.');metadata=[];metadataSources=[];mapBankMetadataReport=null;mapBankRawPointerEvidence=null;mapBankRawWindowEvidence=null;mapBankDeclaredEvidence=null;mapBankTargetEvidence=null;mapBankCustomSummary=null;cubeMapEvidence=null;cubeWarpEvidence=null;cubeConnectionEvidence=null;metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
 function snapshotMatchedWords(words=metadataMatchedWords){
   if(!model)return [];
   return words.map(word=>{
@@ -9491,6 +10222,7 @@ function clearCubeWarpEditPreview(){
   $('cube-warp-edit-status').textContent='Inspect CUBE warps, then load a record. This tool never writes ROM bytes.';
 }
 function clearCubeWarpTrace(){
+  cubeBatchEditors.ready(false);cubeBatchReadySnapshot=null;
   clearCubeWarpAudit();
   clearCubeWarpEditPreview();
   cubeWarpTraceEvidence=null;
@@ -9501,6 +10233,9 @@ function drawCubeWarpEvidence(){
   const status=$('cube-warps-status'),list=$('cube-warps-list');
   list.replaceChildren();
   const snapshot=cubeWarpEvidence;
+  if(cubeBatchReadySnapshot!==snapshot){
+   cubeBatchEditors.ready(Boolean(snapshot));cubeBatchReadySnapshot=snapshot;
+  }
   $('cube-warp-trace').disabled=!snapshot;
   $('cube-warp-audit').disabled=!snapshot;
   $('cube-warp-edit-load').disabled=!snapshot;

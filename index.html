@@ -169,6 +169,51 @@
   </div>
   <output id="cube-warp-edit-status" class="palette-note" aria-live="polite">Inspect CUBE warps, then load a record. This tool never writes ROM bytes.</output>
   <output id="cube-warp-edit-dryrun-status" class="palette-note" aria-live="polite">No isolated warp rehearsal performed.</output>
+
+  <section class="sub-panel" aria-label="CUBE atomic multi-record preview tools">
+   <h3>Atomic CUBE warp batch (copy-only)</h3>
+   <p class="palette-note">Queue up to 32 distinct raw warp records against one original snapshot. Destination bank counts must be explicitly declared. Preview, topology re-decode and rollback never save a ROM.</p>
+   <div class="input-row">
+    <div class="input-wrap"><label for="cube-batch-warp-index">Warp index</label><input id="cube-batch-warp-index" type="number" min="0" value="0"></div>
+    <button type="button" id="cube-batch-warp-load" class="subtle-button" disabled>Load warp</button>
+   </div>
+   <div class="input-row">
+    <div class="input-wrap"><label for="cube-batch-warp-x">X</label><input id="cube-batch-warp-x" type="number" min="0" max="65535" value="0"></div>
+    <div class="input-wrap"><label for="cube-batch-warp-y">Y</label><input id="cube-batch-warp-y" type="number" min="0" max="65535" value="0"></div>
+    <div class="input-wrap"><label for="cube-batch-warp-elevation">Elevation</label><input id="cube-batch-warp-elevation" type="number" min="0" max="255" value="0"></div>
+    <div class="input-wrap"><label for="cube-batch-warp-warpId">Destination warp</label><input id="cube-batch-warp-warpId" type="number" min="0" max="255" value="0"></div>
+    <div class="input-wrap"><label for="cube-batch-warp-targetMap">Destination map</label><input id="cube-batch-warp-targetMap" type="number" min="0" max="255" value="0"></div>
+    <div class="input-wrap"><label for="cube-batch-warp-targetBank">Destination bank</label><input id="cube-batch-warp-targetBank" type="number" min="0" max="255" value="0"></div>
+   </div>
+   <div class="input-row">
+    <div class="input-wrap"><label for="cube-batch-warp-banks">Explicit bank:map counts</label><input id="cube-batch-warp-banks" type="text" placeholder="0:12,1:9" spellcheck="false"></div>
+    <button type="button" id="cube-batch-warp-queue" class="subtle-button" disabled>Queue warp</button>
+    <button type="button" id="cube-batch-warp-preview" class="subtle-button" disabled>Preview batch</button>
+    <button type="button" id="cube-batch-warp-verify" class="subtle-button" disabled>Verify rollback</button>
+    <button type="button" id="cube-batch-warp-clear" class="subtle-button" disabled>Clear queue</button>
+   </div>
+   <output id="cube-batch-warp-status" class="palette-note" aria-live="polite">No queued warp proposals.</output>
+   <div id="cube-batch-warp-list" class="anchor-list" aria-label="Queued CUBE warp changes"></div>
+   <h3>Atomic CUBE event relocation (copy-only)</h3>
+   <p class="palette-note">Move object, script-trigger and signpost coordinates/elevation only. Unknown fields and script pointers are retained. Shared destination cells are reported, not assumed safe.</p>
+   <div class="input-row">
+    <div class="input-wrap"><label for="cube-batch-event-kind">Event kind</label><select id="cube-batch-event-kind"><option value="objects">Object</option><option value="scripts">Script trigger</option><option value="signposts">Signpost</option></select></div>
+    <div class="input-wrap"><label for="cube-batch-event-index">Event index</label><input id="cube-batch-event-index" type="number" min="0" value="0"></div>
+    <button type="button" id="cube-batch-event-load" class="subtle-button" disabled>Load event</button>
+   </div>
+   <div class="input-row">
+    <div class="input-wrap"><label for="cube-batch-event-x">X</label><input id="cube-batch-event-x" type="number" min="0" max="65535" value="0"></div>
+    <div class="input-wrap"><label for="cube-batch-event-y">Y</label><input id="cube-batch-event-y" type="number" min="0" max="65535" value="0"></div>
+    <div class="input-wrap"><label for="cube-batch-event-elevation">Elevation</label><input id="cube-batch-event-elevation" type="number" min="0" max="65535" value="0"></div>
+    <button type="button" id="cube-batch-event-queue" class="subtle-button" disabled>Queue event</button>
+    <button type="button" id="cube-batch-event-preview" class="subtle-button" disabled>Preview batch</button>
+    <button type="button" id="cube-batch-event-verify" class="subtle-button" disabled>Verify rollback</button>
+    <button type="button" id="cube-batch-event-clear" class="subtle-button" disabled>Clear queue</button>
+   </div>
+   <output id="cube-batch-event-status" class="palette-note" aria-live="polite">No queued event relocations.</output>
+   <div id="cube-batch-event-list" class="anchor-list" aria-label="Queued CUBE event changes"></div>
+  </section>
+
   <div class="input-row" aria-label="Bounded CUBE raw warp topology audit">
     <div class="input-wrap"><label for="cube-warp-audit-banks">Destination bank:map-count declarations</label><input id="cube-warp-audit-banks" type="text" value="0:1" placeholder="0:12,1:9" spellcheck="false"></div>
     <button type="button" id="cube-warp-audit" class="subtle-button" disabled>Audit all raw map warps (max 32)</button>
