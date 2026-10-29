@@ -39,7 +39,8 @@ public class BackNavigationSmokeTest {
             " state=" + evaluate(instrumentation, web,
                 "JSON.stringify({hash:location.hash,homeHidden:" +
                 "document.getElementById('home-button')?.hidden," +
-                "dialogs:document.querySelectorAll('dialog[open]').length})"));
+                "dialogs:document.querySelectorAll('dialog[open]').length," +
+                "routeFn:typeof gotoTab,scriptCount:document.scripts.length})"));
     }
 
     @Test public void backDismissesDialogBeforeNavigatingTab() throws Exception {
@@ -57,8 +58,9 @@ public class BackNavigationSmokeTest {
             awaitTrue(instrumentation, web.get(),
                 "document.readyState==='complete' && !!window.__cubeNativeExportInstalled" +
                 " && !!document.getElementById('help-button')", 90000);
-            evaluate(instrumentation, web.get(),
-                "document.querySelector('[data-tab=\\\"hex\\\"]').click();true");
+            assertEquals("true", evaluate(instrumentation, web.get(),
+                "(function(){var tab=document.querySelector('[data-tab=\\\"hex\\\"]');" +
+                "if(!tab)return false;tab.click();return true;})()"));
             awaitTrue(instrumentation, web.get(),
                 "location.hash==='#/hex' && !document.getElementById('home-button').hidden", 10000);
             assertEquals("true", evaluate(instrumentation, web.get(),
