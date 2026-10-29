@@ -3,9 +3,9 @@
   "upstream": "kcradi/CUBHMA@3044393183e01af2ae1e907fb37e4a75eda6a8dc",
   "authoritativeBranch": "main",
   "checkpoint": {
-    "sequence": 0,
+    "sequence": 1,
     "lastIntegratedCommit": null,
-    "lastRun": null
+    "lastRun": "2026-10-29"
   },
   "tasks": [
     {
@@ -227,25 +227,30 @@
       "paths": [
         ".github/workflows/android-build.yml"
       ],
-      "status": "pending",
+      "status": "in_progress",
       "effortHours": 8,
       "validation": "Signed installable candidate and device smoke",
-      "owner": null,
-      "branch": null,
+      "owner": "CUBE Mobile Port Watchdog",
+      "branch": "agent/q012-signed-release-gate-20261029",
       "blocker": null,
       "evidence": [
         ".github/workflows/android-build.yml",
         "scripts/verify-android-apk.mjs",
-        "tests/verify-android-apk.test.mjs"
+        "tests/verify-android-apk.test.mjs",
+        "scripts/verify-android-release.mjs",
+        "tests/verify-android-release.test.mjs",
+        ".github/workflows/android-signed-candidate.yml",
+        "docs/ANDROID_SIGNED_CANDIDATE.md"
       ],
       "checkpoint": {
         "date": "2026-10-29",
         "kind": "partial",
-        "branch": "agent/q012-apk-integrity-20261029",
-        "summary": "Added byte-exact offline HTML verification, package/version/permission validation, ROM/save exclusion, debug APK SHA-256 provenance and regression tests. This does not satisfy signed release or physical-device smoke.",
+        "branch": "agent/q012-signed-release-gate-20261029",
+        "summary": "Implementing main-only protected signed candidate build, pinned APK signer identity and offline payload verification. Signing credentials and physical device evidence unavailable in CI PR.",
         "remaining": [
-          "signed release candidate without committing keys",
-          "physical Android device installation and SAF smoke",
+          "merge only after all PR CI green",
+          "run signed candidate with privately configured release-signing environment",
+          "physical Android SAF/import/export smoke",
           "authentic CUBE ROM acceptance"
         ]
       }
