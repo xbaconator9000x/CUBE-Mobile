@@ -3,8 +3,8 @@
   "upstream": "kcradi/CUBHMA@3044393183e01af2ae1e907fb37e4a75eda6a8dc",
   "authoritativeBranch": "main",
   "checkpoint": {
-    "sequence": 5,
-    "lastIntegratedCommit": "3d21ddd703e1113aa242149de98f11cecf66256a",
+    "sequence": 7,
+    "lastIntegratedCommit": "459b922724054a0e0bb48a4cc8e178d085068c09",
     "lastRun": "2026-10-29"
   },
   "tasks": [
@@ -345,7 +345,9 @@
           "Authenticate genuine legally held CUBE ROM and ordered metadata provenance",
           "Wire status into touch/offline UI and validate independent device/emulator acceptance"
         ],
-        "branch": "watchdog/q016-rom-metadata-provenance-binding-20261029"
+        "branch": "watchdog/q016-rom-metadata-provenance-binding-20261029",
+        "mergedPr": 250,
+        "mergedCommit": "3d21ddd703e1113aa242149de98f11cecf66256a"
       }
     },
     {
@@ -376,7 +378,9 @@
           "Validate on genuine legally held ROM and matching BPS patch with independent emulator reopen",
           "Pre-publication orphan stages require manual review; never auto-delete unowned files"
         ],
-        "branch": "watchdog/q017-bps-crash-recovery-20261029"
+        "branch": "watchdog/q017-bps-crash-recovery-main-reconciled-20261029",
+        "mergedPr": 252,
+        "mergedCommit": "36f65c7e99636d29ed7f33f23ed2a0c994f9733c"
       }
     },
     {
@@ -393,8 +397,23 @@
       "owner": null,
       "branch": null,
       "blocker": null,
-      "evidence": [],
-      "checkpoint": null
+      "evidence": [
+        "android/app/src/main/java/com/pokebacon/cubemobile/NativeExport.java",
+        "tests/android-saf-abort-safety.test.mjs",
+        "docs/ANDROID_SAF_ABORT_RECOVERY.md"
+      ],
+      "checkpoint": {
+        "date": "2026-10-29",
+        "kind": "partial",
+        "summary": "Made native SAF export abort non-destructive when document provider ownership is unproven, preserving explicit user cleanup and cancellation/reload safeguards. Source regression and Android compile required; physical SAF provider acceptance unavailable.",
+        "remaining": [
+          "Physical Android SAF import/export, cancellation and process-recreation tests across providers",
+          "Authenticated CUBE ROM workflow and release candidate acceptance"
+        ],
+        "branch": "watchdog/q018-saf-nondestructive-abort-20261029",
+        "mergedPr": 253,
+        "mergedCommit": "459b922724054a0e0bb48a4cc8e178d085068c09"
+      }
     },
     {
       "id": "Q019",
@@ -438,7 +457,12 @@
       "checkpoint": {
         "date": "2026-10-29",
         "kind": "partial",
-        "summary": "Prepared fail-closed opt-in Codex worker, CI dispatch and self-chaining workflow; no live agent execution or authenticated activation evidence."
+        "summary": "Continuous Codex worker remains opt-in and unactivated; task selection now rotates by partial attempt count to avoid repeatedly choosing the same pending task after each merge. Live coding-agent dispatch and billing/permissions are not verified.",
+        "remaining": [
+          "Set CUBE_AUTOCODE_ENABLED=true and project-scoped OPENAI_API_KEY in GitHub Actions privately",
+          "Confirm Actions PR permissions and run first live Codex cycle",
+          "Verify green-only merge and immediate next-task dispatch with a real run"
+        ]
       }
     }
   ]
