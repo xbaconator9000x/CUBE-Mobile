@@ -44,7 +44,9 @@ public class OfflineShellSmokeTest {
                     "(function(){return location.href.indexOf('https://appassets.androidplatform.net/assets/index.html')===0" +
                     " && document.readyState==='complete' && !!document.body" +
                     " && document.body.innerText.length>100 && !!window.CubeExport" +
-                    " && !!window.__cubeNativeExportInstalled;})()",
+                    " && !!window.__cubeNativeExportInstalled" +
+                    " && typeof gotoTab==='function'" +
+                    " && !!document.querySelector('.view.active');})()",
                     value -> { result.set(value); latch.countDown(); }));
                 if (latch.await(5, TimeUnit.SECONDS) &&
                     "true".equals(result.get())) { loaded = true; break; }
