@@ -42,7 +42,15 @@ export function verifyReleaseApk({ apkPath, htmlPath, expectedVersion, aaptPath,
     signatureOutput ?? execFileSync(apksignerPath,
       ['verify', '--verbose', '--print-certs', apkPath], { encoding: 'utf8' }),
     expectedFingerprint);
-  const base = verifyApk({ apkPath, htmlPath, expectedVersion, aaptPath, badging, permissions });
+  // A valid signature is not sufficient if a release candidate is debuggable.
+  // Inspect the actual packaged manifest via aapt, not a source manifest.
+  const inspectedBadging = badging ?? execFileSync(aaptPath || 'aapt',
+    ['dump', 'badging', apkPath], { encoding: 'utf8' });
+  if (/^application-debuggable\\s*$/m.test(inspectedBadging)) {
+    throw Error('Signed candidate must not be debuggable');
+  }
+  const base = verifyApk({ apkPath, htmlPath, expectedVersion, aaptPath,
+    badging: inspectedBadging, permissions });
   return {
     ...base,
     schema: 'cube-mobile-android-signed-candidate-provenance/1',
