@@ -3,8 +3,8 @@
   "upstream": "kcradi/CUBHMA@3044393183e01af2ae1e907fb37e4a75eda6a8dc",
   "authoritativeBranch": "main",
   "checkpoint": {
-    "sequence": 3,
-    "lastIntegratedCommit": "95b04a5c2420486fb9f4747b4d3c0c48e8e0931e",
+    "sequence": 5,
+    "lastIntegratedCommit": "3d21ddd703e1113aa242149de98f11cecf66256a",
     "lastRun": "2026-10-29"
   },
   "tasks": [
@@ -331,8 +331,22 @@
       "owner": null,
       "branch": null,
       "blocker": null,
-      "evidence": [],
-      "checkpoint": null
+      "evidence": [
+        "src/rom-compatibility.js",
+        "src/hma-rom-provenance-binding.js",
+        "tests/hma-rom-provenance-binding.test.mjs",
+        "docs/ROM_TOML_CROSS_SOURCE_BINDING.md"
+      ],
+      "checkpoint": {
+        "date": "2026-10-29",
+        "kind": "partial",
+        "summary": "Implemented read-only intersection of exact ROM profile and ordered TOML manifest with header, layout, upstream commit, digest and stale-snapshot conflict checks. No curated ROM evidence, no mobile UI wiring, no write authority.",
+        "remaining": [
+          "Authenticate genuine legally held CUBE ROM and ordered metadata provenance",
+          "Wire status into touch/offline UI and validate independent device/emulator acceptance"
+        ],
+        "branch": "watchdog/q016-rom-metadata-provenance-binding-20261029"
+      }
     },
     {
       "id": "Q017",
@@ -348,8 +362,22 @@
       "owner": null,
       "branch": null,
       "blocker": null,
-      "evidence": [],
-      "checkpoint": null
+      "evidence": [
+        "scripts/local-bps-apply-saveas.mjs",
+        "scripts/local-bps-recovery.mjs",
+        "tests/local-bps-recovery.test.mjs",
+        "docs/LOCAL_BPS_SAVEAS_RECOVERY.md"
+      ],
+      "checkpoint": {
+        "date": "2026-10-29",
+        "kind": "partial",
+        "summary": "Added explicit crash recovery for redundant post-publication BPS Save As staging hardlinks, exact-target independent reopen, symlink/foreign-inode/ambiguous-stage/private-directory checks, CLI and regression tests. No real ROM or Android acceptance.",
+        "remaining": [
+          "Validate on genuine legally held ROM and matching BPS patch with independent emulator reopen",
+          "Pre-publication orphan stages require manual review; never auto-delete unowned files"
+        ],
+        "branch": "watchdog/q017-bps-crash-recovery-20261029"
+      }
     },
     {
       "id": "Q018",
