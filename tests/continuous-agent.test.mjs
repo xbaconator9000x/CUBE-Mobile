@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {reconcile} from '../scripts/development-queue.mjs';
 import {
   chooseTask, taskPrompt, verifyReadme, verifyStagedPaths, recordPartialCheckpoint,
 } from '../scripts/continuous-agent.mjs';
@@ -8,7 +9,7 @@ const queue = JSON.parse(readFileSync(new URL('../queue/development.json', impor
 
 test('selects the highest priority dependency-eligible task, never blocked tasks', () => {
   const selected = chooseTask(queue);
-  assert.equal(selected?.id, 'Q016');
+  assert.equal(selected?.id || null, reconcile(queue).parallelBatch[0] || null);
   assert.notEqual(selected?.id, 'Q003');
 });
 test('returns null when all tasks are done or blocked', () => {
@@ -17,8 +18,8 @@ test('returns null when all tasks are done or blocked', () => {
   assert.equal(chooseTask(q), null);
 });
 test('agent prompt preserves fail-closed constraints and task identity', () => {
-  const prompt = taskPrompt(chooseTask(queue));
-  assert.match(prompt, /Q016/);
+  const prompt = taskPrompt({id:'Q999',title:'Test task',validation:'Read-only checks',paths:['src/app.js']});
+  assert.match(prompt, /Q999/);
   assert.match(prompt, /Never commit ROM\/save assets/);
   assert.match(prompt, /mark the task done ONLY/);
 });
@@ -33,19 +34,19 @@ test('rejects copyrighted ROMs, secrets, and worker self-modification', () => {
   assert.throws(() => verifyStagedPaths([]), /No changes/);
 });
 test('checkpoint remains partial until independently accepted', () => {
-  const q = structuredClone(queue);
-  const result = recordPartialCheckpoint(q, 'Q012', 'autocode/Q012-123', 'a'.repeat(40));
-  const task = result.tasks.find(t => t.id === 'Q012');
+  const q = {tasks:[{id:'Q999',status:'pending',checkpoint:null}]};
+  const result = recordPartialCheckpoint(q, 'Q999', 'autocode/Q999-123', 'a'.repeat(40));
+  const task = result.tasks[0];
   assert.equal(task.status, 'pending');
   assert.equal(task.checkpoint.kind, 'partial');
   assert.equal(task.checkpoint.baseCommit, 'a'.repeat(40));
-  assert.throws(() => recordPartialCheckpoint(q, 'Q012', 'bad-branch', 'a'.repeat(40)), /Invalid/);
+  assert.throws(() => recordPartialCheckpoint(q, 'Q999', 'bad-branch', 'a'.repeat(40)), /Invalid/);
 });
 test('stale in-progress work returns to pending after a new checkpoint', () => {
-  const q = structuredClone(queue);
-  const t = q.tasks.find(t => t.id === 'Q012');
+  const q = {tasks:[{id:'Q999',status:'in_progress',owner:'runner',branch:'old',checkpoint:null}]};
+  const t = q.tasks[0];
   t.status = 'in_progress'; t.owner = 'runner'; t.branch = 'old';
-  recordPartialCheckpoint(q, 'Q012', 'autocode/Q012-123', 'a'.repeat(40));
+  recordPartialCheckpoint(q, 'Q999', 'autocode/Q999-123', 'a'.repeat(40));
   assert.equal(t.status, 'pending');
   assert.equal(t.owner, null);
   assert.equal(t.branch, null);
