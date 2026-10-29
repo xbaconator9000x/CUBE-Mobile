@@ -57,6 +57,7 @@ import {traceHmaCubeConnectionDestination} from './hma-cube-connection-trace.js'
 import {auditHmaCubeCrossBankOwnership} from './hma-cube-cross-bank-ownership.js';
 import {previewHmaCubeCellBatch,planHmaCubeViewportFloodFill,planHmaCubeViewportStamp,planHmaCubeViewportReplace,verifyHmaCubeCellBatchDryRun} from './hma-cube-cell-batch.js';
 
+window.__cubeAppBootStage='initializing';
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
 let pcsReference=null,pcsReferenceName='';
@@ -71,6 +72,7 @@ let model=null, currentTab='home', page=0, selected=null, patchFile=null, palett
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
 ctx.imageSmoothingEnabled=false;
+window.__cubeAppBootStage='canvas';
 const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-summary-scan','map-preview-cell','map-visual-compare','map-visual-compare-queue','map-layout-inspect','map-bank-inspect','map-atlas-inspect','map-atlas-probe','map-warp-inspect','map-connection-inspect','map-event-inspect','map-script-pointer-inspect','map-script-map-audit','map-script-operand-atlas-audit','map-blockset-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','discard-button','edit-unlock'];
 const tabs={home:['YOUR WORKSPACE','ROM Workbench'],hex:['BINARY INSPECTOR','Hex editor'],anchors:['ROM SEMANTICS','Named data'],maps:['RAW MAP CELLS','Blockmap inspector'],graphics:['GBA GRAPHICS','Graphics explorer'],patches:['PATCH WORKFLOW','Patch tools'],changes:['REVIEW & EXPORT','Changes']};
 function toast(message,bad=false){const t=$('toast');t.textContent=message;t.classList.toggle('error',bad);t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),4300);}
@@ -104,6 +106,7 @@ const cubeBatchEditors=bindHmaCubeBatchEditors({
  getSelectedCell:validatedCubeSelectedCell,
  safeRun
 });
+window.__cubeAppBootStage='batch';
 let cubeBatchReadySnapshot=null;
 // A fragment route works both in an HTTPS-installed PWA and in a locally opened
 // file:// standalone HTML app. Each tab change creates a real history entry,
@@ -138,6 +141,7 @@ qa('[data-tab]').forEach(b=>b.addEventListener('click',()=>gotoTab(b.dataset.tab
 qa('[data-go]').forEach(b=>b.addEventListener('click',()=>gotoTab(b.dataset.go)));
 $('home-button').addEventListener('click',()=>gotoTab('home'));
 $('help-button').addEventListener('click',()=>$('help-dialog').showModal());
+window.__cubeAppBootStage='navigation';
 function bytetext(n){return hex(n,2);}
 function showRomInfo(){
   const panel=$('rom-panel');
@@ -4579,3 +4583,5 @@ $('map-summary-next').addEventListener('click',()=>safeRun(()=>{
 $('map-summary-start').addEventListener('change',()=>clearRawBlockmapSummary('Start cell changed; scan again.'));
 
 updateIndicators();drawGraphics();drawAnchors();renderTab(routeFromHash());
+window.__cubeAppReady=true;
+window.__cubeAppBootStage='ready';
