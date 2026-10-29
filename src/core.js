@@ -266,6 +266,22 @@ export class RomModel {
   project(){
     return {format:'cubhma-mobile-lab',version:1,fileName:this.name,originalSize:this.original.length,originalCrc32:hex(this.originCrc,8),baseCrc32:hex(this.baseCrc,8),patchApplied:this.appliedPatch,edits:[...this.edits.entries()].sort((a,b)=>a[0]-b[0]).map(([offset,value])=>[offset,value])};
   }
+  // Version 2 binds sidecar edits to exact base ROM bytes, not CRC32 alone.
+  // The caller must independently hash the unchanged base (not staged edits).
+  projectV2(baseSha256){
+    if(this.appliedPatch)throw Error('Reopen the saved patched ROM before exporting a sidecar');
+    if(typeof baseSha256!=='string'||!/^[a-f0-9]{64}$/i.test(baseSha256))
+      throw Error('Exact base-ROM SHA-256 is required for a version 2 sidecar');
+    return {...this.project(),version:2,baseSha256:baseSha256.toLowerCase()};
+  }
+  loadProjectV2(project,verifiedBaseSha256){
+    if(!project||project.format!=='cubhma-mobile-lab'||project.version!==2||
+       typeof project.baseSha256!=='string'||!/^[a-f0-9]{64}$/i.test(project.baseSha256)||
+       typeof verifiedBaseSha256!=='string'||!/^[a-f0-9]{64}$/i.test(verifiedBaseSha256)||
+       project.baseSha256.toLowerCase()!==verifiedBaseSha256.toLowerCase())
+      throw Error('Project base-ROM SHA-256 differs or is missing; nothing imported');
+    return this.loadProject({...project,version:1});
+  }
   loadProject(project){
     if(!project||project.format!=='cubhma-mobile-lab'||project.version!==1)throw Error('Unrecognised project format');
     if(project.patchApplied)throw Error('This sidecar references a patched ROM. Reopen the saved patched ROM before importing a sidecar');
