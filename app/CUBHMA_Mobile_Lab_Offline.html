@@ -588,6 +588,18 @@
 <script>
 'use strict';
 /* CUBHMA Mobile Lab: independent, data-only GBA ROM primitives. No upstream code bundled. */
+// Android WebView system images can lag current desktop Chromium. Keep the
+// standard own-property predicate available to map/event preflight code.
+if (typeof Object.hasOwn !== 'function') {
+  Object.defineProperty(Object, 'hasOwn', {
+    configurable: true, writable: true,
+    value: (object, key) => {
+      if (object === null || object === undefined)
+        throw new TypeError('Cannot convert null or undefined to object');
+      return Object.prototype.hasOwnProperty.call(object, key);
+    }
+  });
+}
 const MAX_BYTES = 128 * 1024 * 1024;
 const hex = (n, digits=6) => (Number(n) >>> 0).toString(16).toUpperCase().padStart(digits, '0');
 function parseOffset(text, { allowPointer=true }={}) {
@@ -710,7 +722,7 @@ function applyIps(source,patch){
 function buildIps(edits, original){
   if(!edits.size)throw Error('No edits to export');
   const sorted=[...edits.entries()].sort((a,b)=>a[0]-b[0]);
-  if(sorted.at(-1)[0]>0xFFFFFF)throw Error('IPS cannot encode changes past 16 MiB; save a ROM copy');
+  if(sorted[sorted.length-1][0]>0xFFFFFF)throw Error('IPS cannot encode changes past 16 MiB; save a ROM copy');
   const output=[80,65,84,67,72];let i=0;
   while(i<sorted.length){
     let start=sorted[i][0],data=[];
@@ -2048,7 +2060,7 @@ function parseHmaPcsReference(source) {
       const match=/^0x([0-9a-f]{1,2})\s*=\s*(.*?)\s*(?:#.*)?$/i.exec(line);
       if (!match) throw Error('Malformed PCS glyph at line '+lineNo);
       const start=parseInt(match[1],16),raw=match[2].trim();
-      const quoted=raw.length>=2 && raw[0]==='"' && raw.at(-1)==='"';
+      const quoted=raw.length>=2 && raw[0]==='"' && raw[raw.length-1]==='"';
       // Upstream pcsReference.txt has `0xFF = "`: a literal one-character quote,
       // not an unterminated quoted range. C# GetPCSFromReference treats it as a glyph.
       if (raw.startsWith('"') && !quoted && raw!=='"') throw Error('Malformed PCS quoted glyph at line '+lineNo);

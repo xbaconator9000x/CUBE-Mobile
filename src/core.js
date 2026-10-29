@@ -1,4 +1,16 @@
 /* CUBHMA Mobile Lab: independent, data-only GBA ROM primitives. No upstream code bundled. */
+// Android WebView system images can lag current desktop Chromium. Keep the
+// standard own-property predicate available to map/event preflight code.
+if (typeof Object.hasOwn !== 'function') {
+  Object.defineProperty(Object, 'hasOwn', {
+    configurable: true, writable: true,
+    value: (object, key) => {
+      if (object === null || object === undefined)
+        throw new TypeError('Cannot convert null or undefined to object');
+      return Object.prototype.hasOwnProperty.call(object, key);
+    }
+  });
+}
 export const MAX_BYTES = 128 * 1024 * 1024;
 export const hex = (n, digits=6) => (Number(n) >>> 0).toString(16).toUpperCase().padStart(digits, '0');
 export function parseOffset(text, { allowPointer=true }={}) {
@@ -121,7 +133,7 @@ export function applyIps(source,patch){
 export function buildIps(edits, original){
   if(!edits.size)throw Error('No edits to export');
   const sorted=[...edits.entries()].sort((a,b)=>a[0]-b[0]);
-  if(sorted.at(-1)[0]>0xFFFFFF)throw Error('IPS cannot encode changes past 16 MiB; save a ROM copy');
+  if(sorted[sorted.length-1][0]>0xFFFFFF)throw Error('IPS cannot encode changes past 16 MiB; save a ROM copy');
   const output=[80,65,84,67,72];let i=0;
   while(i<sorted.length){
     let start=sorted[i][0],data=[];
