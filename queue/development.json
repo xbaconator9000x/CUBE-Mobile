@@ -4,7 +4,7 @@
   "authoritativeBranch": "main",
   "checkpoint": {
     "sequence": 1,
-    "lastIntegratedCommit": null,
+    "lastIntegratedCommit": "c66af30406d4a3091bebf2cf22eed1687cc8fa90",
     "lastRun": "2026-10-29"
   },
   "tasks": [
@@ -227,11 +227,11 @@
       "paths": [
         ".github/workflows/android-build.yml"
       ],
-      "status": "in_progress",
+      "status": "pending",
       "effortHours": 8,
       "validation": "Signed installable candidate and device smoke",
-      "owner": "CUBE Mobile Port Watchdog",
-      "branch": "agent/q012-signed-release-gate-20261029",
+      "owner": null,
+      "branch": null,
       "blocker": null,
       "evidence": [
         ".github/workflows/android-build.yml",
@@ -246,11 +246,12 @@
         "date": "2026-10-29",
         "kind": "partial",
         "branch": "agent/q012-signed-release-gate-20261029",
-        "summary": "Implementing main-only protected signed candidate build, pinned APK signer identity and offline payload verification. Signing credentials and physical device evidence unavailable in CI PR.",
+        "pr": 247,
+        "summary": "Signed release candidate implementation in PR #247: main-only manually dispatched protected signing, v2 signature/certificate pin, exact offline payload and ROM exclusion checks, provenance and tests. Not signed or hardware-verified without private credentials/device.",
         "remaining": [
-          "merge only after all PR CI green",
-          "run signed candidate with privately configured release-signing environment",
-          "physical Android SAF/import/export smoke",
+          "green PR CI and merge",
+          "run signed candidate with privately configured release-signing environment and pin",
+          "physical Android device installation and SAF import/export smoke",
           "authentic CUBE ROM acceptance"
         ]
       }
