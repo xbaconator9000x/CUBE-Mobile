@@ -4,7 +4,9 @@
  * The JSON manifest is supplied by the caller, NOT curated authentication.
  * Emits no ROM bytes, metadata bytes, file paths, addresses or digests.
  */
-import {readFile,stat} from 'node:fs/promises';
+import {readStableLocalFile} from './local-input-safety.mjs';
+import {compareRomHmaProvenance} from '../src/hma-rom-provenance-binding.js';
+import {validateRomProfileRegistry} from '../src/rom-compatibility.js';
 import {basename,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {RomModel} from '../src/core.js';
@@ -17,9 +19,9 @@ import {inspectHmaDeclaredBankPointerTable} from '../src/hma-map-bank-declared-t
 import {inspectHmaDeclaredBankTargetWindows} from '../src/hma-map-bank-target-windows.js';
 
 export function parseLocalHmaManifestArgs(argv){
- if(!Array.isArray(argv)||argv.length<6||argv.length>38||argv.length%2!==0)
+ if(!Array.isArray(argv)||argv.length<6||argv.length>40||argv.length%2!==0)
   throw new RangeError('Usage: --rom <local.gba> --manifest <local.json> --metadata <first.toml> [--metadata <next.toml> ...]');
- let rom=null,manifest=null,targetWords=null;const metadata=[];
+ let rom=null,manifest=null,profile=null,targetWords=null;const metadata=[];
  for(let i=0;i<argv.length;i+=2){
   const key=argv[i],value=argv[i+1];
   if(typeof value!=='string'||!value||value.includes('\0'))
@@ -27,27 +29,25 @@ export function parseLocalHmaManifestArgs(argv){
   if(key==='--rom'&&!rom)rom=value;
   else if(key==='--manifest'&&!manifest)manifest=value;
   else if(key==='--metadata')metadata.push(value);
+  else if(key==='--profile'&&!profile)profile=value;
   else if(key==='--target-words'&&targetWords===null&&/^(?:[1-9]|1[0-6])$/.test(value))
    targetWords=Number(value);
   else throw new RangeError('Invalid or repeated local manifest smoke argument');
  }
  if(!rom||!manifest||metadata.length<1||metadata.length>16)
   throw new RangeError('ROM, manifest and 1–16 ordered metadata files are required');
+ const paths=[rom,manifest,...(profile?[profile]:[]),...metadata].map(path=>resolve(path));
+ if(new Set(paths).size!==paths.length)
+  throw new RangeError('Local ROM, manifest, profile and metadata paths must be distinct');
  const names=metadata.map(path=>basename(path).toLowerCase());
  if(new Set(names).size!==names.length)
   throw new RangeError('Repeated metadata basename in local file set');
- return Object.freeze({rom,manifest,targetWords,metadata:Object.freeze(metadata)});
+ return Object.freeze({rom,manifest,profile,targetWords,metadata:Object.freeze(metadata)});
 }
 async function boundedRead(path,max){
- const before=await stat(path);
- if(!before.isFile()||before.size<1||before.size>max)
-  throw new RangeError('Local input exceeds size budget');
- const bytes=await readFile(path);
- const after=await stat(path);
- if(bytes.length!==before.size||after.size!==before.size||
-    after.mtimeMs!==before.mtimeMs)
-  throw new RangeError('Local input changed while reading');
- return bytes;
+ // Unlike stat/readFile/stat, this rejects symlink traversal and checks
+ // descriptor + pathname inode, size, mtime and ctime around the read.
+ return readStableLocalFile(path,max);
 }
 export async function inspectLocalHmaManifest(argv){
  const args=parseLocalHmaManifestArgs(argv);
@@ -56,6 +56,14 @@ export async function inspectLocalHmaManifest(argv){
  try{manifest=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(manifestBytes));}
  catch(_error){throw new RangeError('Manifest is not valid UTF-8 JSON');}
  const registry=validateHmaMetadataManifests([manifest]);
+ let profiles=null;
+ if(args.profile){
+  const bytes=await boundedRead(args.profile,128*1024);
+  let profile;
+  try{profile=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));}
+  catch(_error){throw new RangeError('ROM profile is not valid UTF-8 JSON');}
+  profiles=validateRomProfileRegistry([profile]);
+ }
  const rom=await boundedRead(args.rom,128*1024*1024);
  const model=new RomModel('local-rom',rom);
  const fingerprint=await fingerprintRomSha256(model);
@@ -69,10 +77,14 @@ export async function inspectLocalHmaManifest(argv){
  }
  const records=fingerprintMetadataFiles(files);
  const checked=compareHmaMetadataManifest(model,fingerprint,records,{manifests:registry});
+ const cross=profiles?compareRomHmaProvenance(model,fingerprint,records,
+  {profiles,manifests:registry}):null;
  let bank=null;
  if(args.targetWords!==null){
   if(checked.status!=='exact-file-set-match')
    throw new RangeError('Ordered file set does not match supplied manifest; bank inspection refused');
+  if(cross&&!cross.consistentExactByteClaims)
+   throw new RangeError('Cross-source ROM/TOML claims are not consistent; bank inspection refused');
   const decoder=new TextDecoder('utf-8',{fatal:true});
   const sources=files.map(file=>({name:file.name,text:decoder.decode(file.bytes)}));
   const metadata=inspectHmaMapBankAnchorSources(sources,{romSize:rom.length});
@@ -96,13 +108,16 @@ export async function inspectLocalHmaManifest(argv){
   status:checked.status,exactFileSetMatch:checked.exactFileSetMatch,
   metadataFilesProvided:records.length,
   manifestFilesDeclared:registry[0].files.length,
+  separateProfileProvided:!!profiles,
+  crossSourceStatus:cross?.status||'not-requested',
+  crossSourceClaimsConsistent:cross?.consistentExactByteClaims||false,
   ...(bank||{}),
   romModified:false,romExported:false,metadataExported:false,
   independentlyAuthenticated:false,cubeLayoutAuthenticated:false,
   safeSemanticEditingVerified:false,romSaveReopenVerified:false,
   emulatorVerified:false,androidHardwareVerified:false,
   independentParityEvidence:false,
-  warning:'Caller-supplied exact-byte manifest evidence and optional raw bank census do not authenticate CUBE maps or permit semantic editing.'
+  warning:'Caller-supplied exact-byte ROM profile, ordered TOML manifest and optional raw bank census are consistency checks only; they do not authenticate CUBE maps or permit semantic editing.'
  });
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
