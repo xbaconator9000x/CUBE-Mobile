@@ -53,6 +53,9 @@ test('signed candidate requires exact packaged HTML, no ROM and remains not rele
     assert.equal(report.semanticRomCompatibilityVerified, false);
     assert.equal(report.physicalDeviceVerified, false);
     assert.equal(report.signingCertificateSha256, PIN);
+    assert.throws(() => verifyReleaseApk({
+      ...args, badging: args.badging + 'application-debuggable\\n'
+    }), /must not be debuggable/);
     writeFileSync(html, 'tampered');
     assert.throws(() => verifyReleaseApk(args), /differs/);
     writeFileSync(html, '<html>Verified offline asset</html>');
