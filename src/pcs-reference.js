@@ -51,7 +51,7 @@ export function parseHmaPcsReference(source) {
       const match=/^0x([0-9a-f]{1,2})\s*=\s*(.*?)\s*(?:#.*)?$/i.exec(line);
       if (!match) throw Error('Malformed PCS glyph at line '+lineNo);
       const start=parseInt(match[1],16),raw=match[2].trim();
-      const quoted=raw.length>=2 && raw[0]==='"' && raw.at(-1)==='"';
+      const quoted=raw.length>=2 && raw[0]==='"' && raw[raw.length-1]==='"';
       // Upstream pcsReference.txt has `0xFF = "`: a literal one-character quote,
       // not an unterminated quoted range. C# GetPCSFromReference treats it as a glyph.
       if (raw.startsWith('"') && !quoted && raw!=='"') throw Error('Malformed PCS quoted glyph at line '+lineNo);
