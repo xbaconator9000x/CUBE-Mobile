@@ -8904,6 +8904,128 @@ function verifyHmaCubeEventPositionDryRun(source,summary,options={}){
  });
 }
 
+/**
+ * Source-checked RAW scalar CUBE event-field preview. These offsets follow
+ * pinned CUBHMA Emerald 24/16/12-byte object/trigger/signpost arrays.
+ * Script pointers, signpost arguments and unknown padding are excluded.
+ * No semantic interpretation, ROM export or write permission is provided.
+ */
+const cubeRawScalarFields=Object.freeze({
+ objects:Object.freeze({
+  id:Object.freeze([0,1]),graphics:Object.freeze([1,1]),
+  kindField:Object.freeze([2,2]),movement:Object.freeze([9,1]),
+  range:Object.freeze([10,2]),trainerType:Object.freeze([12,2]),
+  trainerRangeOrBerryId:Object.freeze([14,2]),flag:Object.freeze([20,2])
+ }),
+ scripts:Object.freeze({
+  trigger:Object.freeze([6,2]),indexValue:Object.freeze([8,4])
+ }),
+ signposts:Object.freeze({
+  kind:Object.freeze([5,1]),unused:Object.freeze([6,2])
+ })
+});
+function previewHmaCubeEventRawFieldChange(source,summary,{
+ bankIndex,mapIndex,mapCount,kind,index,expected,proposed
+}={}){
+ const specs=cubeRawScalarFields[kind];
+ if(!specs)throw new RangeError('Unsupported CUBE raw event kind');
+ const keys=proposed&&typeof proposed==='object'?Object.keys(proposed):[];
+ if(!keys.length||keys.length>8||keys.some(k=>!Object.hasOwn(specs,k)))
+  throw new RangeError('Only supported raw scalar event fields may be proposed');
+ if(!expected||typeof expected!=='object'||
+    Object.keys(expected).length!==keys.length||
+    keys.some(k=>!Object.hasOwn(expected,k)))
+  throw new RangeError('Exact source values required for every proposed raw field');
+ const rom=reader(source),opts={bankIndex,mapIndex,mapCount};
+ const before=inspectHmaCubeMapEventWarps(rom,summary,opts);
+ if(!Number.isSafeInteger(index)||index<0||index>=before.arrays[kind].length)
+  throw new RangeError('Raw event index outside decoded array');
+ const record=before.arrays[kind][index],overlay=new Map(),original=new Map();
+ const changedFields=[];
+ for(const field of keys){
+  const [relative,width]=specs[field],max=2**(8*width)-1;
+  integer(expected[field],max,'Expected '+field);
+  integer(proposed[field],max,'Proposed '+field);
+  if(record[field]!==expected[field])
+   throw new RangeError('Raw event field changed since selection: '+field);
+  if(record[field]!==proposed[field])changedFields.push(field);
+  for(let j=0;j<width;j++){
+   const at=record.offset+relative+j;
+   const oldByte=(expected[field]>>>(8*j))&255;
+   const newByte=(proposed[field]>>>(8*j))&255;
+   if(original.has(at)||byte(rom,at)!==oldByte)
+    throw new RangeError('Raw event field overlaps or source byte changed');
+   original.set(at,oldByte);
+   if(oldByte!==newByte)overlay.set(at,newByte);
+  }
+ }
+ if(!overlay.size)throw new RangeError('Raw event proposal changes no bytes');
+ const staged=Object.freeze({length:rom.length,
+  read:i=>overlay.has(i)?overlay.get(i):byte(rom,i)});
+ const after=inspectHmaCubeMapEventWarps(staged,summary,opts);
+ for(const name of Object.keys(before.arrays)){
+  if(after.arrays[name].length!==before.arrays[name].length)
+   throw new RangeError('Raw event proposal changed an event array length');
+  for(let i=0;i<before.arrays[name].length;i++){
+   const expectedRecord=name===kind&&i===index?
+    {...record,...proposed}:before.arrays[name][i];
+   if(JSON.stringify(after.arrays[name][i])!==JSON.stringify(expectedRecord))
+    throw new RangeError('Raw event proposal changed unrelated record fields');
+  }
+ }
+ return Object.freeze({
+  kind,index,sourceOffset:record.offset,
+  before:Object.freeze(Object.fromEntries(keys.map(k=>[k,record[k]]))),
+  after:Object.freeze(Object.fromEntries(keys.map(k=>[k,after.arrays[kind][index][k]]))),
+  changedFields:Object.freeze(changedFields),
+  rawBytes:Object.freeze([...overlay].sort((a,b)=>a[0]-b[0]).map(([offset,value])=>
+   Object.freeze({offset,expected:original.get(offset),value}))),
+  unrelatedFieldsPreserved:true,virtualReDecodeVerified:true,
+  readOnly:true,copyOnly:true,writeAuthorized:false,
+  romAuthenticated:false,cubeLayoutAuthenticated:false,
+  scriptSemanticsVerified:false,authenticSaveReopenVerified:false
+ });
+}
+/** Full-copy rehearsal of a raw scalar proposal, including exact rollback. */
+function verifyHmaCubeEventRawFieldDryRun(source,summary,options={}){
+ const rom=reader(source);
+ if(rom.length<1||rom.length>64*1024*1024)
+  throw new RangeError('Raw event rehearsal requires a 1–64 MiB ROM');
+ const original=new Uint8Array(rom.length);
+ for(let i=0;i<rom.length;i++)original[i]=byte(rom,i);
+ for(let i=0;i<rom.length;i++)if(byte(rom,i)!==original[i])
+  throw new RangeError('Source changed during raw event snapshot');
+ const plan=previewHmaCubeEventRawFieldChange(original,summary,options);
+ const staged=original.slice();
+ for(const edit of plan.rawBytes){
+  if(staged[edit.offset]!==edit.expected)
+   throw new RangeError('Raw event source changed before copy-only apply');
+  staged[edit.offset]=edit.value;
+ }
+ const after=inspectHmaCubeMapEventWarps(staged,summary,options);
+ for(const [key,value] of Object.entries(plan.after))
+  if(after.arrays[plan.kind][plan.index][key]!==value)
+   throw new RangeError('Raw event staged re-decode differs from proposal');
+ let changed=0;
+ const allowed=new Set(plan.rawBytes.map(edit=>edit.offset));
+ for(let i=0;i<staged.length;i++)if(staged[i]!==original[i]){
+  if(!allowed.has(i))throw new RangeError('Raw event rehearsal changed unrelated bytes');
+  changed++;
+ }
+ for(const edit of plan.rawBytes)staged[edit.offset]=edit.expected;
+ for(let i=0;i<original.length;i++)
+  if(staged[i]!==original[i]||byte(rom,i)!==original[i])
+   throw new RangeError('Raw event rollback or source preservation failed');
+ return Object.freeze({
+  kind:plan.kind,index:plan.index,changedBytes:changed,
+  inMemoryReDecodeVerified:true,inMemoryRollbackVerified:true,
+  unrelatedBytesPreserved:true,sourceBytesPreserved:true,
+  patchedRomExported:false,writeAuthorized:false,readOnly:true,copyOnly:true,
+  romAuthenticated:false,authenticSaveReopenVerified:false,
+  scriptSemanticsVerified:false
+ });
+}
+
 return previewHmaCubeEventPositionChange;
 })();
 const {previewHmaCubeEventPositionBatch,verifyHmaCubeEventPositionBatchDryRun}=(()=>{
