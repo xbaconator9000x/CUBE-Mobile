@@ -57,6 +57,18 @@ import {traceHmaCubeConnectionDestination} from './hma-cube-connection-trace.js'
 import {auditHmaCubeCrossBankOwnership} from './hma-cube-cross-bank-ownership.js';
 import {previewHmaCubeCellBatch,planHmaCubeViewportFloodFill,planHmaCubeViewportStamp,planHmaCubeViewportReplace,verifyHmaCubeCellBatchDryRun} from './hma-cube-cell-batch.js';
 
+// Older system WebViews can lack replaceChildren even though basic DOM and
+// canvas APIs work. Without this fallback the editor aborts during startup.
+if(typeof Element.prototype.replaceChildren!=='function'){
+ Element.prototype.replaceChildren=function(...nodes){
+  this.textContent='';
+  this.append(...nodes);
+ };
+}
+window.addEventListener('error',event=>{
+ if(window.__cubeAppBootStage!=='ready')
+  window.__cubeAppBootError=String(event.message||'startup error').slice(0,180);
+});
 window.__cubeAppBootStage='initializing';
 const $=id=>document.getElementById(id), qa=q=>[...document.querySelectorAll(q)];
 let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffsetPointers=[],metadataLists=[],metadataListConflicts=new Set(),metadataMatchedWords=[],metadataWordConflicts=new Set(),metadataWordSnapshot=null,metadataResolution=null,selectedAnchor=null;
