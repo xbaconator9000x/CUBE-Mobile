@@ -1,0 +1,119 @@
+name: Continuous CUBE coding worker
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ['Verify mobile source']
+    types: [completed]
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+concurrency:
+  group: cube-autocode-main
+  cancel-in-progress: false
+jobs:
+  implement:
+    if: >-
+      vars.CUBE_AUTOCODE_ENABLED == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Select next eligible task from authoritative main
+        id: select
+        run: node scripts/continuous-agent.mjs select
+      - name: Verify task is not already represented by an open PR
+        if: steps.select.outputs.has_task == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TASK_ID: ${{ steps.select.outputs.task_id }}
+        run: |
+          set -euo pipefail
+          if gh pr list --state open --json title --jq '.[].title' | grep -F "[$TASK_ID]"; then
+            echo '::error::An open PR already owns this task; do not duplicate work.'
+            exit 1
+          fi
+      - name: Create isolated implementation branch
+        if: steps.select.outputs.has_task == 'true'
+        id: branch
+        env:
+          TASK_ID: ${{ steps.select.outputs.task_id }}
+        run: |
+          set -euo pipefail
+          BRANCH="autocode/${TASK_ID}-${GITHUB_RUN_ID}"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout -b "$BRANCH"
+          echo "name=$BRANCH" >> "$GITHUB_OUTPUT"
+      - name: Install Codex and implement task in workspace-write sandbox
+        if: steps.select.outputs.has_task == 'true'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$OPENAI_API_KEY" || { echo '::error::OPENAI_API_KEY secret is required to run the coding agent.'; exit 1; }
+          npm install --global @openai/codex
+          timeout --signal=INT --kill-after=30s 30m codex exec --full-auto - < "$RUNNER_TEMP/cube-agent-task.txt"
+      - name: Validate implementation and persist partial queue checkpoint
+        if: steps.select.outputs.has_task == 'true'
+        id: verify
+        env:
+          TASK_ID: ${{ steps.select.outputs.task_id }}
+          BRANCH: ${{ steps.branch.outputs.name }}
+        run: |
+          set -euo pipefail
+          npm run build:standalone
+          npm test
+          npm run safety:check
+          npm run parity:check
+          npm run engineering:check
+          git diff --check
+          git add -A
+          if git diff --cached --quiet; then
+            echo '::notice::No changes produced; stopping without a PR.'
+            echo 'has_changes=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! git diff --cached --name-only | grep -Eq '^(src/|android/|scripts/|\.github/workflows/)'; then
+            echo '::error::No implementation files changed; refusing a queue-only or docs-only PR.'
+            exit 1
+          fi
+          node scripts/continuous-agent.mjs checkpoint "$TASK_ID" "$BRANCH" "$(git rev-parse HEAD)"
+          git add -A
+          node scripts/continuous-agent.mjs verify
+          git diff --cached --check
+          git commit -m "Implement ${TASK_ID} with tests and queue checkpoint"
+          git push --set-upstream origin "$BRANCH"
+          echo 'has_changes=true' >> "$GITHUB_OUTPUT"
+      - name: Open PR, dispatch independent source and Android CI, and merge only green
+        if: steps.select.outputs.has_task == 'true' && steps.verify.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TASK_ID: ${{ steps.select.outputs.task_id }}
+          BRANCH: ${{ steps.branch.outputs.name }}
+        run: |
+          set -euo pipefail
+          PR_URL=$(gh pr create --base main --head "$BRANCH" \
+            --title "[$TASK_ID] Autonomous source-grounded implementation" \
+            --body "Automated queue-selected implementation candidate for $TASK_ID. Tests and Android build are dispatched independently on this exact branch SHA. ROM authenticity, emulator gameplay and hardware acceptance are not inferred from CI.")
+          echo "PR: $PR_URL"
+          node scripts/continuous-agent.mjs ci "$BRANCH" "$(git rev-parse HEAD)"
+          REVIEW=$(gh pr view "$PR_URL" --json reviewDecision --jq '.reviewDecision')
+          if [[ "$REVIEW" == 'REVIEW_REQUIRED' || "$REVIEW" == 'CHANGES_REQUESTED' ]]; then
+            echo '::warning::Required review is outstanding; leaving the green PR for approval.'
+            exit 0
+          fi
+          gh pr merge "$PR_URL" --squash --delete-branch
+          echo 'Merged verified PR; dispatching main CI to trigger next eligible task.'
+          gh workflow run ci.yml --ref main
