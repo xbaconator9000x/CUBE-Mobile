@@ -6,6 +6,7 @@ import {decodeHmaPcsFallback} from './pcs-default.js';
 import {parseHmaPcsReference,decodeHmaPcsReference} from './pcs-reference.js';
 import {fingerprintRomSha256,fingerprintMatchesRom} from './rom-fingerprint.js';
 import {compareRomIdentity} from './rom-compatibility.js';
+import {compareHmaMetadataManifest,validateHmaMetadataManifests} from './hma-metadata-manifest.js';
 import {fingerprintMetadataFiles,compareRomMetadataFingerprintRecords} from './metadata-fingerprint.js';
 import {inspectBlockMap,summarizeBlockmapChunk} from './map-blocks.js';
 import {inspectVanillaMapLayout,inspectVanillaMapHeader} from './map-layouts.js';
@@ -76,6 +77,7 @@ let metadata=[],metadataSources=[],metadataLayoutKind='unspecified',metadataOffs
 let pcsReference=null,pcsReferenceName='';
 let fingerprintResult=null,fingerprintAbort=null;
 let metadataFingerprints=[],metadataImportSerial=0,mapBankMetadataReport=null,mapBankRawPointerEvidence=null,mapBankRawWindowEvidence=null,mapBankDeclaredEvidence=null,mapBankTargetEvidence=null,mapBankCustomSummary=null,cubeMapEvidence=null,cubeWarpEvidence=null,cubeConnectionEvidence=null,cubeRenderEvidence=null,cubeRenderSelection=null,cubeCellPreview=null;
+let importedHmaManifest=null,manifestImportSerial=0;
 let inspectedWarpMap=null,selectedWarpPreview=null,selectedEventPreview=null,inspectedEventMap=null,inspectedMapAtlas=null,atlasBatchStart=0,atlasCoordinateBatchStart=0,atlasScriptAliasStart=0,atlasScriptCrossPageStart=0,atlasIncomingStart=0,atlasIncomingTarget=null;
 let activeRenderedMap=null,selectedRenderedHit=null;
 let cubeCatalogEvidence=null,cubeWarpTraceEvidence=null,cubeConnectionTraceEvidence=null,cubeOwnershipEvidence=null,cubeWarpAuditEvidence=null,cubeWarpEditSelection=null;
@@ -198,7 +200,7 @@ function updateIndicators(){
   drawMapBankRawPointerEvidence();
   drawMapBankRawWindowEvidence();
 }
-function installModel(name,bytes){cubeBatchEditors.ready(false);cubeBatchReadySnapshot=null;clearCubeRenderedMap('ROM replaced; render again.');clearCubeCatalog();clearMapChangeReview();clearMapAtlas('ROM replaced; declared atlas invalidated.');metadataImportSerial++;metadataFingerprints=[];mapBankMetadataReport=null;mapBankRawPointerEvidence=null;mapBankRawWindowEvidence=null;mapBankDeclaredEvidence=null;mapBankTargetEvidence=null;mapBankCustomSummary=null;cubeMapEvidence=null;cubeWarpEvidence=null;cubeConnectionEvidence=null;clearRenderedMap('ROM replaced. Select vanilla header again.');$('map-grid').innerHTML='<div class="empty-state">No blockmap inspected.</div>';$('map-bank-status').textContent='ROM replaced. Re-enter independently verified vanilla bank location and counts.';clearWarpInspection('ROM replaced. Select a vanilla map header again.');clearConnectionInspection('ROM replaced. Select a vanilla map header again.');$('map-layout-status').textContent='ROM replaced. No vanilla-format layout inspected.';$('map-status').textContent='ROM replaced. Enter a verified offset and inspect again.';pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
+function installModel(name,bytes){cubeBatchEditors.ready(false);cubeBatchReadySnapshot=null;clearCubeRenderedMap('ROM replaced; render again.');clearCubeCatalog();clearMapChangeReview();clearMapAtlas('ROM replaced; declared atlas invalidated.');metadataImportSerial++;metadataFingerprints=[];importedHmaManifest=null;manifestImportSerial++;mapBankMetadataReport=null;mapBankRawPointerEvidence=null;mapBankRawWindowEvidence=null;mapBankDeclaredEvidence=null;mapBankTargetEvidence=null;mapBankCustomSummary=null;cubeMapEvidence=null;cubeWarpEvidence=null;cubeConnectionEvidence=null;clearRenderedMap('ROM replaced. Select vanilla header again.');$('map-grid').innerHTML='<div class="empty-state">No blockmap inspected.</div>';$('map-bank-status').textContent='ROM replaced. Re-enter independently verified vanilla bank location and counts.';clearWarpInspection('ROM replaced. Select a vanilla map header again.');clearConnectionInspection('ROM replaced. Select a vanilla map header again.');$('map-layout-status').textContent='ROM replaced. No vanilla-format layout inspected.';$('map-status').textContent='ROM replaced. Enter a verified offset and inspect again.';pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
 $('rom-picker').addEventListener('change',async e=>{
   const file=e.target.files?.[0];e.target.value='';if(!file)return;
   if(file.size<0xC0 || file.size>MAX_BYTES)return toast('ROM must be 192 bytes to 128 MiB',true);
@@ -504,7 +506,7 @@ if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostn
 // engine, game fingerprints and pointer allocator have been ported and tested.
 let displayedAnchors=[], selectedInspection=null;
 const encodeHex=bytes=>Array.from(bytes).map((b,i)=>hex(b,2)+(i%16===15?'\n':' ')).join('').trim();
-function metadataReset(){metadataImportSerial++;metadataFingerprints=[];clearWarpInspection('Metadata reset; inspect warps again.');clearMapChangeReview();clearCubeRenderedMap('Metadata reset; render again.');cubeBatchEditors.ready(false);cubeBatchReadySnapshot=null;clearCubeCatalog();clearConnectionInspection('Metadata reset; inspect connections again.');clearMapGrid('Metadata reset; inspect map again.');metadata=[];metadataSources=[];mapBankMetadataReport=null;mapBankRawPointerEvidence=null;mapBankRawWindowEvidence=null;mapBankDeclaredEvidence=null;mapBankTargetEvidence=null;mapBankCustomSummary=null;cubeMapEvidence=null;cubeWarpEvidence=null;cubeConnectionEvidence=null;metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
+function metadataReset(){metadataImportSerial++;metadataFingerprints=[];importedHmaManifest=null;manifestImportSerial++;clearWarpInspection('Metadata reset; inspect warps again.');clearMapChangeReview();clearCubeRenderedMap('Metadata reset; render again.');cubeBatchEditors.ready(false);cubeBatchReadySnapshot=null;clearCubeCatalog();clearConnectionInspection('Metadata reset; inspect connections again.');clearMapGrid('Metadata reset; inspect map again.');metadata=[];metadataSources=[];mapBankMetadataReport=null;mapBankRawPointerEvidence=null;mapBankRawWindowEvidence=null;mapBankDeclaredEvidence=null;mapBankTargetEvidence=null;mapBankCustomSummary=null;cubeMapEvidence=null;cubeWarpEvidence=null;cubeConnectionEvidence=null;metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;selectedInspection=null;drawAnchors();}
 function snapshotMatchedWords(words=metadataMatchedWords){
   if(!model)return [];
   return words.map(word=>{
@@ -706,7 +708,42 @@ function drawAnchorDetails(){
   $('anchor-follow-pointer').disabled=inspection.pointer===null;
   $('anchor-to-graphics').disabled=!inspection.isLz10;
 }
+function drawImportedManifestStatus(){
+  const output=$('metadata-manifest-status');
+  if(!output)return;
+  const warning='This is a caller-supplied claim, not independent CUBE authentication; semantic writes remain disabled.';
+  if(!importedHmaManifest){
+    output.textContent='No ordered manifest imported. Local ROM/TOML provenance is unverified.';
+    return;
+  }
+  if(!model){
+    output.textContent='Open a ROM before comparing the ordered manifest. '+warning;
+    return;
+  }
+  if(!fingerprintResult){
+    output.textContent='Compute the current ROM SHA-256 before comparing the ordered manifest. '+warning;
+    return;
+  }
+  try{
+    const result=compareHmaMetadataManifest(model,fingerprintResult,metadataFingerprints,
+      {manifests:[importedHmaManifest]});
+    const descriptions={
+      'stale':'ROM bytes changed since fingerprinting; recompute SHA-256.',
+      'unknown-rom':'ROM SHA-256 or length differs from the supplied manifest.',
+      'rom-header-conflict':'ROM game code or revision conflicts with the supplied manifest.',
+      'metadata-missing':'Import the ordered TOML files listed by the manifest.',
+      'ordered-file-set-mismatch':'TOML filenames, order or count conflict with the manifest.',
+      'file-byte-mismatch':'At least one TOML file size or exact SHA-256 conflicts with the manifest.',
+      'exact-file-set-match':'Exact ROM and ordered TOML byte claims agree; no layout authenticity established.'
+    };
+    output.textContent='Ordered manifest comparison: '+
+      (descriptions[result.status]||'Comparison unavailable; verify inputs.')+' '+warning;
+  }catch{
+    output.textContent='Ordered manifest comparison refused invalid or stale evidence. '+warning;
+  }
+}
 function drawMetadataFingerprintStatus(){
+  drawImportedManifestStatus();
   const output=$('metadata-fingerprint-status');
   if(!output)return;
   if(!metadataFingerprints.length){
@@ -2181,6 +2218,30 @@ function decodeMetadataSource(name,bytes){
     throw Error('Metadata file must contain 1 byte to 4 MiB');
   return {name,bytes,text:new TextDecoder('utf-8',{fatal:true}).decode(bytes)};
 }
+$('metadata-manifest-picker').addEventListener('change',async e=>{
+  const file=e.target.files?.[0];e.target.value='';
+  if(!file)return;
+  try{
+    ensureModel();
+    if(!Number.isSafeInteger(file.size)||file.size<2||file.size>64*1024)
+      throw Error('Ordered manifest must be 2 bytes to 64 KiB');
+    const current=model,serial=++manifestImportSerial;
+    const raw=new Uint8Array(await file.arrayBuffer());
+    if(current!==model||serial!==manifestImportSerial)return;
+    const text=new TextDecoder('utf-8',{fatal:true}).decode(raw);
+    const [validated]=validateHmaMetadataManifests([JSON.parse(text)]);
+    if(current!==model||serial!==manifestImportSerial)return;
+    importedHmaManifest=validated;
+    drawImportedManifestStatus();
+    toast('Local ordered manifest claim loaded. It cannot authorize ROM editing.');
+  }catch{
+    toast('Ordered manifest import refused: invalid JSON or evidence schema.',true);
+  }
+});
+$('metadata-manifest-clear').addEventListener('click',()=>{
+  manifestImportSerial++;importedHmaManifest=null;
+  drawImportedManifestStatus();
+});
 $('metadata-picker').addEventListener('change',async e=>{
   const files=[...(e.target.files||[])];e.target.value='';if(!files.length)return;
   try{
