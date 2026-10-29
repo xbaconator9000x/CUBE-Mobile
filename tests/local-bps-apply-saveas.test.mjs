@@ -151,3 +151,57 @@ test('complete local expected-byte plan -> published BPS -> verified target ROM 
   assert.deepEqual(await readFile(f.patch),Buffer.from(f.bps));
  });
 });
+
+test('strict expected-byte plan verifies every unchanged byte before publication',async()=>{
+ await fixture(async f=>{
+  const plan=join(f.dir,'scoped-plan.json');
+  await writeFile(plan,JSON.stringify({edits:[
+   {offset:0,expected:f.source[0],value:91},
+   {offset:4096,expected:f.source[4096],value:117},
+   {offset:8191,expected:f.source[8191],value:23}
+  ]}));
+  const result=await saveLocalBpsTargetAs([...f.args,'--plan',plan]);
+  assert.equal(result.expectedBytePlanVerified,true);
+  assert.equal(result.unrelatedBytesPreserved,true);
+  assert.equal(result.scopedChangedBytes,3);
+  assert.deepEqual(await readFile(f.out),f.target);
+  assert.deepEqual(await readFile(f.rom),f.source);
+ });
+});
+test('undeclared target changes fail closed even with correct independent target hash',async()=>{
+ await fixture(async f=>{
+  const plan=join(f.dir,'incomplete-plan.json');
+  await writeFile(plan,JSON.stringify({edits:[
+   {offset:0,expected:f.source[0],value:91},
+   {offset:4096,expected:f.source[4096],value:117}
+  ]}));
+  await assert.rejects(saveLocalBpsTargetAs([...f.args,'--plan',plan]),/undeclared/i);
+  assert.deepEqual((await readdir(f.dir)).sort(),['change.bps','incomplete-plan.json','owned.gba']);
+  assert.deepEqual(await readFile(f.rom),f.source);
+ });
+});
+test('stale, duplicate and malformed scoped plans refuse before creating target',async()=>{
+ await fixture(async f=>{
+  const plan=join(f.dir,'bad-plan.json');
+  const cases=[
+   {edits:[{offset:0,expected:f.source[0]^1,value:91}]},
+   {edits:[{offset:0,expected:f.source[0],value:91},{offset:0,expected:f.source[0],value:91}]},
+   {edits:[{offset:0,expected:f.source[0],value:91,extra:true}]},
+   {edits:[]}
+  ];
+  for(const body of cases){
+   await writeFile(plan,JSON.stringify(body));
+   await assert.rejects(saveLocalBpsTargetAs([...f.args,'--plan',plan]),RangeError);
+   assert.deepEqual(await readFile(f.rom),f.source);
+  }
+  assert.deepEqual((await readdir(f.dir)).sort(),['bad-plan.json','change.bps','owned.gba']);
+ });
+});
+test('plan cannot alias any ROM, patch or output path',async()=>{
+ await fixture(async f=>{
+  for(const path of [f.rom,f.patch,f.out]){
+   assert.throws(()=>parseLocalBpsSaveAsArgs([...f.args,'--plan',path]),RangeError);
+  }
+  assert.deepEqual((await readdir(f.dir)).sort(),['change.bps','owned.gba']);
+ });
+});
