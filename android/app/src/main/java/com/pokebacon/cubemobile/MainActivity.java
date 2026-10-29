@@ -28,6 +28,7 @@ public final class MainActivity extends Activity {
     private static final int PICK_FILE = 1001;
     private static final String IMPORTED_DOCUMENTS_STATE = "cube.importedDocuments";
     private static final String IMPORT_PICKER_STATE = "cube.importPickerOutstanding";
+    private static final String EXPORT_PICKER_STATE = "cube.exportPickerOutstanding";
     private static final String APP_URL =
         "https://appassets.androidplatform.net/assets/index.html";
     private WebView webView;
@@ -57,6 +58,11 @@ public final class MainActivity extends Activity {
         setContentView(webView);
         nativeExport = new NativeExport(this, webView,
             chosen -> importedDocuments.protects(chosen == null ? null : chosen.toString()));
+        if (state != null && state.getBoolean(EXPORT_PICKER_STATE, false)) {
+            // The old ACTION_CREATE_DOCUMENT result may arrive after recreation.
+            // Reserve its ticket without restoring the destroyed JS session.
+            nativeExport.restoreOutstandingPicker();
+        }
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
@@ -210,6 +216,8 @@ public final class MainActivity extends Activity {
         // recreation. A null snapshot intentionally restores as fail-closed.
         outState.putStringArrayList(IMPORTED_DOCUMENTS_STATE, importedDocuments.snapshot());
         outState.putBoolean(IMPORT_PICKER_STATE, importPickerGate.isInFlight());
+        outState.putBoolean(EXPORT_PICKER_STATE,
+            nativeExport != null && nativeExport.hasOutstandingPicker());
         super.onSaveInstanceState(outState);
     }
 
