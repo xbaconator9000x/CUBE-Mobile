@@ -23,7 +23,8 @@ test('v2 project sidecar restores staged bytes only against exact SHA-256 base',
 test('CRC32-only legacy project cannot pass the v2 import gate',async()=>{
  const a=new RomModel('a.gba',rom());a.write(8,0xff);
  const legacy=a.project(),b=new RomModel('b.gba',rom());
- assert.throws(()=>b.loadProjectV2(legacy,await baseHash(b)),/SHA-256/);
+ const digest=await baseHash(b);
+ assert.throws(()=>b.loadProjectV2(legacy,digest),/SHA-256/);
  assert.equal(b.edits.size,0);
 });
 test('invalid SHA, patched base and corrupt v2 sidecars fail closed',async()=>{
@@ -41,6 +42,7 @@ test('a changed base ROM is rejected even when project CRC fields are copied',as
  const p=a.projectV2(await baseHash(a));
  const altered=rom();altered[30]^=1;
  const b=new RomModel('b.gba',altered);
- assert.throws(()=>b.loadProjectV2(p,await baseHash(b)),/SHA-256/);
+ const digest=await baseHash(b);
+ assert.throws(()=>b.loadProjectV2(p,digest),/SHA-256/);
  assert.equal(b.edits.size,0);
 });
