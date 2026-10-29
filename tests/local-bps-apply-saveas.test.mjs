@@ -144,8 +144,9 @@ test('complete local expected-byte plan -> published BPS -> verified target ROM 
    '--plan',plan,'--out',f.patch
   ]);
   assert.equal(exported.publishedPatchReplayed,true);
-  const saved=await saveLocalBpsTargetAs(f.args);
+  const saved=await saveLocalBpsTargetAs([...f.args,'--plan',plan]);
   assert.equal(saved.destinationReopenVerified,true);
+  assert.equal(saved.unrelatedBytesPreserved,true);
   assert.deepEqual(await readFile(f.out),f.target);
   assert.deepEqual(await readFile(f.rom),f.source);
   assert.deepEqual(await readFile(f.patch),Buffer.from(f.bps));
