@@ -3,8 +3,8 @@
   "upstream": "kcradi/CUBHMA@3044393183e01af2ae1e907fb37e4a75eda6a8dc",
   "authoritativeBranch": "main",
   "checkpoint": {
-    "sequence": 7,
-    "lastIntegratedCommit": "459b922724054a0e0bb48a4cc8e178d085068c09",
+    "sequence": 8,
+    "lastIntegratedCommit": "822fa099aacd8525b07f3fbeecaedf6f57ff149b",
     "lastRun": "2026-10-29"
   },
   "tasks": [
@@ -431,8 +431,24 @@
       "owner": null,
       "branch": null,
       "blocker": null,
-      "evidence": [],
-      "checkpoint": null
+      "evidence": [
+        "src/app.js",
+        "src/styles.css",
+        "index.html",
+        "app/CUBHMA_Mobile_Lab_Offline.html",
+        "tests/mobile-cube-canvas-keyboard.test.mjs",
+        "docs/CUBE_CANVAS_KEYBOARD.md"
+      ],
+      "checkpoint": {
+        "date": "2026-10-29",
+        "kind": "partial",
+        "summary": "Keyboard-focusable CUBE map canvas with arrow/Enter/Space cell selection routed through existing guarded touch click, accessible label/focus ring and modular/offline parity. Hardware accessibility acceptance outstanding.",
+        "remaining": [
+          "Real Android touch, hardware keyboard and screen-reader validation",
+          "Full map/event editor accessibility and authentic CUBE ROM compatibility"
+        ],
+        "branch": "watchdog/q019-cube-canvas-keyboard-20261029"
+      }
     },
     {
       "id": "Q020",
@@ -462,7 +478,9 @@
           "Set CUBE_AUTOCODE_ENABLED=true and project-scoped OPENAI_API_KEY in GitHub Actions privately",
           "Confirm Actions PR permissions and run first live Codex cycle",
           "Verify green-only merge and immediate next-task dispatch with a real run"
-        ]
+        ],
+        "mergedPr": 255,
+        "mergedCommit": "822fa099aacd8525b07f3fbeecaedf6f57ff149b"
       }
     }
   ]
