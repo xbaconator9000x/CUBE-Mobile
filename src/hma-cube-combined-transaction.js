@@ -46,7 +46,7 @@ function register(patches,offset,expected,value,kind){
  */
 export function verifyHmaCubeCombinedTransaction(source,summary,{
  bankIndex,mapIndex,mapCount,cells=[],warps=[],events=[],connections=[],scripts=[],
- targetBanks,banks,x=0,y=0,viewportWidth=10,viewportHeight=8
+ targetBanks,banks,x=0,y=0,viewportWidth=10,viewportHeight=8,targetRom
 }={}){
  const rom=reader(source);
  if(rom.length<1||rom.length>64*1024*1024)
@@ -156,6 +156,16 @@ export function verifyHmaCubeCombinedTransaction(source,summary,{
    throw RangeError('Combined transaction modified an unplanned ROM byte');
   changedBytes++;
  }
+ // Optional read-only acceptance: compare a separately replayed BPS target
+ // against EVERY byte of the independently constructed semantic preview.
+ // A match is evidence of exact proposal replay, NEVER write authorization.
+ if(targetRom!==undefined){
+  if(!(targetRom instanceof Uint8Array)||targetRom.length!==original.length)
+   throw new RangeError('BPS target ROM length or type differs from semantic preview');
+  for(let i=0;i<staged.length;i++)
+   if(targetRom[i]!==staged[i])
+    throw new RangeError('BPS target contains an undeclared or missing semantic byte');
+ }
  for(const patch of patches.values())staged[patch.offset]=patch.expected;
  for(let i=0;i<staged.length;i++)
   if(staged[i]!==original[i]||byte(rom,i)!==original[i])
@@ -169,6 +179,7 @@ export function verifyHmaCubeCombinedTransaction(source,summary,{
   claimedBytes:patches.size,changedBytes,
   combinedReDecodeVerified:true,inMemoryRollbackVerified:true,
   unrelatedBytesPreserved:true,sourceBytesPreserved:true,
+  targetReplayMatched:targetRom===undefined?false:true,
   patchedRomExported:false,authenticSaveReopenVerified:false,
   exclusiveOwnershipProven:false,romAuthenticated:false,
   writeAuthorized:false,copyOnly:true,readOnly:true

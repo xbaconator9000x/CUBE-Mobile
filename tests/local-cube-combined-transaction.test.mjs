@@ -7,6 +7,8 @@ import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {inspectLocalCubeCombinedTransaction} from '../scripts/local-cube-combined-transaction.mjs';
+import {inspectLocalCubeBpsAcceptance,parseLocalCubeBpsAcceptanceArgs} from '../scripts/local-cube-bps-acceptance.mjs';
+import {buildVerifiedBpsDiff} from '../src/bps-export.js';
 
 const cli=fileURLToPath(new URL('../scripts/local-cube-combined-transaction.mjs',import.meta.url));
 function u16(b,i,v){b[i]=v&255;b[i+1]=v>>>8;}
@@ -120,6 +122,64 @@ test('invalid and oversized plans, symlink input and duplicate banks refuse safe
    args.map((v,i)=>i===1?alias:v)),/non-symlink/i);
   await assert.rejects(inspectLocalCubeCombinedTransaction(
    [...args.slice(0,-1),'0:1,0:1']),RangeError);
+  assert.deepEqual(await readFile(rom),Buffer.from(bytes));
+ });
+});
+
+test('five-kind BPS replay matches every semantic preview byte without writing ROM',async()=>{
+ await fixture(async({args,rom,metadata,plan,bytes,hash,dir})=>{
+  const edits=[[0x9401,2],[0x800,1],[0x824,0],[0xa24,0xfd],[0x830,0x10]];
+  const target=Buffer.from(bytes);
+  for(const [at,value] of edits)target[at]=value;
+  const patch=join(dir,'semantic.bps');
+  await writeFile(patch,buildVerifiedBpsDiff(bytes,edits));
+  const targetHash=createHash('sha256').update(target).digest('hex');
+  const extended=[...args,'--patch',patch,'--expected-target-sha256',targetHash];
+  const result=await inspectLocalCubeBpsAcceptance(extended);
+  assert.deepEqual([result.cellChanges,result.warpChanges,result.eventChanges,
+   result.connectionChanges,result.scriptChanges],[1,1,1,1,1]);
+  assert.equal(result.changedBytes,5);
+  assert.equal(result.exactSemanticTargetReplayVerified,true);
+  assert.equal(result.independentBpsReopenVerified,true);
+  assert.equal(result.writeAuthorized,false);
+  assert.equal(result.strictParityEvidence,false);
+  assert.equal(result.romExported,false);
+  assert.deepEqual(await readFile(rom),Buffer.from(bytes));
+  assert.ok(!JSON.stringify(result).includes(dir));
+  assert.ok(!JSON.stringify(result).includes(hash));
+  const cli=fileURLToPath(new URL('../scripts/local-cube-bps-acceptance.mjs',import.meta.url));
+  const run=spawnSync(process.execPath,[cli,...extended],{encoding:'utf8'});
+  assert.equal(run.status,0,run.stderr);
+  assert.equal(JSON.parse(run.stdout).exactSemanticTargetReplayVerified,true);
+  assert.ok(!run.stdout.includes(dir)&&!run.stdout.includes(hash));
+ });
+});
+test('CUBE BPS semantic acceptance rejects an undeclared byte even with valid BPS CRC and SHA',async()=>{
+ await fixture(async({args,rom,bytes,dir})=>{
+  const patch=join(dir,'mismatch.bps');
+  const edits=[[0x9401,2],[0x800,1],[0x824,0],[0xa24,0xfd],[0x830,0x10],[0xd00,99]];
+  const target=Buffer.from(bytes);
+  for(const [at,value] of edits)target[at]=value;
+  await writeFile(patch,buildVerifiedBpsDiff(bytes,edits));
+  const hash=createHash('sha256').update(target).digest('hex');
+  await assert.rejects(inspectLocalCubeBpsAcceptance([
+   ...args,'--patch',patch,'--expected-target-sha256',hash
+  ]),/undeclared|semantic/i);
+  assert.deepEqual(await readFile(rom),Buffer.from(bytes));
+ });
+});
+test('CUBE BPS acceptance refuses stale hash, duplicate paths and malformed arguments',async()=>{
+ await fixture(async({args,rom,bytes,dir})=>{
+  const patch=join(dir,'semantic.bps');
+  const edits=[[0x9401,2],[0x800,1],[0x824,0],[0xa24,0xfd],[0x830,0x10]];
+  const target=Buffer.from(bytes);
+  for(const [at,value] of edits)target[at]=value;
+  await writeFile(patch,buildVerifiedBpsDiff(bytes,edits));
+  const hash=createHash('sha256').update(target).digest('hex');
+  const full=[...args,'--patch',patch,'--expected-target-sha256',hash];
+  assert.throws(()=>parseLocalCubeBpsAcceptanceArgs([...full,'--patch',patch]),RangeError);
+  assert.throws(()=>parseLocalCubeBpsAcceptanceArgs(full.map(v=>v===patch?rom:v)),RangeError);
+  await assert.rejects(inspectLocalCubeBpsAcceptance(full.map(v=>v===hash?'0'.repeat(64):v)),/digest/i);
   assert.deepEqual(await readFile(rom),Buffer.from(bytes));
  });
 });

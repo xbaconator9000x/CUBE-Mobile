@@ -1,0 +1,9 @@
+# Local five-kind CUBE BPS semantic replay acceptance
+
+Run `npm run rom:cube:bps:accept -- --rom /owned/source.gba --metadata /owned/cube.toml --expected-sha256 <source-64-hex> --bank-index 0 --map-index 0 --map-count 1 --plan /owned/semantic-plan.json --banks 0:1 --patch /owned/proposed.bps --expected-target-sha256 <target-64-hex>`.
+
+The bank counts are **explicit caller declarations**, not a discovery or ownership guarantee. Use the same bounded five-kind JSON proposal format documented in [the combined transaction rehearsal](LOCAL_CUBE_COMBINED_TRANSACTION.md). The command is **read-only** and does not create, modify or publish a ROM or patch.
+
+Acceptance combines the existing five-kind copy-only semantic re-decode/rollback and partial cross-bank ownership audit with BPS CRC32 verification, exact source/target SHA-256, and a byte-for-byte comparison of the **entire BPS target ROM** against an independently constructed semantic transaction preview. It then independently reopens and replays the patch, reopens all four local inputs, and refuses changed files. A valid BPS that alters even one undeclared byte is rejected. Results contain aggregate counts and booleans only, never local paths, ROM bytes, pointer addresses or SHA digests. Synthetic tests exercise all five edit kinds, undeclared-byte rejection, stale digest refusal and the CLI.
+
+**This is an acceptance rehearsal, not write authorization.** A user-provided ROM digest and TOML do not authenticate the CUBE build. Even exact pinned upstream TOML bytes do not prove the ROM version. The ownership census is bounded and whole-ROM pointer candidates are heuristic, not a complete alias graph. The command cannot establish complete pointer ownership, real emulator behavior, Android hardware acceptance or strict feature parity. It must never be used as a substitute for those release gates.
