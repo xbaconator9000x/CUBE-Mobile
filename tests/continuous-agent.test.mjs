@@ -31,6 +31,9 @@ test('rejects copyrighted ROMs, secrets, and worker self-modification', () => {
   assert.doesNotThrow(() => verifyStagedPaths(['src/app.js', 'tests/app.test.mjs']));
   for (const file of ['game.gba', '.env', 'secrets/pin.key', 'android/keystore.p12', '.github/workflows/continuous-development.yml', 'scripts/continuous-agent.mjs'])
     assert.throws(() => verifyStagedPaths([file]), /Unsafe/);
+  assert.throws(() => verifyStagedPaths(['.github/workflows/ci.yml']), /Unsafe/);
+  assert.doesNotThrow(() => verifyStagedPaths(['.github/workflows/android-build.yml'], {paths:['.github/workflows/android-build.yml']}));
+  assert.throws(() => verifyStagedPaths(['.github/workflows/android-build.yml'], {paths:['src/app.js']}), /Unsafe/);
   assert.throws(() => verifyStagedPaths([]), /No changes/);
 });
 test('checkpoint remains partial until independently accepted', () => {
