@@ -3,7 +3,7 @@
   "upstream": "kcradi/CUBHMA@3044393183e01af2ae1e907fb37e4a75eda6a8dc",
   "authoritativeBranch": "main",
   "checkpoint": {
-    "sequence": 3,
+    "sequence": 4,
     "lastIntegratedCommit": "95b04a5c2420486fb9f4747b4d3c0c48e8e0931e",
     "lastRun": "2026-10-29"
   },
@@ -331,8 +331,22 @@
       "owner": null,
       "branch": null,
       "blocker": null,
-      "evidence": [],
-      "checkpoint": null
+      "evidence": [
+        "src/rom-compatibility.js",
+        "src/hma-rom-provenance-binding.js",
+        "tests/hma-rom-provenance-binding.test.mjs",
+        "docs/ROM_TOML_CROSS_SOURCE_BINDING.md"
+      ],
+      "checkpoint": {
+        "date": "2026-10-29",
+        "kind": "partial",
+        "summary": "Implemented read-only intersection of exact ROM profile and ordered TOML manifest with header, layout, upstream commit, digest and stale-snapshot conflict checks. No curated ROM evidence, no mobile UI wiring, no write authority.",
+        "remaining": [
+          "Authenticate genuine legally held CUBE ROM and ordered metadata provenance",
+          "Wire status into touch/offline UI and validate independent device/emulator acceptance"
+        ],
+        "branch": "watchdog/q016-rom-metadata-provenance-binding-20261029"
+      }
     },
     {
       "id": "Q017",
