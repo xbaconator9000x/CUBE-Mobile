@@ -16,7 +16,7 @@ export async function readStableLocalFile(path,max){
   throw RangeError('Invalid bounded local input request');
  const canonical=resolve(path);
  if(await realpath(canonical)!==canonical)
-  throw RangeError('Local input path traverses a symlink');
+  throw RangeError('Local input must be a non-symlink path (symlink traversal refused)');
  const before=await lstat(canonical);
  if(!before.isFile()||before.isSymbolicLink()||before.size<1||before.size>max)
   throw RangeError('Local input must be a bounded regular non-symlink file');
