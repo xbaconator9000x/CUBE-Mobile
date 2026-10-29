@@ -56,8 +56,9 @@ export async function recoverPublishedBpsSaveAs({
      (typeof process.getuid==='function'&&dirStat.uid!==process.getuid()))
     throw new RangeError('Recovery requires a private owner-controlled directory');
   const named=await lstat(destination);
-  if(!named.isFile()||named.isSymbolicLink()||
-     named.size<0xC0||named.size>ROM_LIMIT)
+  if(named.isSymbolicLink())
+    throw new RangeError('Symlinked published ROM refused');
+  if(!named.isFile()||named.size<0xC0||named.size>ROM_LIMIT)
     throw new RangeError('Published ROM must be a bounded regular file');
   const target=await readStableLocalFile(destination,ROM_LIMIT);
   if(digest(target)!==expectedTargetSha256.toLowerCase())
