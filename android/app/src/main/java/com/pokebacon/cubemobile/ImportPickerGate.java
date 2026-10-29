@@ -17,6 +17,11 @@ final class ImportPickerGate {
         return true;
     }
 
+    void restoreOutstanding() {
+        inFlight = true;
+        callbackValid = false; // Never revive a callback from the old WebView.
+    }
+
     void invalidate() {
         callbackValid = false; // Keep the Android result ticket outstanding.
     }
