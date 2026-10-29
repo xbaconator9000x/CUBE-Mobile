@@ -4,7 +4,7 @@
   "authoritativeBranch": "main",
   "checkpoint": {
     "sequence": 17,
-    "lastIntegratedCommit": "f37d75e8416aaff060da52ace28b23304abbb348",
+    "lastIntegratedCommit": "74896d63de493f87eb152cc05c4a0c692ee55a98",
     "lastRun": "2026-10-29"
   },
   "tasks": [
@@ -669,8 +669,23 @@
       "owner": null,
       "branch": null,
       "blocker": null,
-      "evidence": [],
-      "checkpoint": null
+      "evidence": [
+        "android/app/src/androidTest/java/com/pokebacon/cubemobile/SafRoundtripTest.java",
+        "docs/ANDROID_INSTRUMENTED_SAF_HARNESS.md"
+      ],
+      "checkpoint": {
+        "date": "2026-10-29",
+        "kind": "partial",
+        "branch": "watchdog/q025-android-saf-accessibility-harness-20261029-r7",
+        "mergedPr": 278,
+        "mergedCommit": "74896d63de493f87eb152cc05c4a0c692ee55a98",
+        "summary": "Merged #278: Android emulator instrumentation now creates/reopens a disposable synthetic content-provider document, checks production SHA-256/length readback and imported URI guard, and verifies named offline WebView navigation and live status. All four emulator instrumentation tests passed, with source, Android and queue CI green. This does not exercise external SAF picker/cloud provider, real ROM or TalkBack.",
+        "remaining": [
+          "Real ACTION_OPEN_DOCUMENT/ACTION_CREATE_DOCUMENT picker lifecycle with third-party SAF providers and process recreation",
+          "Physical Android touch, TalkBack and accessibility acceptance",
+          "Authenticated legal CUBE ROM and production signed release end-to-end save/reopen"
+        ]
+      }
     }
   ]
 }
