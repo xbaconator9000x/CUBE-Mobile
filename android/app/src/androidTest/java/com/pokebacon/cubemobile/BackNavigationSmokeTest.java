@@ -41,6 +41,9 @@ public class BackNavigationSmokeTest {
                 "document.getElementById('home-button')?.hidden," +
                 "dialogs:document.querySelectorAll('dialog[open]').length," +
                 "routeFn:typeof gotoTab,scriptCount:document.scripts.length," +
+                "currentTab:(function(){try{return currentTab}catch(e){return e.name}})()," +
+                "canvas2d:!!document.getElementById('tile-canvas')?.getContext('2d')," +
+                "tabCount:document.querySelectorAll('[data-tab]').length," +
                 "inlineBytes:document.scripts[0]?.textContent.length," +
                 "parse:(function(){try{new Function(document.scripts[0].textContent);" +
                 "return 'ok';}catch(e){return e.name+':'+e.message}})()})"));
