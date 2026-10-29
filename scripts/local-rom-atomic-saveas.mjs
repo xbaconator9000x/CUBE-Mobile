@@ -44,6 +44,8 @@ async function noDestination(path){
  catch(e){if(e?.code!=='ENOENT')throw e;}
 }
 async function verifiedSource(path,expected){
+ if(await realpath(path)!==path)
+  throw RangeError('Source path traverses a symlink');
  const info=await lstat(path);
  if(!info.isFile()||info.isSymbolicLink()||info.size<1||info.size>LIMIT)
   throw RangeError('Source must be a bounded regular file, not a symlink');
@@ -56,6 +58,10 @@ async function verifiedSource(path,expected){
   if(!sameIdentity(before,after)||bytes.length!==before.size||
      digest(bytes)!==expected)
    throw RangeError('Source changed or differs from expected SHA-256');
+  const named=await lstat(path);
+  if(!named.isFile()||named.isSymbolicLink()||!sameIdentity(named,after)||
+     await realpath(path)!==path)
+   throw RangeError('Source pathname changed during Save As');
   return bytes;
  }finally{await file.close();}
 }

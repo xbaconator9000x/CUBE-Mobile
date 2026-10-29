@@ -93,3 +93,18 @@ test('destination directory symlink traversal fails closed before staging',async
   assert.deepEqual(await readFile(args.sourcePath),args.bytes);
  });
 });
+
+test('Save As refuses a symlinked source directory before creating output',async()=>{
+ await fixture(async args=>{
+  const actual=join(args.dir,'actual'),alias=join(args.dir,'alias');
+  await mkdir(actual);
+  const source=join(actual,'source.bin');
+  await writeFile(source,args.bytes);
+  await symlink(actual,alias);
+  await assert.rejects(saveUnmodifiedRomAs({
+   ...args,sourcePath:join(alias,'source.bin')
+  }),/symlink/i);
+  assert.deepEqual(await readdir(args.dir),['actual','alias','synthetic.bin']);
+  assert.deepEqual(await readFile(source),args.bytes);
+ });
+});
