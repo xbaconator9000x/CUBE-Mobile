@@ -3,8 +3,8 @@
   "upstream": "kcradi/CUBHMA@3044393183e01af2ae1e907fb37e4a75eda6a8dc",
   "authoritativeBranch": "main",
   "checkpoint": {
-    "sequence": 12,
-    "lastIntegratedCommit": "5aa3d32cdcb158f86271ff8643ba796c5bb4a136",
+    "sequence": 13,
+    "lastIntegratedCommit": "e95d43e8724e7b1d5a4560a91bcf3882b5afde24",
     "lastRun": "2026-10-29"
   },
   "tasks": [
@@ -350,14 +350,16 @@
       ],
       "checkpoint": {
         "date": "2026-10-29",
-        "kind": "partial-candidate",
-        "summary": "Candidate read-only ordered ROM/TOML manifest import and exact-byte status in modular/offline Named data UI; synthetic tests and CI pending. Caller-supplied claims cannot authorize writes.",
+        "kind": "partial",
+        "summary": "Merged #265: local ordered JSON ROM/TOML manifest claims now compare exact ROM SHA-256/header and every imported TOML filename, order, size and raw-byte SHA-256 in modular and standalone offline Named data UI. Claims clear on ROM replacement/metadata reset; stale and conflicting bytes fail closed. 976 source tests and source/Android/emulator/queue PR CI green. Caller-supplied manifest never grants write authority.",
         "remaining": [
-          "Green source, Android and queue CI and reviewed PR merge",
-          "Independent legally held CUBE ROM and matching authenticated metadata",
-          "Physical Android SAF manifest/TOML import and screen-reader acceptance"
+          "Independent legally held CUBE ROM and authenticated ordered TOML provenance",
+          "Physical Android SAF manifest/TOML import and screen-reader acceptance",
+          "Safe semantic write permissions remain disabled"
         ],
-        "branch": "watchdog/q016-mobile-manifest-status-20261029"
+        "branch": "watchdog/q016-mobile-manifest-status-20261029",
+        "mergedPr": 265,
+        "mergedCommit": "e95d43e8724e7b1d5a4560a91bcf3882b5afde24"
       }
     },
     {
@@ -418,19 +420,23 @@
         "docs/ANDROID_SAF_ABORT_RECOVERY.md",
         "android/app/src/main/java/com/pokebacon/cubemobile/ImportPickerGate.java",
         "android/app/src/test/java/com/pokebacon/cubemobile/ImportPickerGateTest.java",
-        "tests/android-import-picker-lifecycle.test.mjs"
+        "tests/android-import-picker-lifecycle.test.mjs",
+        "android/app/src/main/java/com/pokebacon/cubemobile/ExportPickerGate.java",
+        "android/app/src/test/java/com/pokebacon/cubemobile/ExportPickerGateTest.java",
+        "tests/android-export-picker-recreation.test.mjs",
+        "docs/ANDROID_EXPORT_PICKER_RECREATION.md"
       ],
       "checkpoint": {
         "date": "2026-10-29",
         "kind": "partial",
-        "summary": "Merged #253 non-destructive SAF export abort and #260 import-picker stale-result protection across WebView reload/Activity recreation. Source, native Android unit, APK build, emulator offline smoke and queue CI green; real hardware SAF provider acceptance unavailable.",
+        "summary": "Merged #266: Android ACTION_CREATE_DOCUMENT export picker now retains an outstanding stale result ticket across Activity recreation, preventing a late old save-picker result from binding to a newer WebView export session. Two native gate tests plus Node integration test; source, Android APK, queue and emulator PR CI green. Hardware acceptance remains outstanding.",
         "remaining": [
-          "Physical Android SAF import/export, cancellation, process-recreation and screen reader tests across providers",
-          "Authenticated CUBE ROM workflow and real signed release candidate acceptance"
+          "Physical Android SAF import/export, cancellation, Activity/process recreation and screen-reader testing across providers",
+          "Authenticated CUBE ROM save/reopen and production-signed candidate validation"
         ],
-        "branch": "watchdog/q018-import-picker-lifecycle-20261029",
-        "mergedPr": 260,
-        "mergedCommit": "abf27e23525592d8042b188acc1526d13b1733dd"
+        "branch": "watchdog/q018-export-picker-recreation-20261029",
+        "mergedPr": 266,
+        "mergedCommit": "2a06bc93ddf9054b6af476a6d17891302996251b"
       }
     },
     {
