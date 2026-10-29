@@ -153,3 +153,48 @@ test('script and event overlapping byte ownership fails closed',async()=>{
  assert.equal(r.scriptChanges,1);
  assert.equal(r.changedBytes,2);
 });
+
+
+test('five-kind byte ownership evidence independently replays in reverse order without exposing ROM bytes',async()=>{
+ const {bytes,summary}=await fixture(),original=bytes.slice();
+ const report=verifyHmaCubeCombinedTransaction(bytes,summary,{
+  ...options,...changes,scripts:[scriptEdit]
+ });
+ assert.equal(report.changedBytes,5);
+ assert.deepEqual(report.changedBytesByKind,{
+  cell:1,warp:1,event:1,connection:1,'script-reference':1
+ });
+ assert.equal(report.changedByteRanges.length,5);
+ assert.deepEqual(report.changedByteRanges.map(r=>r.kind).sort(),[
+  'cell','connection','event','script-reference','warp'
+ ]);
+ assert.ok(report.changedByteRanges.every(r=>
+  Number.isSafeInteger(r.start)&&r.start>=0&&r.length===1&&
+  Object.keys(r).sort().join(',')==='kind,length,start'
+ ));
+ assert.equal(report.exactExpectedByteReplayVerified,true);
+ assert.equal(report.reverseOrderReplayVerified,true);
+ assert.equal(report.reverseOrderRollbackVerified,true);
+ assert.equal(report.targetReplayMatched,false);
+ assert.equal(report.writeAuthorized,false);
+ assert.ok(Object.isFrozen(report.changedBytesByKind));
+ assert.ok(Object.isFrozen(report.changedByteRanges));
+ assert.ok(Object.isFrozen(report.changedByteRanges[0]));
+ assert.deepEqual(bytes,original);
+});
+test('one-kind independent replay retains full-ROM source and no raw byte export',async()=>{
+ const {bytes,summary}=await fixture(),original=bytes.slice();
+ const result=verifyHmaCubeCombinedTransaction(bytes,summary,{
+  ...options,connections:changes.connections,targetBanks:changes.targetBanks
+ });
+ assert.equal(result.changedBytes,1);
+ assert.deepEqual(result.changedBytesByKind,{
+  cell:0,warp:0,event:0,connection:1,'script-reference':0
+ });
+ assert.equal(result.changedByteRanges.length,1);
+ assert.equal(result.reverseOrderReplayVerified,true);
+ assert.equal(result.reverseOrderRollbackVerified,true);
+ assert.equal(result.sourceBytesPreserved,true);
+ assert.equal(result.patchedRomExported,false);
+ assert.deepEqual(bytes,original);
+});
