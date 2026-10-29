@@ -28,7 +28,9 @@
       "upstreamPath": "src/HexManiac.Core/Models/Code/BpsPatch.cs",
       "status": "partial",
       "localEvidence": [
-        "tests/core-regression.test.mjs"
+        "tests/core-regression.test.mjs",
+        "tests/bps-export.test.mjs",
+        "tests/local-bps-diff.test.mjs"
       ]
     },
     {
