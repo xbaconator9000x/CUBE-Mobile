@@ -9249,7 +9249,7 @@ function verifyHmaCubeCombinedTransaction(source,summary,{
    throw new RangeError('BPS target ROM length or type differs from semantic preview');
   for(let i=0;i<staged.length;i++)
    if(targetRom[i]!==staged[i])
-    throw new RangeError('BPS target contains an undeclared or missing semantic byte);
+    throw new RangeError('BPS target contains an undeclared or missing semantic byte');
  }
  for(const patch of patches.values())staged[patch.offset]=patch.expected;
  for(let i=0;i<staged.length;i++)
