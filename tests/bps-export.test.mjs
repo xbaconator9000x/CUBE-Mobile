@@ -50,3 +50,12 @@ test('BPS coalesces contiguous changed bytes and ignores valid no-op entries', (
   expected.set([4,5,6], 100);
   assert.deepEqual(applyBps(source, patch), expected);
 });
+
+test('Node Buffer inputs never mutate source bytes while building BPS', () => {
+  const source = Buffer.from(base()), before = Buffer.from(source);
+  const patch = buildVerifiedBpsDiff(source, [[8, 77], [2047, 99]]);
+  const expected = Uint8Array.from(before);
+  expected[8] = 77; expected[2047] = 99;
+  assert.deepEqual(applyBps(source, patch), expected);
+  assert.deepEqual(source, before);
+});
