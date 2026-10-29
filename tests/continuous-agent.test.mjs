@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
+import {readFileSync, mkdtempSync, rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {spawnSync} from 'node:child_process';
 import {reconcile} from '../scripts/development-queue.mjs';
 import {
   chooseTask, taskPrompt, verifyReadme, verifyStagedPaths, recordPartialCheckpoint, validateCIRef,
@@ -60,4 +63,17 @@ test('CI accepts only exact main or task branch SHA', () => {
   assert.doesNotThrow(() => validateCIRef('autocode/Q016-123', 'a'.repeat(40)));
   assert.throws(() => validateCIRef('untrusted-pr', 'a'.repeat(40)), /Invalid/);
   assert.throws(() => validateCIRef('main', 'not-a-sha'), /Invalid/);
+});
+
+test('selector CLI imports queue module without treating subcommand as a file path', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'cube-agent-test-'));
+  try {
+    const output = join(dir, 'output');
+    const run = spawnSync(process.execPath, ['scripts/continuous-agent.mjs', 'select'], {
+      cwd: new URL('..', import.meta.url).pathname,
+      env: {...process.env, GITHUB_OUTPUT: output, RUNNER_TEMP: dir}, encoding: 'utf8',
+    });
+    assert.equal(run.status, 0, run.stderr);
+    assert.match(readFileSync(output, 'utf8'), /has_task=(?:true|false)/);
+  } finally { rmSync(dir, {recursive:true,force:true}); }
 });
