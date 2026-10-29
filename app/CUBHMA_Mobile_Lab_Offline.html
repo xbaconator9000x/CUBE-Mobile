@@ -2633,6 +2633,7 @@ function compareRomMetadataIdentity(model,romFingerprint,metadataFiles,
     fingerprintMetadataFiles(metadataFiles),{profiles});
 }
 
+const {compareHmaMetadataManifest,validateHmaMetadataManifests}=(()=>{
 /**
  * Exact, ordered multi-file HMA TOML manifest evidence. Pinned upstream
  * kcradi/CUBHMA StoredMetadata and stock metadata overlays load separate
@@ -2731,6 +2732,8 @@ function compareHmaMetadataManifest(model,romFingerprint,metadataFingerprints,
     exactFileSetMatch:match,manifest:publicManifest});
 }
 
+return {compareHmaMetadataManifest,validateHmaMetadataManifests};
+})();
 /**
  * Read-only, source-grounded GBA blockmap inspection.
  *
