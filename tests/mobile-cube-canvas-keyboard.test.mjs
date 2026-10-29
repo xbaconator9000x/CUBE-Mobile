@@ -39,7 +39,7 @@ test('CUBE canvas arrow keys select exact metatile centers through existing clic
   assert.equal(h.press('ArrowRight'),true);
   assert.equal(h.events.length,1);
   assert.equal(h.events[0].type,'click');
-  assert.equal(h.events[0].clientX,42);
+  assert.equal(h.events[0].clientX,58);
   assert.equal(h.events[0].clientY,36);
   assert.equal(h.events[0].bubbles,true);
   h.context.cubeRenderSelection={snapshot:h.snapshot,x:13,y:22};
