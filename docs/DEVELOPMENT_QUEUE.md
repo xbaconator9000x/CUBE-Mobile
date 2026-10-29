@@ -11,3 +11,11 @@ The **persistent queue validation workflow** only validates scheduling and uploa
 Initial tasks reflect the repository's current structural and editing modules and upstream provenance. `done` means prerequisite infrastructure exists, not independently verified feature parity. The most important blocked dependency is authenticated local CUBE ROM/manifest validation. Continue parallel Android packaging, BPS infrastructure, and other non-conflicting tasks where possible.
 
 Independent, dependency-eligible engineering tasks Q016–Q019 provide useful work even while Q003 genuine ROM evidence remains blocked. Q020 tracks the external Codex worker activation requirement. These are provisional queue planning hours, not additional independently accepted parity or an increase in the 286-unit WBS estimate.
+
+## 2026-10-29 dependency and throughput checkpoint
+
+Q016 and Q017 are blocked for **external acceptance evidence**, not because their partial source implementations have been erased: their remaining tests require an independently authenticated, legally held CUBE ROM/ordered TOML profile, physical Android SAF behavior and/or emulator gameplay save/reopen. Do not repeatedly create low-value polish PRs to simulate completing these gates. Resume those tasks when the evidence is available.
+
+Q021–Q025 are independent, dependency-eligible implementation batches covering typed CUBE event records, script-reference navigation, cross-bank ownership, combined transaction verification and Android instrumentation. These tasks do **not** bypass Q003 or authorize semantic ROM writes. Prefer them to re-auditing completed BPS/provenance safeguards. Each must add source-grounded implementation, tests and evidence, with separate branches for disjoint paths. The queue may grow as new source-backed feature families are discovered; its planning hours are not a total-project estimate.
+
+Continue toward full release readiness rather than stopping at a 20% parity milestone. GitHub main, reviewed green PRs, and the weighted engineering WBS remain separate authorities for task state, integration and estimated completion respectively.
