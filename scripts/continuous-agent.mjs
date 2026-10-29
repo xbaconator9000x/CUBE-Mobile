@@ -21,14 +21,30 @@ const protectedWorkflows = new Set([
   '.github/workflows/development-queue.yml',
 ]);
 
+function taskAttempts(task) {
+  if (task.checkpoint?.kind !== 'partial') return 0;
+  const n = task.checkpoint.agentAttempts;
+  // Older manual checkpoints predate the automated attempt counter. Treat
+  // them as one prior attempt rather than repeatedly selecting the same
+  // partially completed highest-priority task on every chained run.
+  return Number.isSafeInteger(n) && n >= 1 ? n : 1;
+}
+
 export function chooseTask(queue) {
   const selected = reconcile(queue).parallelBatch;
-  const id = selected[0];
-  if (!id) return null;
-  if (!taskIdPattern.test(id)) throw new Error('Unsafe task ID');
-  const task = queue.tasks.find(item => item.id === id);
-  if (!task || task.status !== 'pending' || task.blocker) throw new Error('Selected task is not runnable');
-  return task;
+  const candidates = selected.map(id => {
+    if (!taskIdPattern.test(id)) throw new Error('Unsafe task ID');
+    const task = queue.tasks.find(item => item.id === id);
+    if (!task || task.status !== 'pending' || task.blocker)
+      throw new Error('Selected task is not runnable');
+    return task;
+  });
+  // Preserve dependency/path safety from reconcile, but distribute chained
+  // coding effort across fresh tasks before revisiting partial checkpoints.
+  // Equal-attempt tasks retain their original priority/ID ordering.
+  candidates.sort((a,b) => taskAttempts(a)-taskAttempts(b) ||
+    a.priority-b.priority || a.id.localeCompare(b.id));
+  return candidates[0] || null;
 }
 
 export function taskPrompt(task) {
@@ -71,13 +87,16 @@ export function recordPartialCheckpoint(queue, taskId, branch, sha) {
     task.branch = null;
   }
   if (task.status === 'pending') {
+    const previous = task.checkpoint || {};
+    const {mergedPr,mergedCommit,...retained} = previous;
     task.checkpoint = {
-      ...task.checkpoint,
+      ...retained,
       date: new Date().toISOString().slice(0, 10),
       kind: 'partial',
+      agentAttempts: taskAttempts(task) + 1,
       branch,
       baseCommit: sha,
-      summary: task.checkpoint?.summary || 'Automated implementation candidate; final acceptance and CI are not inferred.',
+      summary: 'Automated implementation candidate; final acceptance and CI are not inferred.',
     };
   }
   return queue;
