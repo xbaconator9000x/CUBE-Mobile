@@ -37,7 +37,9 @@ const stripPcsReference=pcsReference.replace(/\bexport (const|class|function)\b/
 const stripTextInspection=textInspection.replace(/\bexport (const|class|function)\b/g,'$1').replace(/^import \{.*?\} from '\.\/pcs-default\.js';\s*/gm,'');
 const stripRomFingerprint=romFingerprint.replace(/\bexport (async )?(const|class|function)\b/g,'$1$2');
 const hmaMetadataManifest=read('src/hma-metadata-manifest.js');
-const stripHmaMetadataManifest=hmaMetadataManifest.replace(/^import .*?;\s*/gm,'').replace(/\bexport (const|class|function)\b/g,'$1');
+const stripHmaMetadataManifest='const {compareHmaMetadataManifest,validateHmaMetadataManifests}=(()=>{\n'+
+ hmaMetadataManifest.replace(/^import .*?;\s*/gm,'').replace(/\bexport (const|class|function)\b/g,'$1')+
+ '\nreturn {compareHmaMetadataManifest,validateHmaMetadataManifests};\n})();';
 const stripRomCompatibility=romCompatibility.replace(/^import \{.*?\} from '\.\/rom-fingerprint\.js';\s*/gm,'').replace(/\bexport (const|class|function)\b/g,'$1');
 const stripMetadataFingerprint=metadataFingerprint.replace(/^import \{.*?\} from '\.\/(?:rom-fingerprint|rom-compatibility)\.js';\s*/gm,'').replace(/\bexport (const|class|function)\b/g,'$1');
 const stripMapBlocks=mapBlocks.replace(/\bexport (const|class|function)\b/g,'$1');
