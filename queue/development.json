@@ -3,8 +3,8 @@
   "upstream": "kcradi/CUBHMA@3044393183e01af2ae1e907fb37e4a75eda6a8dc",
   "authoritativeBranch": "main",
   "checkpoint": {
-    "sequence": 15,
-    "lastIntegratedCommit": "84857d4f484f62c795c106096cd28988a854a02e",
+    "sequence": 16,
+    "lastIntegratedCommit": "d37a2f912e9c6f69c96912da5049998f51920be8",
     "lastRun": "2026-10-29"
   },
   "tasks": [
@@ -532,8 +532,24 @@
       "owner": null,
       "branch": null,
       "blocker": null,
-      "evidence": [],
-      "checkpoint": null
+      "evidence": [
+        "src/hma-cube-event-position.js",
+        "tests/hma-cube-event-raw-fields.test.mjs",
+        "docs/CUBE_EVENT_RAW_SCALARS.md",
+        "app/CUBHMA_Mobile_Lab_Offline.html"
+      ],
+      "checkpoint": {
+        "date": "2026-10-29",
+        "kind": "partial",
+        "branch": "watchdog/q021-event-raw-fields-20261029-r6",
+        "mergedPr": 273,
+        "mergedCommit": "2e917e335832765b6c435e4d636c48847d24d6fd",
+        "summary": "Merged #273: source-checked object/trigger/signpost scalar raw-field preflight and full-copy rollback, script pointers/padding excluded; 992/992 source tests, Android debug, emulator and queue PR CI green. No semantic writes or authentic CUBE ROM acceptance.",
+        "remaining": [
+          "Integrate guarded typed raw field controls in mobile/offline editor",
+          "Full event scripting semantics, global ownership, authentic ROM save/reopen and physical Android validation"
+        ]
+      }
     },
     {
       "id": "Q022",
@@ -551,8 +567,24 @@
       "owner": null,
       "branch": null,
       "blocker": null,
-      "evidence": [],
-      "checkpoint": null
+      "evidence": [
+        "src/hma-cube-map-script-table.js",
+        "tests/hma-cube-script-references.test.mjs",
+        "docs/CUBE_MAP_SCRIPT_REFERENCES.md",
+        "app/CUBHMA_Mobile_Lab_Offline.html"
+      ],
+      "checkpoint": {
+        "date": "2026-10-29",
+        "kind": "partial",
+        "branch": "watchdog/q022-map-script-references-20261029-r6",
+        "mergedPr": 274,
+        "mergedCommit": "d37a2f912e9c6f69c96912da5049998f51920be8",
+        "summary": "Merged #274: bounded direct/conditional script pointer reference index with raw source offsets, alias groups, structural warnings and truncation; 993/993 source tests, Android debug, emulator and queue PR CI green. No opcode execution, pointer relocation or write authority.",
+        "remaining": [
+          "Expose bounded script reference navigation in mobile/offline UI",
+          "Source-grounded opcode grammar/compiler, authenticated ROM and emulator gameplay acceptance"
+        ]
+      }
     },
     {
       "id": "Q023",
