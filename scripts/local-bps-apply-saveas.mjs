@@ -35,7 +35,7 @@ export function parseLocalBpsSaveAsArgs(argv){
     !HASH.test(args['--expected-sha256'])||
     !HASH.test(args['--expected-target-sha256']))
   throw new RangeError('Exact source and target SHA-256 required');
- const paths=[args['--rom'],args['--patch'],args['--out']].map(resolve);
+ const paths=[args['--rom'],args['--patch'],args['--out']].map(path=>resolve(path));
  if(new Set(paths).size!==3)throw new RangeError('Source, patch and output must be distinct');
  return args;
 }
