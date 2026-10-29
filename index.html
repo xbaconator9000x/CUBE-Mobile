@@ -144,6 +144,12 @@
   <div style="overflow-x:auto"><canvas id="cube-map-preview-after" hidden aria-label="Read-only proposed CUBE metatile canvas" style="max-width:none;image-rendering:pixelated"></canvas></div>
   <div class="input-row"><button type="button" id="cube-map-warps" class="subtle-button" disabled>Inspect CUBE custom event/warp records (read only)</button></div>
   <output id="cube-warps-status" class="palette-note" aria-live="polite">Inspect a custom CUBE map before reading its raw event arrays.</output>
+  <div class="input-row" role="group" aria-label="Filter inspected CUBE event records">
+    <div class="input-wrap"><label for="cube-warps-kind-filter">Record type</label><select id="cube-warps-kind-filter"><option value="all">All types</option><option value="objects">Objects</option><option value="warps">Warps</option><option value="scripts">Script triggers</option><option value="signposts">Signposts</option></select></div>
+    <div class="input-wrap"><label for="cube-warps-index-filter">Record index (blank for all)</label><input id="cube-warps-index-filter" type="number" min="0" max="65535" placeholder="All indices" inputmode="numeric"></div>
+    <button type="button" id="cube-warps-filter-clear" class="subtle-button">Show all records</button>
+  </div>
+  <output id="cube-warps-filter-status" class="palette-note" aria-live="polite">Inspect CUBE events to filter records.</output>
   <div id="cube-warps-list" class="anchor-list" aria-label="Unverified CUBE event and warp records"></div>
   <div class="input-row" aria-label="Read-only CUBE warp arrival trace">
     <div class="input-wrap"><label for="cube-warp-trace-index">Source warp index</label><input id="cube-warp-trace-index" type="number" min="0" max="254" value="0"></div>
