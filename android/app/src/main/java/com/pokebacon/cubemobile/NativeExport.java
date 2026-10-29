@@ -58,6 +58,15 @@ final class NativeExport {
         this.isImportedDocument = isImportedDocument;
     }
 
+    /** A recreated Activity must consume the old picker result before any new export. */
+    void restoreOutstandingPicker() {
+        pickerGate.restoreOutstanding();
+    }
+
+    boolean hasOutstandingPicker() {
+        return pickerGate.isInFlight();
+    }
+
     void install() {
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
             return;
