@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,writeFile,readFile,readdir,rm,link,symlink,chmod,lstat} from 'node:fs/promises';
+import {mkdtemp,writeFile,readFile,readdir,rm,link,symlink,chmod,lstat,rename} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {assertPrivateBpsDirectory,finishOwnedBpsPublication,
@@ -22,7 +22,6 @@ async function fixture(run){
 test('private directory remains the same inode despite adding entries',async()=>{
  await fixture(async f=>{
   await writeFile(f.stage,f.target);
-  assert.doesNotThrow(()=>{});
   const identity=await assertPrivateBpsDirectory(f.parent,f.parentIdentity);
   assert.equal(identity.ino,f.parentIdentity.ino);
  });
@@ -69,7 +68,7 @@ test('foreign stage pathname is never removed, even if it contains identical byt
  await fixture(async f=>{
   await writeFile(f.stage,f.target);
   const identity=await lstat(f.stage);
-  await rm(f.stage);
+  await rename(f.stage,join(f.parent,'original-stage'));
   await writeFile(f.stage,f.target);
   await assert.rejects(rollbackOwnedBpsPublication({...f,identity,published:false}),/staging pathname changed/);
   assert.deepEqual(await readFile(f.stage),f.target);
