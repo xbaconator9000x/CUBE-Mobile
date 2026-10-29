@@ -3,7 +3,7 @@
   "upstream": "kcradi/CUBHMA@3044393183e01af2ae1e907fb37e4a75eda6a8dc",
   "authoritativeBranch": "main",
   "checkpoint": {
-    "sequence": 10,
+    "sequence": 11,
     "lastIntegratedCommit": "abf27e23525592d8042b188acc1526d13b1733dd",
     "lastRun": "2026-10-29"
   },
@@ -341,15 +341,17 @@
       ],
       "checkpoint": {
         "date": "2026-10-29",
-        "kind": "partial",
-        "summary": "Merged #250 read-only ROM/TOML provenance comparator and #259 local exact ROM-profile/ordered TOML cross-source smoke with stable symlink-rejecting reads. Source, queue and Android CI passed; user-supplied claims are not independent CUBE authentication.",
+        "kind": "partial-candidate",
+        "summary": "Candidate: opt-in multi-file ROM profile now binds every ordered TOML name, size and SHA-256 against the separate manifest and exact local bytes; preserves legacy single-file behavior and rejects conflicting claims. Synthetic tests added; CI and merge pending.",
         "remaining": [
+          "Review PR CI and merge only if green",
           "Independently authenticate genuine legally held CUBE ROM and ordered TOML metadata",
-          "Wire read-only cross-source status into modular/offline UI and validate real device/emulator acceptance"
+          "Wire read-only cross-source status into modular/offline UI and validate real Android hardware"
         ],
         "branch": "watchdog/q016-local-rom-toml-cross-source-20261029",
         "mergedPr": 259,
-        "mergedCommit": "ffdc3695246826918e62ff45d69e2e959560bdf4"
+        "mergedCommit": "ffdc3695246826918e62ff45d69e2e959560bdf4",
+        "candidateBranch": "watchdog/q016-ordered-overlay-cross-source-20261029"
       }
     },
     {
