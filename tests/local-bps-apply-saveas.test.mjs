@@ -39,7 +39,7 @@ test('local BPS target Save As publishes exact replay and preserves source and p
   assert.equal(report.strictParityEvidence,false);
   assert.deepEqual(await readFile(f.out),f.target);
   assert.deepEqual(await readFile(f.rom),f.source);
-  assert.deepEqual(await readFile(f.patch),f.bps);
+  assert.deepEqual(await readFile(f.patch),Buffer.from(f.bps));
   assert.deepEqual((await readdir(f.dir)).sort(),['change.bps','owned.gba','target.gba']);
   assert.ok(!JSON.stringify(report).includes(f.dir));
   assert.ok(!JSON.stringify(report).includes(f.sourceHash));
@@ -148,6 +148,6 @@ test('complete local expected-byte plan -> published BPS -> verified target ROM 
   assert.equal(saved.destinationReopenVerified,true);
   assert.deepEqual(await readFile(f.out),f.target);
   assert.deepEqual(await readFile(f.rom),f.source);
-  assert.deepEqual(await readFile(f.patch),f.bps);
+  assert.deepEqual(await readFile(f.patch),Buffer.from(f.bps));
  });
 });
