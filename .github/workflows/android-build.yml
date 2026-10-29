@@ -41,6 +41,18 @@ jobs:
       - name: Compile Android shell and run native picker lifecycle unit tests
         working-directory: android
         run: gradle --no-daemon --stacktrace :app:assembleDebug :app:testDebugUnitTest
+      - name: Reject unsigned release build in public CI
+        working-directory: android
+        run: |
+          set -euo pipefail
+          if gradle --no-daemon :app:assembleRelease > "$RUNNER_TEMP/unsigned-release.log" 2>&1; then
+            echo "Unsigned release build unexpectedly succeeded"
+            exit 1
+          fi
+          if ! grep -q 'Release signing environment is incomplete' "$RUNNER_TEMP/unsigned-release.log"; then
+            cat "$RUNNER_TEMP/unsigned-release.log"
+            exit 1
+          fi
       - name: Verify debug APK identity, offline bytes, permissions and provenance
         run: |
           node --test tests/verify-android-apk.test.mjs
