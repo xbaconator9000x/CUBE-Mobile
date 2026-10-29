@@ -3,8 +3,8 @@
   "upstream": "kcradi/CUBHMA@3044393183e01af2ae1e907fb37e4a75eda6a8dc",
   "authoritativeBranch": "main",
   "checkpoint": {
-    "sequence": 16,
-    "lastIntegratedCommit": "d37a2f912e9c6f69c96912da5049998f51920be8",
+    "sequence": 17,
+    "lastIntegratedCommit": "f37d75e8416aaff060da52ace28b23304abbb348",
     "lastRun": "2026-10-29"
   },
   "tasks": [
@@ -602,8 +602,24 @@
       "owner": null,
       "branch": null,
       "blocker": null,
-      "evidence": [],
-      "checkpoint": null
+      "evidence": [
+        "src/hma-cube-cross-bank-ownership.js",
+        "tests/hma-cube-cross-bank-ownership.test.mjs",
+        "docs/CUBE_CROSS_BANK_ALIAS_GRAPH.md",
+        "app/CUBHMA_Mobile_Lab_Offline.html"
+      ],
+      "checkpoint": {
+        "date": "2026-10-29",
+        "kind": "partial",
+        "branch": "watchdog/q023-transitive-alias-components-20261029-r7",
+        "mergedPr": 276,
+        "mergedCommit": "a882d40c1017d22c6897dbd259da1671d6cd9adb",
+        "summary": "Merged #276: bounded cross-bank structural alias census now builds complete direct map adjacency and transitive components independent of focused/truncated finding retention, reports invalid slots and distinct cross-bank pairs; three regressions and 1000/1000 source tests, Android, emulator and queue CI green. No authenticated CUBE ROM or write authority.",
+        "remaining": [
+          "Independent authenticated legal CUBE ROM and complete bank/metadata ownership coverage",
+          "Unknown pointers and cross-editor ownership acceptance before semantic writes"
+        ]
+      }
     },
     {
       "id": "Q024",
@@ -621,8 +637,23 @@
       "owner": null,
       "branch": null,
       "blocker": null,
-      "evidence": [],
-      "checkpoint": null
+      "evidence": [
+        "src/hma-cube-combined-transaction.js",
+        "tests/hma-cube-combined-transaction.test.mjs",
+        "app/CUBHMA_Mobile_Lab_Offline.html"
+      ],
+      "checkpoint": {
+        "date": "2026-10-29",
+        "kind": "partial",
+        "branch": "watchdog/q024-independent-replay-evidence-20261029-r7",
+        "mergedPr": 277,
+        "mergedCommit": "f37d75e8416aaff060da52ace28b23304abbb348",
+        "summary": "Merged #277: five-kind combined transaction now independently replays patches in descending byte-offset order with exact whole-ROM expected-byte comparison and second rollback, exposing frozen offset-only changed ranges and per-kind counts; two regressions, 999/999 source tests, Android, emulator and queue PR CI green. No persisted semantic ROM write or authentic save/reopen.",
+        "remaining": [
+          "Authenticated CUBE ROM metadata and global ownership proof",
+          "Real saved-ROM semantic transaction, independent reopen and emulator gameplay acceptance"
+        ]
+      }
     },
     {
       "id": "Q025",
