@@ -20,7 +20,8 @@
     "rom:cube:bps:accept": "node scripts/local-cube-bps-acceptance.mjs",
     "rom:bps:local": "node scripts/local-bps-diff.mjs",
     "rom:bps:verify": "node scripts/local-bps-verify.mjs",
-    "rom:bps:saveas": "node scripts/local-bps-apply-saveas.mjs"
+    "rom:bps:saveas": "node scripts/local-bps-apply-saveas.mjs",
+    "rom:bps:recover": "node scripts/local-bps-recovery.mjs"
   },
   "license": "MIT"
 }

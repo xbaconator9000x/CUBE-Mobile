@@ -13,6 +13,8 @@ import {pathToFileURL} from 'node:url';
 import {readStableLocalFile} from './local-input-safety.mjs';
 import {parseExpectedBytePlan} from './local-bps-diff.mjs';
 import {applyBps} from '../src/core.js';
+// Explicit, opt-in recovery for interrupted post-publication staging hardlinks.
+export {recoverPublishedBpsSaveAs} from './local-bps-recovery.mjs';
 
 const HASH=/^[0-9a-f]{64}$/i;
 const ROM_LIMIT=64*1024*1024;
