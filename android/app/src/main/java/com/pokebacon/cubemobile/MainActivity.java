@@ -34,6 +34,7 @@ public final class MainActivity extends Activity {
     private NativeExport nativeExport;
     private final Set<Uri> importedDocuments = new HashSet<>();
     private OnBackInvokedCallback modernBackCallback;
+    private boolean backInFlight;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -160,15 +161,28 @@ public final class MainActivity extends Activity {
     }
 
     private void handleBack() {
-        if (webView != null && webView.canGoBack()) {
-            webView.goBack();
-        } else if (webView != null) {
-            webView.evaluateJavascript(
-                "(function(){var b=document.getElementById('home-button');" +
-                "if(b&&!b.hidden){b.click();return true;}return false;})()", null);
-        } else {
-            super.onBackPressed();
-        }
+        if (webView == null || backInFlight || isFinishing() || isDestroyed()) return;
+        backInFlight = true;
+        // Native Back must dismiss an open editor/help dialog before changing
+        // tabs. WebView.canGoBack() alone incorrectly leaves dialogs open while
+        // navigating underneath them, trapping touch and keyboard interaction.
+        webView.evaluateJavascript(
+            "(function(){var dialogs=document.querySelectorAll('dialog[open]');" +
+            "if(!dialogs.length)return false;" +
+            "dialogs[dialogs.length-1].close();return true;})()", result -> {
+                backInFlight = false;
+                if (webView == null || isFinishing() || isDestroyed()) return;
+                if ("true".equals(result)) return;
+                // The web app creates real hash-history entries per tab. Keep
+                // native Back in sync with its own route history.
+                if (webView.canGoBack()) {
+                    webView.goBack();
+                } else {
+                    webView.evaluateJavascript(
+                        "(function(){var b=document.getElementById('home-button');" +
+                        "if(b&&!b.hidden){b.click();return true;}return false;})()", null);
+                }
+            });
     }
 
     @Override protected void onDestroy() {

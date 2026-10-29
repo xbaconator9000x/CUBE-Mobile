@@ -31,7 +31,8 @@ export function indexMapWarpMarkers(warps,{width,height}={}){
       throw new RangeError('Invalid warp coordinates/index');
     if(warp.x>=width||warp.y>=height||warp.x<0||warp.y<0)continue;
     const key=warp.x+','+warp.y;
-    (markers[key]??=[]).push(warp.index);
+    if(markers[key]===undefined)markers[key]=[];
+    markers[key].push(warp.index);
   }
   for(const key of Object.keys(markers))Object.freeze(markers[key]);
   return Object.freeze(markers);
@@ -56,7 +57,8 @@ export function indexMapEventMarkers(arrays,{width,height}={}){
         throw new RangeError('Invalid '+name+' event coordinates/index');
       if(record.x<0||record.y<0||record.x>=width||record.y>=height)continue;
       const key=record.x+','+record.y;
-      (markers[key]??=[]).push(prefix+record.index);
+      if(markers[key]===undefined)markers[key]=[];
+    markers[key].push(prefix+record.index);
     }
   }
   for(const key of Object.keys(markers))Object.freeze(markers[key]);
