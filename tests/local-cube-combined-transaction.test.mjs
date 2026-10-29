@@ -79,6 +79,9 @@ test('five kinds re-decode and roll back on disk without exporting edited ROM',a
   assert.equal(r.globalPointerCensus.writeAuthorized,false);
   assert.equal(r.writeAuthorized,false);
   assert.equal(r.strictParityEvidence,false);
+  assert.equal(r.upstreamMetadataExactBytesMatched,false);
+  assert.equal(r.metadataSourcePreserved,true);
+  assert.equal(r.romBuildProvenanceVerified,false);
   assert.deepEqual(await readFile(rom),Buffer.from(bytes));
   assert.equal((await readdir(dir)).length,3);
   const report=JSON.stringify(r);

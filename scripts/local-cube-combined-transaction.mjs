@@ -8,6 +8,7 @@ import {createHash} from 'node:crypto';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {readStableLocalFile} from './local-input-safety.mjs';
+import {inspectPinnedCubeEmeraldToml} from './pinned-cube-metadata.mjs';
 import {inspectHmaMapBankAnchorSources} from '../src/hma-map-bank-metadata.js';
 import {verifyHmaCubeCombinedTransaction} from '../src/hma-cube-combined-transaction.js';
 import {auditHmaCubeEditOwnershipImpact} from '../src/hma-cube-edit-ownership-impact.js';
@@ -78,6 +79,7 @@ export async function inspectLocalCubeCombinedTransaction(argv){
  if(originalHash!==args['--expected-sha256'].toLowerCase())
   throw RangeError('ROM differs from user-declared SHA-256');
  const metadata=await readStableLocalFile(args['--metadata'],4*1024*1024);
+ const upstream=inspectPinnedCubeEmeraldToml(metadata);
  const summary=inspectHmaMapBankAnchorSources([{
   name:'local-cube-metadata',
   text:new TextDecoder('utf-8',{fatal:true}).decode(metadata)
@@ -94,11 +96,16 @@ export async function inspectLocalCubeCombinedTransaction(argv){
     rehearsal.changedBytes!==ownership.changedBytes||sha(rom)!==originalHash)
   throw RangeError('Combined transaction or ownership evidence disagrees');
  const reopened=await readStableLocalFile(args['--rom'],64*1024*1024);
+ const reopenedMetadata=await readStableLocalFile(args['--metadata'],4*1024*1024);
+ if(!reopenedMetadata.equals(metadata))
+  throw RangeError('Metadata changed during local transaction');
  if(sha(reopened)!==originalHash||!reopened.equals(rom))
   throw RangeError('Original ROM changed during local transaction');
  return Object.freeze({
   schema:'cube-mobile-local-combined-transaction-smoke/1',
   userDeclaredRomHashMatched:true,customMetadataFormatRecognized:true,
+  upstreamMetadataExactBytesMatched:upstream.exactUpstreamBytes,
+  romBuildProvenanceVerified:false,metadataSourcePreserved:true,
   proposals:count,cellChanges:rehearsal.cellChanges,warpChanges:rehearsal.warpChanges,
   eventChanges:rehearsal.eventChanges,connectionChanges:rehearsal.connectionChanges,
   scriptChanges:rehearsal.scriptChanges,changedBytes:rehearsal.changedBytes,
@@ -113,7 +120,7 @@ export async function inspectLocalCubeCombinedTransaction(argv){
   independentlyAuthenticated:false,exclusiveOwnershipProven:false,
   emulatorVerified:false,androidHardwareVerified:false,writeAuthorized:false,
   strictParityEvidence:false,
-  warning:'User-supplied ROM hash, metadata and map counts do not authenticate CUBE. Whole-ROM aligned and unaligned pointer candidates are heuristic, not an alias graph or ownership proof. This is a read-only rehearsal, not edited-ROM save/reopen or gameplay acceptance.'
+  warning:'Exact pinned upstream TOML provenance, if present, does not authenticate the ROM. User-supplied ROM hash, metadata and map counts do not authenticate CUBE. Whole-ROM aligned and unaligned pointer candidates are heuristic, not an alias graph or ownership proof. This is a read-only rehearsal, not edited-ROM save/reopen or gameplay acceptance.'
  });
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){

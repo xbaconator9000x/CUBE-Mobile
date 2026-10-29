@@ -19,6 +19,22 @@ jobs:
         run: node --check src/app.js
       - name: Unit tests
         run: npm test
+      - name: Verify exact pinned public CUBE TOML source without bundling assets
+        shell: bash
+        run: |
+          temp_file=$(mktemp)
+          trap 'rm -f "$temp_file"' EXIT
+          curl --fail --location --retry 3 --max-time 90 --silent --show-error \
+            'https://raw.githubusercontent.com/kcradi/CUBHMA/3044393183e01af2ae1e907fb37e4a75eda6a8dc/src/HexManiac.Core/ViewModels/QuickEditItems/cube_emerald.toml' \
+            --output "$temp_file"
+          node --input-type=module - "$temp_file" <<'NODE'
+          import {readFileSync} from 'node:fs';
+          import {inspectPinnedCubeEmeraldToml} from './scripts/pinned-cube-metadata.mjs';
+          const result = inspectPinnedCubeEmeraldToml(readFileSync(process.argv[2]));
+          if (!result.exactUpstreamBytes || result.writeAuthorized || result.romBuildAuthenticated)
+            throw new Error('Pinned upstream TOML source mismatch or unsafe acceptance');
+          console.log('Exact upstream TOML bytes verified; ROM provenance and writes remain unverified.');
+          NODE
       - name: Guard tracked ROM assets and credential signatures
         run: npm run safety:check
       - name: Validate conservative feature parity baseline
