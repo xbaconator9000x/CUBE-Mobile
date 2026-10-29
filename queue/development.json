@@ -233,8 +233,22 @@
       "owner": null,
       "branch": null,
       "blocker": null,
-      "evidence": [],
-      "checkpoint": null
+      "evidence": [
+        ".github/workflows/android-build.yml",
+        "scripts/verify-android-apk.mjs",
+        "tests/verify-android-apk.test.mjs"
+      ],
+      "checkpoint": {
+        "date": "2026-10-29",
+        "kind": "partial",
+        "branch": "agent/q012-apk-integrity-20261029",
+        "summary": "Added byte-exact offline HTML verification, package/version/permission validation, ROM/save exclusion, debug APK SHA-256 provenance and regression tests. This does not satisfy signed release or physical-device smoke.",
+        "remaining": [
+          "signed release candidate without committing keys",
+          "physical Android device installation and SAF smoke",
+          "authentic CUBE ROM acceptance"
+        ]
+      }
     },
     {
       "id": "Q013",
