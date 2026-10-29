@@ -17,8 +17,7 @@ import android.webkit.WebViewClient;
 import android.widget.Toast;
 import androidx.webkit.WebViewAssetLoader;
 import java.io.ByteArrayInputStream;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.ArrayList;
 
 /**
  * Offline-only Android host for the generated, source-controlled CUBE web app.
@@ -27,28 +26,30 @@ import java.util.Set;
  */
 public final class MainActivity extends Activity {
     private static final int PICK_FILE = 1001;
+    private static final String IMPORTED_DOCUMENTS_STATE = "cube.importedDocuments";
     private static final String APP_URL =
         "https://appassets.androidplatform.net/assets/index.html";
     private WebView webView;
     private ValueCallback<Uri[]> fileCallback;
     private NativeExport nativeExport;
-    private final Set<Uri> importedDocuments = new HashSet<>();
+    private final ImportedDocumentGuard importedDocuments = new ImportedDocumentGuard();
     private OnBackInvokedCallback modernBackCallback;
     private boolean backInFlight;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        if (state != null && state.containsKey(IMPORTED_DOCUMENTS_STATE)) {
+            try {
+                importedDocuments.restore(state.getStringArrayList(IMPORTED_DOCUMENTS_STATE));
+            } catch (RuntimeException malformedState) {
+                importedDocuments.invalidate();
+            }
+        }
         WebView.setWebContentsDebuggingEnabled(false);
         webView = new WebView(this);
         setContentView(webView);
-        nativeExport = new NativeExport(this, webView, chosen -> {
-            if (importedDocuments.contains(chosen)) return true;
-            for (Uri imported : importedDocuments) {
-                if (SafDocumentIdentity.aliases(imported.toString(), chosen.toString()))
-                    return true;
-            }
-            return false;
-        });
+        nativeExport = new NativeExport(this, webView,
+            chosen -> importedDocuments.protects(chosen == null ? null : chosen.toString()));
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
@@ -141,16 +142,15 @@ public final class MainActivity extends Activity {
         fileCallback = null;
         Uri[] selected = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
         if (selected != null) {
-            // ACTION_OPEN_DOCUMENT should return content URIs. Reject an
-            // untrusted picker that supplies file/http or malformed URIs.
-            for (Uri uri : selected) {
-                if (uri == null || !SafDocumentIdentity.isContentUri(uri.toString())) {
-                    selected = null;
-                    break;
-                }
-            }
-            if (selected != null) {
-                for (Uri uri : selected) importedDocuments.add(uri);
+            // Reject the entire picker selection if any URI is invalid or
+            // exceeds the bounded lifetime identity budget. Never grant the
+            // WebView an import we cannot protect against later export.
+            ArrayList<String> picked = new ArrayList<>();
+            for (Uri uri : selected) picked.add(uri == null ? null : uri.toString());
+            if (!importedDocuments.rememberAll(picked)) {
+                selected = null;
+                Toast.makeText(this, "Import refused: invalid or excessive documents",
+                    Toast.LENGTH_LONG).show();
             }
         }
         callback.onReceiveValue(selected);
@@ -183,6 +183,13 @@ public final class MainActivity extends Activity {
                         "if(b&&!b.hidden){b.click();return true;}return false;})()", null);
                 }
             });
+    }
+
+    @Override protected void onSaveInstanceState(Bundle outState) {
+        // Keep the protected input identities through process/activity
+        // recreation. A null snapshot intentionally restores as fail-closed.
+        outState.putStringArrayList(IMPORTED_DOCUMENTS_STATE, importedDocuments.snapshot());
+        super.onSaveInstanceState(outState);
     }
 
     @Override protected void onDestroy() {
