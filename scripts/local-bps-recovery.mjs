@@ -29,7 +29,7 @@ export function parseBpsRecoveryArgs(argv){
  const args={};
  for(let i=0;i<argv.length;i+=2){
   if(!allowed.has(argv[i])||Object.hasOwn(args,argv[i])||
-     typeof argv[i+1]!=='string'||!argv[i+1]||argv[i+1].includes('\\0'))
+     typeof argv[i+1]!=='string'||!argv[i+1]||argv[i+1].includes('\0'))
    throw new RangeError('Invalid recovery arguments');
   args[argv[i]]=argv[i+1];
  }
@@ -67,8 +67,8 @@ export async function recoverPublishedBpsSaveAs({
   if(supplied!==0&&supplied!==3)
     throw new RangeError('Optional source ROM, BPS patch and digest must be supplied together');
   if(supplied===3&&(!SHA.test(expectedSourceSha256)||
-      typeof sourcePath!=='string'||!sourcePath||sourcePath.includes('\\0')||
-      typeof patchPath!=='string'||!patchPath||patchPath.includes('\\0')))
+      typeof sourcePath!=='string'||!sourcePath||sourcePath.includes('\0')||
+      typeof patchPath!=='string'||!patchPath||patchPath.includes('\0')))
     throw new RangeError('Invalid source-bound BPS recovery inputs');
   const destination=resolve(destinationPath),parent=dirname(destination);
   if(supplied===3&&new Set([destination,resolve(sourcePath),resolve(patchPath)]).size!==3)
