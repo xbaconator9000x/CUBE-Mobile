@@ -16,10 +16,10 @@ import {verifyHmaCubeCombinedTransaction} from '../src/hma-cube-combined-transac
 import {applyBps} from '../src/core.js';
 
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
-const EXTRA=new Set(['--patch','--expected-target-sha256']);
+const EXTRA=new Set(['--patch','--expected-target-sha256','--saved-rom']);
 const SHA=/^[0-9a-f]{64}$/i;
 export function parseLocalCubeBpsAcceptanceArgs(argv){
- if(!Array.isArray(argv)||argv.length!==20)
+ if(!Array.isArray(argv)||![20,22].includes(argv.length))
   throw new RangeError('Exact five-kind CUBE plan, BPS patch and target digest required');
  const args={},base=[];
  for(let i=0;i<argv.length;i+=2){
@@ -30,13 +30,13 @@ export function parseLocalCubeBpsAcceptanceArgs(argv){
   args[key]=value;
   if(!EXTRA.has(key))base.push(key,value);
  }
- if(Object.keys(args).length!==10||!EXTRA.has('--patch')||
+ if(Object.keys(args).length!==argv.length/2||
     !Object.hasOwn(args,'--patch')||!SHA.test(args['--expected-target-sha256']))
   throw new RangeError('Exact BPS target digest and patch required');
  const validated=parseLocalCubeScriptTransactionArgs(base);
  if(validated['--banks']===undefined)
   throw new RangeError('Explicit bounded ownership banks are required');
- const paths=['--rom','--metadata','--plan','--patch'].map(k=>resolve(args[k]));
+ const paths=['--rom','--metadata','--plan','--patch',...(args['--saved-rom']?['--saved-rom']:[])].map(k=>resolve(args[k]));
  if(new Set(paths).size!==paths.length)
   throw new RangeError('ROM, metadata, plan and patch must be distinct files');
  return {args:Object.freeze(args),base};
@@ -75,6 +75,14 @@ export async function inspectLocalCubeBpsAcceptance(argv){
  });
  if(!result.targetReplayMatched||result.changedBytes!==census.changedBytes)
   throw new RangeError('BPS target and independent CUBE semantic rehearsal disagree');
+ // Optional independent disk acceptance of a previously saved target ROM.
+ // This is strictly read-only: it never invokes Save As or authorizes writes.
+ const saved=args['--saved-rom']
+  ?await readStableLocalFile(args['--saved-rom'],64*1024*1024):null;
+ if(saved&&(saved.length!==target.length||
+    !saved.every((value,i)=>value===target[i])||
+    sha(saved)!==args['--expected-target-sha256'].toLowerCase()))
+  throw new RangeError('Saved target ROM differs from exact semantic BPS replay');
  const independent=await verifyLocalBpsPatch([
   '--rom',args['--rom'],'--patch',args['--patch'],
   '--expected-sha256',args['--expected-sha256'],
@@ -91,6 +99,11 @@ export async function inspectLocalCubeBpsAcceptance(argv){
  ]);
  if([rom,metadata,plan,patch].some((before,i)=>!again[i].equals(before)))
   throw new RangeError('CUBE acceptance input changed during verification');
+ if(saved){
+  const savedAgain=await readStableLocalFile(args['--saved-rom'],64*1024*1024);
+  if(!savedAgain.equals(saved)||sha(savedAgain)!==args['--expected-target-sha256'].toLowerCase())
+   throw new RangeError('Saved ROM changed during independent reopen acceptance');
+ }
  return Object.freeze({
   schema:'cube-mobile-local-cube-bps-semantic-acceptance/1',
   proposals:census.proposals,changedBytes:result.changedBytes,
@@ -101,6 +114,7 @@ export async function inspectLocalCubeBpsAcceptance(argv){
   bpsCrcVerified:true,independentBpsReopenVerified:true,
   exactSemanticTargetReplayVerified:true,combinedReDecodeVerified:true,
   inMemoryRollbackVerified:true,allFourInputsPreserved:true,
+  savedRomReopenVerified:saved!==null,allProvidedInputsPreserved:true,
   boundedOwnershipConflicts:census.ownershipConflicts,
   boundedOwnershipCensusIncomplete:census.ownershipCensusIncomplete,
   globalPointerOwnershipProven:false,
