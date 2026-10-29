@@ -1,5 +1,5 @@
 import {readFileSync,writeFileSync} from 'node:fs';
-const file=process.argv[2]||'queue/development.json';
+const file=process.argv.slice(2).find(arg=>!arg.startsWith('--'))||'queue/development.json';
 const q=JSON.parse(readFileSync(file,'utf8'));
 export function reconcile(q){
  if(q.schema!=='cube-mobile-queue/1'||!Array.isArray(q.tasks))throw Error('Unsupported queue');
