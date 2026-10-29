@@ -46,7 +46,7 @@ export function verifyReleaseApk({ apkPath, htmlPath, expectedVersion, aaptPath,
   // Inspect the actual packaged manifest via aapt, not a source manifest.
   const inspectedBadging = badging ?? execFileSync(aaptPath || 'aapt',
     ['dump', 'badging', apkPath], { encoding: 'utf8' });
-  if (/^application-debuggable\\s*$/m.test(inspectedBadging)) {
+  if (/^application-debuggable\s*$/m.test(inspectedBadging)) {
     throw Error('Signed candidate must not be debuggable');
   }
   const base = verifyApk({ apkPath, htmlPath, expectedVersion, aaptPath,
