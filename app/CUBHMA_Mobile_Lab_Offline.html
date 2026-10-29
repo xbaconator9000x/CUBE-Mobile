@@ -9580,12 +9580,20 @@ function verifyHmaCubeCombinedTransaction(source,summary,{
      !afterImage.pixels.every((n,i)=>n===cellPlan.afterImage.pixels[i]))
    throw RangeError('Combined map render differs from cell preview');
  }
+ // Every changed byte must be owned by exactly one validated proposal.
+ // Report source offsets and kinds only; never export original/edited bytes.
  let changedBytes=0;
+ const changedByKind={cell:0,warp:0,event:0,connection:0,'script-reference':0};
+ const changedRanges=[];
  for(let i=0;i<staged.length;i++)if(staged[i]!==original[i]){
   const patch=patches.get(i);
-  if(!patch||patch.value!==staged[i])
+  if(!patch||patch.value!==staged[i]||patch.expected!==original[i])
    throw RangeError('Combined transaction modified an unplanned ROM byte');
-  changedBytes++;
+  changedBytes++;changedByKind[patch.kind]++;
+  const previous=changedRanges[changedRanges.length-1];
+  if(previous&&previous.kind===patch.kind&&previous.start+previous.length===i)
+   previous.length++;
+  else changedRanges.push({start:i,length:1,kind:patch.kind});
  }
  // Optional read-only acceptance: compare a separately replayed BPS target
  // against EVERY byte of the independently constructed semantic preview.
@@ -9597,7 +9605,29 @@ function verifyHmaCubeCombinedTransaction(source,summary,{
    if(targetRom[i]!==staged[i])
     throw new RangeError('BPS target contains an undeclared or missing semantic byte');
  }
- for(const patch of patches.values())staged[patch.offset]=patch.expected;
+ // Revert the first replay, then replay in descending source-offset order.
+ // Full-ROM byte comparisons detect undeclared edits without allocating a
+ // third 64-MiB ROM copy on memory-constrained Android devices.
+ for(const patch of patches.values()){
+  if(staged[patch.offset]!==patch.value)
+   throw RangeError('First combined replay differs from validated proposal');
+  staged[patch.offset]=patch.expected;
+ }
+ for(let i=0;i<staged.length;i++)if(staged[i]!==original[i])
+  throw RangeError('First combined rollback differs from original');
+ const reverse=[...patches.values()].sort((a,b)=>b.offset-a.offset);
+ for(const patch of reverse){
+  if(staged[patch.offset]!==patch.expected||original[patch.offset]!==patch.expected)
+   throw RangeError('Reverse replay expected-byte precondition failed');
+  staged[patch.offset]=patch.value;
+ }
+ for(let i=0;i<staged.length;i++){
+  const patch=patches.get(i);
+  const expected=patch?patch.value:original[i];
+  if(staged[i]!==expected)
+   throw RangeError('Independent reverse replay differs from expected ROM bytes');
+ }
+ for(const patch of reverse)staged[patch.offset]=patch.expected;
  for(let i=0;i<staged.length;i++)
   if(staged[i]!==original[i]||byte(rom,i)!==original[i])
    throw RangeError('Combined transaction rollback or source preservation failed');
@@ -9608,6 +9638,10 @@ function verifyHmaCubeCombinedTransaction(source,summary,{
   connectionChanges:connectionPlan?.changedRecords??0,
   scriptChanges:scriptPlan?.changedRecords??0,
   claimedBytes:patches.size,changedBytes,
+  changedBytesByKind:Object.freeze(changedByKind),
+  changedByteRanges:Object.freeze(changedRanges.map(r=>Object.freeze(r))),
+  exactExpectedByteReplayVerified:true,reverseOrderReplayVerified:true,
+  reverseOrderRollbackVerified:true,
   combinedReDecodeVerified:true,inMemoryRollbackVerified:true,
   unrelatedBytesPreserved:true,sourceBytesPreserved:true,
   targetReplayMatched:targetRom===undefined?false:true,
