@@ -410,18 +410,43 @@ async function downloadFile(name,bytes,mime='application/octet-stream'){
 }
 function safeName(name){return String(name).replace(/\.(gba|rom|bin)$/i,'').replace(/[^\w.\- ]+/g,'_').slice(0,100)||'rom';}
 $('save-rom').addEventListener('click',()=>safeRun(()=>{ensureModel();downloadFile(`${safeName(model.name)}_mobilelab.gba`,model.snapshot());toast('ROM copy download started. Original file unchanged.');}));
-$('save-project').addEventListener('click',()=>safeRun(()=>{
-  ensureModel();if(model.appliedPatch)throw Error('Export a ROM copy and reopen it before exporting a JSON sidecar. Patch bytes are not represented in sidecar edits.');
-  const data=JSON.stringify(model.project(),null,2);downloadFile(`${safeName(model.name)}_mobilelab.json`,data,'application/json');toast('Checksum-bound project JSON download started.');
+// A sidecar is only portable to the exact base ROM. Hash base bytes in
+// bounded chunks (never the staged edits) and reject concurrent session edits.
+let sidecarIdentityBusy=false;
+async function exactSidecarBaseSha256(current){
+ if(sidecarIdentityBusy)throw Error('A project identity check is already running');
+ sidecarIdentityBusy=true;
+ const base=current.base,edits=new Map(current.edits),patched=current.appliedPatch;
+ try{
+  const result=await fingerprintRomSha256({base,edits:new Map()},{
+   chunkSize:65536,yieldEvery:16
+  });
+  if(model!==current||current.base!==base||current.appliedPatch!==patched||
+     current.edits.size!==edits.size||
+     [...edits].some(([offset,value])=>current.edits.get(offset)!==value))
+   throw Error('ROM or staged edits changed during project SHA-256; retry');
+  return result.sha256;
+ }finally{sidecarIdentityBusy=false;}
+}
+$('save-project').addEventListener('click',()=>safeRun(async()=>{
+ const current=ensureModel();
+ if(current.appliedPatch)throw Error('Export a ROM copy and reopen it before exporting a JSON sidecar. Patch bytes are not represented in sidecar edits.');
+ const sha256=await exactSidecarBaseSha256(current);
+ const data=JSON.stringify(current.projectV2(sha256),null,2);
+ downloadFile(`${safeName(current.name)}_mobilelab.json`,data,'application/json');
+ toast('SHA-256-bound project JSON download started.');
 }));
 $('project-picker').addEventListener('change',async e=>{
-  const file=e.target.files?.[0];e.target.value='';if(!file)return;
-  try{
-    ensureModel();if(file.size>16*1024*1024)throw Error('Project JSON is too large');
-    const project=JSON.parse(await file.text());
-    if(model.dirty&&!(await confirmAction('Replace staged edits?','Restoring a project will discard the current staged edits. Continue?')))return;
-    const restored=model.loadProject(project);invalidateDecodedGraphic();clearWarpInspection('Project restored; inspect warps again.');clearConnectionInspection('Project restored; inspect connections again.');clearMapGrid('Project restored; inspect map cells again.');drawHex();drawGraphics();drawChanges();updateIndicators();toast(`Restored ${restored} bytes of checked edits.`);
-  }catch(err){toast(err.message||String(err),true);}
+ const file=e.target.files?.[0];e.target.value='';if(!file)return;
+ try{
+  const current=ensureModel();if(file.size>16*1024*1024)throw Error('Project JSON is too large');
+  const project=JSON.parse(await file.text());
+  if(project?.version!==2)throw Error('Legacy CRC32-only sidecar cannot be restored safely. Export a SHA-256-bound version 2 sidecar.');
+  if(current.dirty&&!(await confirmAction('Replace staged edits?','Restoring a project will discard the current staged edits. Continue?')))return;
+  const sha256=await exactSidecarBaseSha256(current);
+  const restored=current.loadProjectV2(project,sha256);
+  invalidateDecodedGraphic();clearWarpInspection('Project restored; inspect warps again.');clearConnectionInspection('Project restored; inspect connections again.');clearMapGrid('Project restored; inspect map cells again.');drawHex();drawGraphics();drawChanges();updateIndicators();toast(`Restored ${restored} SHA-256-bound edit bytes.`);
+ }catch(err){toast(err.message||String(err),true);}
 });
 $('patch-picker').addEventListener('change',e=>{patchFile=e.target.files?.[0]||null;$('patch-filename').textContent=patchFile?`${patchFile.name} · ${formatSize(patchFile.size)}`:'No patch selected';updateIndicators();});
 $('apply-patch').addEventListener('click',async()=>{
