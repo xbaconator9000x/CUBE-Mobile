@@ -6,7 +6,9 @@
  * No paths, hashes, source bytes or target bytes are printed.
  */
 import {constants} from 'node:fs';
-import {open, lstat, realpath, link, unlink} from 'node:fs/promises';
+import {open, lstat, link} from 'node:fs/promises';
+import {assertPrivateBpsDirectory,finishOwnedBpsPublication,
+ rollbackOwnedBpsPublication} from './local-bps-publication-safety.mjs';
 import {createHash, randomBytes} from 'node:crypto';
 import {resolve, dirname, basename, join} from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -74,8 +76,7 @@ export async function saveLocalBpsTargetAs(argv){
  const args=parseLocalBpsSaveAsArgs(argv);
  const sourcePath=resolve(args['--rom']),patchPath=resolve(args['--patch']),
   destination=resolve(args['--out']),parent=dirname(destination);
- if(await realpath(parent)!==parent)
-  throw new RangeError('Destination directory symlink traversal refused');
+ const parentIdentity=await assertPrivateBpsDirectory(parent);
  await absent(destination);
  const source=await readStableLocalFile(sourcePath,ROM_LIMIT);
  const patch=await readStableLocalFile(patchPath,PATCH_LIMIT);
@@ -112,8 +113,9 @@ export async function saveLocalBpsTargetAs(argv){
   unchanged(patchPath,patch,PATCH_LIMIT),
   ...(planPath?[unchanged(planPath,planBytes,2*1024*1024)]:[])
  ]);
- // Verify every original inode-backed input again before publication.
+ // Verify original inputs and private output-directory identity before publication.
  await verifyInputs();
+ await assertPrivateBpsDirectory(parent,parentIdentity);
  const stage=join(parent,'.'+basename(destination)+'.cube-rom-stage-'+randomBytes(12).toString('hex'));
  let staged=false,published=false,identity=null;
  try{
@@ -126,7 +128,8 @@ export async function saveLocalBpsTargetAs(argv){
   if(!identity.isFile()||identity.isSymbolicLink())
    throw new RangeError('Staged target is not a regular file');
   await reopenOwned(stage,identity,target,targetHash);
-  // Atomic no-overwrite link, never rename/replace an existing ROM.
+  // Revalidate the output directory before atomic no-overwrite publication.
+  await assertPrivateBpsDirectory(parent,parentIdentity);
   await link(stage,destination);
   published=true;
   const linked=await lstat(destination);
@@ -136,11 +139,8 @@ export async function saveLocalBpsTargetAs(argv){
   // Check both original inputs after publication. Any mismatch rolls back
   // only the newly published destination, not the source or patch.
   await verifyInputs();
-  if(await realpath(parent)!==parent)
-   throw new RangeError('Destination directory changed during publication');
-  const dir=await open(parent,constants.O_RDONLY);
-  try{await dir.sync();}finally{await dir.close();}
-  await unlink(stage);staged=false;
+  await finishOwnedBpsPublication({parent,stage,destination,identity,parentIdentity});
+  staged=false;
   return Object.freeze({
    schema:'cube-mobile-local-bps-target-saveas/1',
    sourceBytes:source.length,patchBytes:patch.length,targetBytes:target.length,
@@ -156,17 +156,15 @@ export async function saveLocalBpsTargetAs(argv){
    androidHardwareVerified:false,strictParityEvidence:false
   });
  }catch(error){
-  if(published){
-   try{
-    const now=await lstat(destination);
-    if(identity&&sameInode(now,identity))await unlink(destination);
-   }catch(cleanup){if(cleanup?.code!=='ENOENT')throw cleanup;}
-  }
+  // Never blindly unlink a path after a failed transaction. A concurrent
+  // replacement, extra hardlink, or changed directory requires manual review.
+  if(staged&&identity)
+   await rollbackOwnedBpsPublication({
+    parent,stage,destination,identity,parentIdentity,published
+   });
   throw error;
- }finally{
-  if(staged)try{await unlink(stage);}
-  catch(cleanup){if(cleanup?.code!=='ENOENT')throw cleanup;}
  }
+
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
  try{process.stdout.write(JSON.stringify(
