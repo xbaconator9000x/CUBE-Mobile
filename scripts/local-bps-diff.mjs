@@ -9,6 +9,7 @@ import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {readStableLocalFile} from './local-input-safety.mjs';
 import {publishNewPatchArtifact} from './local-atomic-patch-artifact.mjs';
+import {verifyLocalBpsPatch} from './local-bps-verify.mjs';
 import {buildVerifiedBpsDiff} from '../src/bps-export.js';
 import {applyBps} from '../src/core.js';
 
@@ -70,12 +71,28 @@ export async function exportLocalBpsDiff(argv) {
   const sourceAgain = await readStableLocalFile(args['--rom'],64*1024*1024);
   if (!sourceAgain.equals(source) || digest(sourceAgain) !== expected)
     throw new RangeError('Source ROM changed before patch publication');
-  const published = await publishNewPatchArtifact(args['--out'],patch);
+  // Independently reopen the published artifact and replay it against the
+  // source, including an exact target SHA-256. Any failed acceptance rolls
+  // back only this publication, never the original ROM.
+  const targetHash=digest(target);
+  const published = await publishNewPatchArtifact(args['--out'],patch,{
+    verifyPublished: async destination => {
+      const report=await verifyLocalBpsPatch([
+        '--rom',args['--rom'],'--patch',destination,
+        '--expected-sha256',expected,'--expected-target-sha256',targetHash
+      ]);
+      if (!report.exactTargetSha256Matched || !report.sourcePreserved ||
+          !report.patchReopenVerified)
+        throw new RangeError('Published BPS replay acceptance failed');
+    }
+  });
   return Object.freeze({schema:'cube-mobile-local-bps-diff/1',
     proposedEdits:edits.length, changedBytes:changed, patchBytes:published.byteCount,
     exactSourceSha256Matched:true, patchReplayVerified:true,
     originalSourcePreserved:true, destinationReopenVerified:published.destinationReopenVerified,
     atomicNoOverwrite:published.atomicNoOverwrite,
+    publishedPatchReplayed:published.publishedAcceptanceVerified,
+    publishedTargetSha256Verified:published.publishedAcceptanceVerified,
     romModified:false,romExported:false,patchExported:true,
     cubeSemanticsAuthenticated:false,exclusiveOwnershipProven:false,
     emulatorVerified:false,androidHardwareVerified:false,
