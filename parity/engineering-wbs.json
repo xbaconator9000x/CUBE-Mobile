@@ -43,15 +43,17 @@
       "id": "patching",
       "effortUnits": 5,
       "completion": {
-        "low": 0.15,
-        "mid": 0.28,
-        "high": 0.46
+        "low": 0.17,
+        "mid": 0.32,
+        "high": 0.49
       },
       "upstreamPath": "src/HexManiac.Core/Models/Code/BpsPatch.cs",
       "localEvidence": [
-        "tests/core-regression.test.mjs"
+        "tests/core-regression.test.mjs",
+        "tests/bps-export.test.mjs",
+        "tests/local-bps-diff.test.mjs"
       ],
-      "rationale": "Partial IPS/BPS workbench; format and authentic ROM roundtrip gaps."
+      "rationale": "Partial IPS/BPS workbench plus source-bound sparse BPS1 encoder and opt-in local CLI with exact SHA-256/expected-byte checks, CRC32 replay, atomic no-overwrite patch publication and source preservation. Mobile BPS export, independently authenticated CUBE compatibility, semantic ownership, gameplay and device acceptance remain unverified."
     },
     {
       "id": "pointers",
