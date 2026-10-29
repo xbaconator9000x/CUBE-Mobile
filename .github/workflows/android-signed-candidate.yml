@@ -1,0 +1,91 @@
+name: Build verified signed Android candidate
+
+# Never expose signing credentials to pull requests or arbitrary branches.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: cube-signed-candidate
+  cancel-in-progress: false
+jobs:
+  signed-candidate:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: release-signing
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Rebuild and verify offline HTML
+        run: |
+          npm run build:standalone
+          git diff --exit-code -- app/CUBHMA_Mobile_Lab_Offline.html
+          npm test
+          npm run safety:check
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+      - name: Install Android build tools
+        run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Materialize temporary release keystore
+        env:
+          CUBE_RELEASE_KEYSTORE_BASE64: ${{ secrets.CUBE_RELEASE_KEYSTORE_BASE64 }}
+          CUBE_RELEASE_STORE_PASSWORD: ${{ secrets.CUBE_RELEASE_STORE_PASSWORD }}
+          CUBE_RELEASE_KEY_ALIAS: ${{ secrets.CUBE_RELEASE_KEY_ALIAS }}
+          CUBE_RELEASE_KEY_PASSWORD: ${{ secrets.CUBE_RELEASE_KEY_PASSWORD }}
+          CUBE_RELEASE_CERT_SHA256: ${{ vars.CUBE_RELEASE_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$CUBE_RELEASE_KEYSTORE_BASE64"
+          test -n "$CUBE_RELEASE_STORE_PASSWORD"
+          test -n "$CUBE_RELEASE_KEY_ALIAS"
+          test -n "$CUBE_RELEASE_KEY_PASSWORD"
+          test -n "$CUBE_RELEASE_CERT_SHA256"
+          printf '%s' "$CUBE_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/cube-release.keystore"
+          test -s "$RUNNER_TEMP/cube-release.keystore"
+      - name: Compile and sign candidate
+        working-directory: android
+        env:
+          CUBE_RELEASE_KEYSTORE_PATH: ${{ runner.temp }}/cube-release.keystore
+          CUBE_RELEASE_STORE_PASSWORD: ${{ secrets.CUBE_RELEASE_STORE_PASSWORD }}
+          CUBE_RELEASE_KEY_ALIAS: ${{ secrets.CUBE_RELEASE_KEY_ALIAS }}
+          CUBE_RELEASE_KEY_PASSWORD: ${{ secrets.CUBE_RELEASE_KEY_PASSWORD }}
+        run: gradle --no-daemon :app:assembleRelease :app:testDebugUnitTest
+      - name: Verify release signature, source bytes and provenance
+        env:
+          CUBE_RELEASE_CERT_SHA256: ${{ vars.CUBE_RELEASE_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          APK="android/app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          test -x "$AAPT"
+          test -x "$APKSIGNER"
+          node scripts/verify-android-release.mjs "$APK" "$AAPT" "$APKSIGNER"
+      - name: Publish verified signed candidate only
+        uses: actions/upload-artifact@v4
+        with:
+          name: cube-mobile-signed-candidate
+          path: |
+            android/app/build/outputs/apk/release/app-release.apk
+            android/app/build/outputs/apk/release/app-release.apk.provenance.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Remove temporary signing material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/cube-release.keystore"
