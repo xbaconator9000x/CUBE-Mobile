@@ -3,8 +3,8 @@
   "upstream": "kcradi/CUBHMA@3044393183e01af2ae1e907fb37e4a75eda6a8dc",
   "authoritativeBranch": "main",
   "checkpoint": {
-    "sequence": 13,
-    "lastIntegratedCommit": "e95d43e8724e7b1d5a4560a91bcf3882b5afde24",
+    "sequence": 14,
+    "lastIntegratedCommit": "d32bfe511278d414b4a21de2f993a0c06f15745c",
     "lastRun": "2026-10-29"
   },
   "tasks": [
@@ -384,20 +384,23 @@
         "scripts/local-bps-publication-safety.mjs",
         "tests/local-bps-publication-safety.test.mjs",
         "tests/local-bps-recovery-replay.test.mjs",
-        "docs/LOCAL_BPS_RECOVERY_REPLAY.md"
+        "docs/LOCAL_BPS_RECOVERY_REPLAY.md",
+        "scripts/local-bps-orphan-recovery.mjs",
+        "tests/local-bps-orphan-recovery.test.mjs",
+        "docs/LOCAL_BPS_ORPHAN_RECOVERY.md"
       ],
       "checkpoint": {
         "date": "2026-10-29",
         "kind": "partial",
-        "summary": "Merged #263: opt-in exact source-bound BPS crash recovery independently replays source and patch against published ROM before deleting an owned staging hardlink, preserving target-only recovery and fail-closed mismatch behavior. Source, Android and queue CI green; real ROM/hardware acceptance unavailable.",
+        "mergedPr": 268,
+        "mergedCommit": "d32bfe511278d414b4a21de2f993a0c06f15745c",
+        "branch": "watchdog/q017-orphan-recovery-20261029",
+        "summary": "Merged #268: explicit pre-publication orphan stage recovery now requires exact source/target SHA-256, independently replayed BPS, private single-link stage, absent destination, atomic hardlink publication and full ROM reopen; source, patch and existing ROM paths preserved. Six new tests; 983/983 source tests, Android and queue PR CI green. No semantic write permission or CUBE authenticity inferred.",
         "remaining": [
-          "Independently validate genuine CUBE ROM/BPS against game emulator and saved-ROM reopen",
-          "Physical Android SAF provider save/reopen acceptance remains separate",
-          "Pre-publication orphan stages still require manual review"
-        ],
-        "branch": "watchdog/q017-recovery-inode-version-20261029",
-        "mergedPr": 263,
-        "mergedCommit": "5aa3d32cdcb158f86271ff8643ba796c5bb4a136"
+          "Genuine legally held CUBE ROM/BPS game emulator acceptance and saved-ROM reopen",
+          "Physical Android SAF provider save/reopen and production release signing",
+          "Independent authenticated CUBE metadata and ownership-safe semantic edits"
+        ]
       }
     },
     {
