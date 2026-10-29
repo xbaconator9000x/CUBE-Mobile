@@ -11,3 +11,9 @@ An Android document provider can return an existing zero-byte document alias eve
 This is a conservative tradeoff: aborted exports may leave incomplete documents, but the app does not pretend to have performed an ownership-safe destructive rollback. Native session cleanup and cancellation remain in place.
 
 The source safety regression is `tests/android-saf-abort-safety.test.mjs`; Android CI compiles the host. A real physical-device test across multiple SAF providers, process recreation, cancellation and provider failures is still required. This change does not authenticate CUBE layouts, authorize semantic writes or establish strict feature parity.
+
+## Import picker result ownership across WebView reloads
+
+The native `ACTION_OPEN_DOCUMENT` import chooser now has its own outstanding-result gate. A WebView reload cancels the previous JavaScript file callback **without releasing the Android picker ticket**. While that picker is still outstanding, a new chooser is rejected rather than allowing the old result to be delivered to a newer callback. The old result consumes its ticket and is discarded. Activity recreation persists only the outstanding-ticket bit; it never restores a stale WebView callback. Picker launch failures clear the ticket and cancel the callback.
+
+`ImportPickerGate` has pure Java JUnit tests for reload, recreation, overlapping pickers and duplicate results. Source wiring tests ensure the MainActivity result path consumes the gate before forwarding selected URIs. No imported ROM data or private URI is stored in the repository. This is a lifecycle safety improvement, not physical-device SAF acceptance; picker cancellation, provider differences and process death still require real Android testing.
