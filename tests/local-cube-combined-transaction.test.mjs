@@ -183,3 +183,61 @@ test('CUBE BPS acceptance refuses stale hash, duplicate paths and malformed argu
   assert.deepEqual(await readFile(rom),Buffer.from(bytes));
  });
 });
+
+test('optional saved-ROM reopen independently matches semantic BPS target and preserves inputs',async()=>{
+ await fixture(async({args,rom,bytes,dir})=>{
+  const edits=[[0x301,2],[0x800,1],[0x824,0],[0xa24,0xfd],[0x830,0x10]];
+  const target=Buffer.from(bytes);
+  for(const [at,value] of edits)target[at]=value;
+  const patch=join(dir,'saved-semantic.bps'),saved=join(dir,'saved-target.gba');
+  await writeFile(patch,buildVerifiedBpsDiff(bytes,edits));
+  await writeFile(saved,target);
+  const hash=createHash('sha256').update(target).digest('hex');
+  const flags=[...args,'--patch',patch,'--expected-target-sha256',hash,
+   '--saved-rom',saved];
+  const report=await inspectLocalCubeBpsAcceptance(flags);
+  assert.equal(report.savedRomReopenVerified,true);
+  assert.equal(report.allProvidedInputsPreserved,true);
+  assert.equal(report.writeAuthorized,false);
+  assert.deepEqual(await readFile(saved),target);
+  assert.deepEqual(await readFile(rom),Buffer.from(bytes));
+  const wrong=Buffer.from(target);wrong[0xd00]^=1;
+  await writeFile(saved,wrong);
+  await assert.rejects(inspectLocalCubeBpsAcceptance(flags),/Saved target ROM differs/i);
+  assert.deepEqual(await readFile(rom),Buffer.from(bytes));
+ });
+});
+test('saved-ROM acceptance refuses symlinked target and path alias before reading',async()=>{
+ await fixture(async({args,rom,bytes,dir})=>{
+  const edits=[[0x301,2],[0x800,1],[0x824,0],[0xa24,0xfd],[0x830,0x10]];
+  const target=Buffer.from(bytes);
+  for(const [at,value] of edits)target[at]=value;
+  const patch=join(dir,'semantic.bps'),saved=join(dir,'saved.gba'),alias=join(dir,'alias.gba');
+  await writeFile(patch,buildVerifiedBpsDiff(bytes,edits));
+  await writeFile(saved,target);
+  await symlink(saved,alias);
+  const hash=createHash('sha256').update(target).digest('hex');
+  const base=[...args,'--patch',patch,'--expected-target-sha256',hash];
+  assert.throws(()=>parseLocalCubeBpsAcceptanceArgs([...base,'--saved-rom',rom]),RangeError);
+  await assert.rejects(inspectLocalCubeBpsAcceptance([...base,'--saved-rom',alias]),/symlink/i);
+  assert.deepEqual(await readFile(rom),Buffer.from(bytes));
+ });
+});
+
+test('saved-ROM acceptance rejects corrupted BPS despite an exact saved target',async()=>{
+ await fixture(async({args,rom,bytes,dir})=>{
+  const edits=[[0x301,2],[0x800,1],[0x824,0],[0xa24,0xfd],[0x830,0x10]];
+  const target=Buffer.from(bytes);
+  for(const [at,value] of edits)target[at]=value;
+  const patch=join(dir,'corrupted.bps'),saved=join(dir,'saved.gba');
+  const encoded=Buffer.from(buildVerifiedBpsDiff(bytes,edits));
+  encoded[encoded.length-1]^=1;
+  await writeFile(patch,encoded);await writeFile(saved,target);
+  const hash=createHash('sha256').update(target).digest('hex');
+  await assert.rejects(inspectLocalCubeBpsAcceptance([
+   ...args,'--patch',patch,'--expected-target-sha256',hash,'--saved-rom',saved
+  ]),/CRC/i);
+  assert.deepEqual(await readFile(rom),Buffer.from(bytes));
+  assert.deepEqual(await readFile(saved),target);
+ });
+});
