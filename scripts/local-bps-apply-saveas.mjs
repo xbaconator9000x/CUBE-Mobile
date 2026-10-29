@@ -11,6 +11,7 @@ import {createHash, randomBytes} from 'node:crypto';
 import {resolve, dirname, basename, join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {readStableLocalFile} from './local-input-safety.mjs';
+import {parseExpectedBytePlan} from './local-bps-diff.mjs';
 import {applyBps} from '../src/core.js';
 
 const HASH=/^[0-9a-f]{64}$/i;
@@ -21,9 +22,9 @@ const sameInode=(a,b)=>a.dev===b.dev&&a.ino===b.ino&&a.size===b.size;
 const sameStat=(a,b)=>sameInode(a,b)&&a.mtimeMs===b.mtimeMs&&a.ctimeMs===b.ctimeMs;
 
 export function parseLocalBpsSaveAsArgs(argv){
- const keys=new Set(['--rom','--patch','--out','--expected-sha256','--expected-target-sha256']);
- if(!Array.isArray(argv)||argv.length!==10)
-  throw new RangeError('Five exact local BPS Save As arguments required');
+ const keys=new Set(['--rom','--patch','--out','--expected-sha256','--expected-target-sha256','--plan']);
+ if(!Array.isArray(argv)||(argv.length!==10&&argv.length!==12))
+  throw new RangeError('Five required BPS Save As arguments and optional plan required');
  const args={};
  for(let i=0;i<argv.length;i+=2){
   if(!keys.has(argv[i])||Object.hasOwn(args,argv[i])||
@@ -31,12 +32,13 @@ export function parseLocalBpsSaveAsArgs(argv){
    throw new RangeError('Invalid or duplicate BPS Save As argument');
   args[argv[i]]=argv[i+1];
  }
- if(Object.keys(args).length!==keys.size||
+ if(Object.keys(args).length!==argv.length/2||
+    !['--rom','--patch','--out','--expected-sha256','--expected-target-sha256'].every(k=>Object.hasOwn(args,k))||
     !HASH.test(args['--expected-sha256'])||
     !HASH.test(args['--expected-target-sha256']))
   throw new RangeError('Exact source and target SHA-256 required');
- const paths=[args['--rom'],args['--patch'],args['--out']].map(path=>resolve(path));
- if(new Set(paths).size!==3)throw new RangeError('Source, patch and output must be distinct');
+ const paths=[args['--rom'],args['--patch'],args['--out'],...(args['--plan']?[args['--plan']]:[])].map(path=>resolve(path));
+ if(new Set(paths).size!==paths.length)throw new RangeError('All local BPS input and output paths must be distinct');
  return args;
 }
 async function absent(path){
@@ -85,9 +87,31 @@ export async function saveLocalBpsTargetAs(argv){
   throw new RangeError('BPS replay differs from exact target SHA-256');
  if(target.length===source.length&&target.equals(source))
   throw new RangeError('BPS patch produces no changed ROM bytes');
- // Verify the two original inode-backed inputs again before publication.
- await Promise.all([unchanged(sourcePath,source,ROM_LIMIT),
-  unchanged(patchPath,patch,PATCH_LIMIT)]);
+ // Optional strict raw-byte plan: prove every byte outside the declared
+ // expected-byte edits is unchanged, not merely that BPS CRCs agree.
+ const planPath=args['--plan']?resolve(args['--plan']):null;
+ const planBytes=planPath?await readStableLocalFile(planPath,2*1024*1024):null;
+ let scopedEdits=0;
+ if(planBytes){
+  if(target.length!==source.length)
+   throw new RangeError('Expected-byte plan cannot authorize ROM length changes');
+  const edits=parseExpectedBytePlan(planBytes,source);
+  const planned=new Map(edits);
+  for(let i=0;i<source.length;i++){
+   const expected=planned.has(i)?planned.get(i):source[i];
+   if(target[i]!==expected)
+    throw new RangeError('BPS target changes an undeclared or mismatched byte');
+   if(source[i]!==target[i])scopedEdits++;
+  }
+  if(!scopedEdits)throw new RangeError('Expected-byte plan has no effective edits');
+ }
+ const verifyInputs=()=>Promise.all([
+  unchanged(sourcePath,source,ROM_LIMIT),
+  unchanged(patchPath,patch,PATCH_LIMIT),
+  ...(planPath?[unchanged(planPath,planBytes,2*1024*1024)]:[])
+ ]);
+ // Verify every original inode-backed input again before publication.
+ await verifyInputs();
  const stage=join(parent,'.'+basename(destination)+'.cube-rom-stage-'+randomBytes(12).toString('hex'));
  let staged=false,published=false,identity=null;
  try{
@@ -109,8 +133,7 @@ export async function saveLocalBpsTargetAs(argv){
   await reopenOwned(destination,linked,target,targetHash);
   // Check both original inputs after publication. Any mismatch rolls back
   // only the newly published destination, not the source or patch.
-  await Promise.all([unchanged(sourcePath,source,ROM_LIMIT),
-   unchanged(patchPath,patch,PATCH_LIMIT)]);
+  await verifyInputs();
   if(await realpath(parent)!==parent)
    throw new RangeError('Destination directory changed during publication');
   const dir=await open(parent,constants.O_RDONLY);
@@ -123,6 +146,8 @@ export async function saveLocalBpsTargetAs(argv){
    bpsCrcAndReplayVerified:true,stagedReopenVerified:true,
    destinationReopenVerified:true,originalSourcePreserved:true,
    originalPatchPreserved:true,atomicNoOverwrite:true,
+   expectedBytePlanVerified:!!planBytes,unrelatedBytesPreserved:!!planBytes,
+   scopedChangedBytes:planBytes?scopedEdits:null,
    newRomCopyPublished:true,sourceRomModified:false,
    cubeRomAuthenticated:false,exclusiveOwnershipProven:false,
    semanticWritesAuthorized:false,gameEmulatorVerified:false,
