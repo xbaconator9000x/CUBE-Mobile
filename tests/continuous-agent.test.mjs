@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {reconcile} from '../scripts/development-queue.mjs';
 import {
-  chooseTask, taskPrompt, verifyReadme, verifyStagedPaths, recordPartialCheckpoint,
+  chooseTask, taskPrompt, verifyReadme, verifyStagedPaths, recordPartialCheckpoint, validateCIRef,
 } from '../scripts/continuous-agent.mjs';
 const queue = JSON.parse(readFileSync(new URL('../queue/development.json', import.meta.url), 'utf8'));
 
@@ -53,4 +53,11 @@ test('stale in-progress work returns to pending after a new checkpoint', () => {
   assert.equal(t.status, 'pending');
   assert.equal(t.owner, null);
   assert.equal(t.branch, null);
+});
+
+test('CI accepts only exact main or task branch SHA', () => {
+  assert.doesNotThrow(() => validateCIRef('main', 'a'.repeat(40)));
+  assert.doesNotThrow(() => validateCIRef('autocode/Q016-123', 'a'.repeat(40)));
+  assert.throws(() => validateCIRef('untrusted-pr', 'a'.repeat(40)), /Invalid/);
+  assert.throws(() => validateCIRef('main', 'not-a-sha'), /Invalid/);
 });
