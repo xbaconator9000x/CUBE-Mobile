@@ -41,11 +41,18 @@ public final class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
-        if (state != null && state.containsKey(IMPORTED_DOCUMENTS_STATE)) {
-            try {
-                importedDocuments.restore(state.getStringArrayList(IMPORTED_DOCUMENTS_STATE));
-            } catch (RuntimeException malformedState) {
+        if (state != null) {
+            // A recreated WebView must never silently forget a ROM identity
+            // because Android returned a partial/malformed saved-state Bundle.
+            // The key is written on every save, including an empty import set.
+            if (!state.containsKey(IMPORTED_DOCUMENTS_STATE)) {
                 importedDocuments.invalidate();
+            } else {
+                try {
+                    importedDocuments.restore(state.getStringArrayList(IMPORTED_DOCUMENTS_STATE));
+                } catch (RuntimeException malformedState) {
+                    importedDocuments.invalidate();
+                }
             }
         }
         if (state != null && state.getBoolean(IMPORT_PICKER_STATE, false)) {
@@ -166,7 +173,16 @@ public final class MainActivity extends Activity {
         ValueCallback<Uri[]> callback = fileCallback;
         fileCallback = null;
         if (!deliver || callback == null) return;
-        Uri[] selected = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
+        Uri[] selected;
+        try {
+            // Malformed third-party picker responses must fail as a cancelled
+            // import, not crash the Activity or leave the callback outstanding.
+            selected = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
+        } catch (RuntimeException malformedResult) {
+            selected = null;
+            Toast.makeText(this, "Import refused: invalid picker response",
+                Toast.LENGTH_LONG).show();
+        }
         if (selected != null) {
             // Reject the entire picker selection if any URI is invalid or
             // exceeds the bounded lifetime identity budget. Never grant the
