@@ -53,6 +53,29 @@ jobs:
             cat "$RUNNER_TEMP/unsigned-release.log"
             exit 1
           fi
+      - name: Exercise signed release candidate with disposable CI-only key
+        working-directory: android
+        run: |
+          set -euo pipefail
+          KEYSTORE="$RUNNER_TEMP/cube-disposable-ci-keystore.p12"
+          trap 'rm -f "$KEYSTORE"' EXIT
+          TEMP_PASSWORD="$(openssl rand -hex 24)"
+          keytool -genkeypair -noprompt -alias cube-ci -keyalg RSA -keysize 2048 \
+            -validity 1 -dname "CN=Disposable CI Only" -keystore "$KEYSTORE" \
+            -storepass "$TEMP_PASSWORD" -keypass "$TEMP_PASSWORD"
+          export CUBE_RELEASE_KEYSTORE_PATH="$KEYSTORE"
+          export CUBE_RELEASE_STORE_PASSWORD="$TEMP_PASSWORD"
+          export CUBE_RELEASE_KEY_ALIAS="cube-ci"
+          export CUBE_RELEASE_KEY_PASSWORD="$TEMP_PASSWORD"
+          gradle --no-daemon :app:assembleRelease
+          export CUBE_RELEASE_CERT_SHA256="$(keytool -list -v -keystore "$KEYSTORE" \
+            -alias cube-ci -storepass "$TEMP_PASSWORD" | sed -n 's/^[[:space:]]*SHA256: //p' | head -n 1)"
+          test -n "$CUBE_RELEASE_CERT_SHA256"
+          cd ..
+          node scripts/verify-android-release.mjs \
+            android/app/build/outputs/apk/release/app-release.apk \
+            "$ANDROID_HOME/build-tools/35.0.0/aapt" \
+            "$ANDROID_HOME/build-tools/35.0.0/apksigner"
       - name: Verify debug APK identity, offline bytes, permissions and provenance
         run: |
           node --test tests/verify-android-apk.test.mjs
