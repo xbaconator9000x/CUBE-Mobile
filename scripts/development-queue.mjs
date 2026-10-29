@@ -1,6 +1,4 @@
 import {readFileSync,writeFileSync} from 'node:fs';
-const file=process.argv.slice(2).find(arg=>!arg.startsWith('--'))||'queue/development.json';
-const q=JSON.parse(readFileSync(file,'utf8'));
 export function reconcile(q){
  if(q.schema!=='cube-mobile-queue/1'||!Array.isArray(q.tasks))throw Error('Unsupported queue');
  const ids=new Set(),map=new Map();
@@ -16,4 +14,4 @@ export function reconcile(q){
  const total=q.tasks.reduce((s,t)=>s+t.effortHours,0),done=q.tasks.filter(t=>t.status==='done').reduce((s,t)=>s+t.effortHours,0);
  return {eligible:eligible.map(t=>t.id),parallelBatch:selected.map(t=>t.id),blocked:q.tasks.filter(t=>t.status==='blocked').map(t=>t.id),inProgress:q.tasks.filter(t=>t.status==='in_progress').map(t=>t.id),estimatedHoursRemaining:total-done,queueTaskHoursTotal:total,queueTaskHoursDone:done,queueCompletionPercent:Number((100*done/total).toFixed(1)),note:'Queue-only hours and completion are planning estimates; NOT total project completion or independently verified parity.'}
 }
-if(process.argv[1]&&import.meta.url===new URL('file://'+process.argv[1]).href){const report=reconcile(q);console.log(JSON.stringify(report,null,2));if(process.argv.includes('--output'))writeFileSync('queue/next-batch.json',JSON.stringify(report,null,2)+'\n')}
+if(process.argv[1]&&import.meta.url===new URL('file://'+process.argv[1]).href){const file=process.argv.slice(2).find(arg=>!arg.startsWith('--'))||'queue/development.json';const q=JSON.parse(readFileSync(file,'utf8'));const report=reconcile(q);console.log(JSON.stringify(report,null,2));if(process.argv.includes('--output'))writeFileSync('queue/next-batch.json',JSON.stringify(report,null,2)+'\n')}
