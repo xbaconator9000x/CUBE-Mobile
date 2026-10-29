@@ -3,8 +3,8 @@
   "upstream": "kcradi/CUBHMA@3044393183e01af2ae1e907fb37e4a75eda6a8dc",
   "authoritativeBranch": "main",
   "checkpoint": {
-    "sequence": 1,
-    "lastIntegratedCommit": "c66af30406d4a3091bebf2cf22eed1687cc8fa90",
+    "sequence": 2,
+    "lastIntegratedCommit": "95b04a5c2420486fb9f4747b4d3c0c48e8e0931e",
     "lastRun": "2026-10-29"
   },
   "tasks": [
@@ -245,14 +245,13 @@
       "checkpoint": {
         "date": "2026-10-29",
         "kind": "partial",
-        "branch": "agent/q012-signed-release-gate-20261029",
-        "pr": 247,
-        "summary": "PR #247 adds main-only protected signed-candidate workflow, release signing gate, pinned v2 APK certificate/payload verification, disposable CI signing roundtrip and SHA-256 provenance. CI-only signing does not prove real release certificate or hardware.",
+        "mergedPr": 247,
+        "mergedCommit": "95b04a5c2420486fb9f4747b4d3c0c48e8e0931e",
+        "summary": "Merged protected signed-candidate workflow, exact pinned v2 signing-certificate and offline payload verification, disposable CI-signed release assembly, unsigned-release rejection and SHA-256 provenance. Follow-up adds fail-closed debuggable-APK rejection. Real release credentials and physical-device evidence not available.",
         "remaining": [
-          "merge after all PR CI green",
-          "dispatch signed candidate with privately configured release-signing environment and real certificate pin",
-          "physical Android device installation and SAF import/export smoke",
-          "authentic CUBE ROM acceptance"
+          "dispatch real signed candidate using protected release-signing environment and certificate pin",
+          "physical Android installation plus SAF import/export smoke",
+          "authenticated CUBE ROM/metadata acceptance"
         ]
       }
     },
