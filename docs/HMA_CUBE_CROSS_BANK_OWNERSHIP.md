@@ -21,3 +21,10 @@ The touch-first cross-bank ownership inspector now **always** includes bounded m
 ## Same-map structural aliases (29 October 2026)
 
 The bounded census now separately reports `sameMapStructuralOverlapCount` and `sameMapStructuralAmbiguityDetected` when two independently decoded structures of the **same** map claim overlapping ROM bytes. The changed-byte ownership impact report treats any such ambiguity as an incomplete census, even if the particular proposed edit does not intersect the ambiguous bytes. A synthetic event-warp/map-script-table alias regression demonstrates why structurally plausible decoders cannot establish exclusive ownership. These are diagnostics, not evidence of a globally complete pointer graph or authorization to save edited ROMs.
+
+
+## Bounded high-alias reporting (29 October 2026)
+
+A ROM may reuse a header, layout or blockmap across hundreds of map slots. The ownership census now counts **all** structural intersections while retaining at most 1,024 cross-map and 1,024 within-map findings by default (bounded 1–4,096 override). A source-range sweep avoids retaining quadratic-size result arrays. Mobile and standalone inspectors display complete counts and explicitly warn about truncated findings.
+
+Changed-byte audits focus the retained findings on the edited map, preventing unrelated aliases from exhausting its reporting budget. If focused findings are truncated, the audit marks ownership evidence **incomplete** and never reports clean coverage. This does not establish global pointer ownership, ROM authenticity, semantic write permission, or strict parity.
