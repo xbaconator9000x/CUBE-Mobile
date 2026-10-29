@@ -40,7 +40,10 @@ public class BackNavigationSmokeTest {
                 "JSON.stringify({hash:location.hash,homeHidden:" +
                 "document.getElementById('home-button')?.hidden," +
                 "dialogs:document.querySelectorAll('dialog[open]').length," +
-                "routeFn:typeof gotoTab,scriptCount:document.scripts.length})"));
+                "routeFn:typeof gotoTab,scriptCount:document.scripts.length," +
+                "inlineBytes:document.scripts[0]?.textContent.length," +
+                "parse:(function(){try{new Function(document.scripts[0].textContent);" +
+                "return 'ok';}catch(e){return e.name+':'+e.message}})()})"));
     }
 
     @Test public void backDismissesDialogBeforeNavigatingTab() throws Exception {
