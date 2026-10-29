@@ -403,19 +403,29 @@
       "evidence": [
         "android/app/src/main/java/com/pokebacon/cubemobile/NativeExport.java",
         "tests/android-saf-abort-safety.test.mjs",
-        "docs/ANDROID_SAF_ABORT_RECOVERY.md"
+        "docs/ANDROID_SAF_ABORT_RECOVERY.md",
+        "android/app/src/main/java/com/pokebacon/cubemobile/ImportPickerGate.java",
+        "android/app/src/test/java/com/pokebacon/cubemobile/ImportPickerGateTest.java",
+        "tests/android-import-picker-lifecycle.test.mjs"
       ],
       "checkpoint": {
         "date": "2026-10-29",
         "kind": "partial",
-        "summary": "Made native SAF export abort non-destructive when document provider ownership is unproven, preserving explicit user cleanup and cancellation/reload safeguards. Source regression and Android compile required; physical SAF provider acceptance unavailable.",
+        "summary": "Existing non-destructive SAF export abort (#253); new candidate protects ACTION_OPEN_DOCUMENT import picker results across WebView reload and Activity recreation with a persistent outstanding-result ticket and no stale callback reuse. Physical Android provider acceptance remains unavailable.",
         "remaining": [
-          "Physical Android SAF import/export, cancellation and process-recreation tests across providers",
+          "Merge only after source, Android native unit and queue CI pass",
+          "Physical Android SAF import/export, cancellation, process-recreation and screen reader tests across providers",
           "Authenticated CUBE ROM workflow and release candidate acceptance"
         ],
         "branch": "watchdog/q018-saf-nondestructive-abort-20261029",
         "mergedPr": 253,
-        "mergedCommit": "459b922724054a0e0bb48a4cc8e178d085068c09"
+        "mergedCommit": "459b922724054a0e0bb48a4cc8e178d085068c09",
+        "reviewCandidate": {
+          "branch": "watchdog/q018-import-picker-lifecycle-20261029",
+          "kind": "unmerged-implementation",
+          "sourceTests": "pending",
+          "androidCI": "pending"
+        }
       }
     },
     {
