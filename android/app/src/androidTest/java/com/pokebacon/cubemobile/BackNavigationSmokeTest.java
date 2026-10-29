@@ -35,7 +35,11 @@ public class BackNavigationSmokeTest {
             if ("true".equals(evaluate(instrumentation, web, expression))) return;
             Thread.sleep(250);
         }
-        fail("WebView navigation state did not settle");
+        fail("WebView navigation state did not settle for " + expression +
+            " state=" + evaluate(instrumentation, web,
+                "JSON.stringify({hash:location.hash,homeHidden:" +
+                "document.getElementById('home-button')?.hidden," +
+                "dialogs:document.querySelectorAll('dialog[open]').length})"));
     }
 
     @Test public void backDismissesDialogBeforeNavigatingTab() throws Exception {
@@ -53,7 +57,8 @@ public class BackNavigationSmokeTest {
             awaitTrue(instrumentation, web.get(),
                 "document.readyState==='complete' && !!window.__cubeNativeExportInstalled" +
                 " && !!document.getElementById('help-button')", 90000);
-            evaluate(instrumentation, web.get(), "location.hash='#/hex';true");
+            evaluate(instrumentation, web.get(),
+                "document.querySelector('[data-tab=\\\"hex\\\"]').click();true");
             awaitTrue(instrumentation, web.get(),
                 "location.hash==='#/hex' && !document.getElementById('home-button').hidden", 10000);
             assertEquals("true", evaluate(instrumentation, web.get(),
