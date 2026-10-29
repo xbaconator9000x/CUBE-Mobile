@@ -368,19 +368,29 @@
         "scripts/local-bps-apply-saveas.mjs",
         "scripts/local-bps-recovery.mjs",
         "tests/local-bps-recovery.test.mjs",
-        "docs/LOCAL_BPS_SAVEAS_RECOVERY.md"
+        "docs/LOCAL_BPS_SAVEAS_RECOVERY.md",
+        "scripts/local-bps-publication-safety.mjs",
+        "tests/local-bps-publication-safety.test.mjs"
       ],
       "checkpoint": {
         "date": "2026-10-29",
         "kind": "partial",
-        "summary": "Added explicit crash recovery for redundant post-publication BPS Save As staging hardlinks, exact-target independent reopen, symlink/foreign-inode/ambiguous-stage/private-directory checks, CLI and regression tests. No real ROM or Android acceptance.",
+        "summary": "Existing exact-target crash recovery (merged #252); current Q017 candidate adds private output-directory enforcement, two-link ownership verification, durable stage cleanup and fail-closed rollback. Real-ROM/emulator acceptance remains unavailable.",
         "remaining": [
-          "Validate on genuine legally held ROM and matching BPS patch with independent emulator reopen",
-          "Pre-publication orphan stages require manual review; never auto-delete unowned files"
+          "Merge only after source, Android and queue CI pass",
+          "Validate legally held genuine CUBE ROM/BPS in independent emulator reopen",
+          "Physical Android file-provider and save/reopen acceptance remain separate",
+          "Pre-publication orphan stages require manual review"
         ],
         "branch": "watchdog/q017-bps-crash-recovery-main-reconciled-20261029",
         "mergedPr": 252,
-        "mergedCommit": "36f65c7e99636d29ed7f33f23ed2a0c994f9733c"
+        "mergedCommit": "36f65c7e99636d29ed7f33f23ed2a0c994f9733c",
+        "reviewCandidate": {
+          "branch": "watchdog/q017-bps-private-publication-hardening-20261029",
+          "kind": "unmerged-implementation",
+          "sourceTests": "pending",
+          "androidCI": "pending"
+        }
       }
     },
     {
