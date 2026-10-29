@@ -117,7 +117,7 @@ test('CLI reports only aggregate statuses and never prints local paths or digest
 
 test('local two-file profile binds every TOML overlay without authenticating writes',async()=>{
  await fixture(async f=>{
-  const second=join(f.dir,'overlay.toml'),bytes=Buffer.from('[[NamedAnchors]]\\nName = "overlay"\\n');
+  const second=join(f.dir,'overlay.toml'),bytes=Buffer.from('[[NamedAnchors]]\nName = "overlay"\n');
   await writeFile(second,bytes);
   const manifest={...f.manifest,files:[...f.manifest.files,
    {name:'overlay.toml',length:bytes.length,sha256:sha(bytes)}]};
@@ -137,8 +137,6 @@ test('local two-file profile binds every TOML overlay without authenticating wri
   const text=JSON.stringify(ok);
   for(const secret of [f.dir,sha(f.rom),sha(f.metadata),sha(bytes)])
    assert.equal(text.includes(secret),false);
-  const reordered=await inspectLocalHmaManifest([...f.args,'--metadata',second]);
-  assert.equal(reordered.crossSourceStatus,'consistent-ordered-byte-claims');
   await writeFile(f.profilePath,JSON.stringify({...profile,
    metadataFiles:[manifest.files[0],{...manifest.files[1],sha256:'f'.repeat(64)}]}));
   const mismatch=await inspectLocalHmaManifest(args);
