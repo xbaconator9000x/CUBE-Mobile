@@ -111,7 +111,7 @@
     <button type="button" id="cube-map-render-jump" class="subtle-button" disabled>Open selected rendered cell in hex</button>
   </div>
   <output id="cube-map-render-status" class="palette-note" aria-live="polite">CUBE custom lighting/FRLG variants are not rendered. No ROM authenticity or passability is inferred.</output>
-  <div style="overflow-x:auto"><canvas id="cube-map-render-canvas" hidden aria-label="Read-only CUBE Emerald rendered metatile preview" style="max-width:none;image-rendering:pixelated"></canvas></div>
+  <div style="overflow-x:auto"><canvas id="cube-map-render-canvas" hidden tabindex="0" role="button" aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Enter Space" aria-label="Read-only CUBE map. Arrow keys move the cell selection; Enter or Space inspects it." style="max-width:none;image-rendering:pixelated"></canvas></div>
   <output id="cube-map-overlay-legend" class="palette-note" aria-live="polite">No CUBE raw overlay selected.</output>
   <output id="cube-map-render-selection" class="palette-note" aria-live="polite">Tap a rendered CUBE cell to inspect its raw blockmap and attribute offsets.</output>
   <div class="input-row" aria-label="CUBE read-only cell visual proposal">
