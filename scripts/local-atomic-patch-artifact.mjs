@@ -27,7 +27,9 @@ async function reopen(path, expected, identity) {
       throw new RangeError('Artifact readback differs from staged bytes');
   } finally { await file.close(); }
 }
-export async function publishNewPatchArtifact(destinationPath, bytes) {
+export async function publishNewPatchArtifact(destinationPath, bytes, {verifyPublished}={}) {
+  if (verifyPublished!==undefined && typeof verifyPublished!=='function')
+    throw new RangeError('Invalid published patch verifier');
   if (typeof destinationPath !== 'string' || !destinationPath ||
       destinationPath.includes('\0') || !(bytes instanceof Uint8Array) ||
       bytes.length < 19 || bytes.length > 2 * 1024 * 1024)
@@ -52,11 +54,15 @@ export async function publishNewPatchArtifact(destinationPath, bytes) {
     const linked = await lstat(destination);
     if (!inode(linked,identity)) throw new RangeError('Artifact publication inode changed');
     await reopen(destination, bytes, linked);
+    // Acceptance happens while the stage still exists. If replay or source
+    // verification fails, catch removes only our newly linked destination.
+    if (verifyPublished) await verifyPublished(destination);
     const dir = await open(parent, constants.O_RDONLY);
     try { await dir.sync(); } finally { await dir.close(); }
     await unlink(stage); staged = false;
     return Object.freeze({byteCount:bytes.length, atomicNoOverwrite:true,
-      stagedReopenVerified:true, destinationReopenVerified:true});
+      stagedReopenVerified:true, destinationReopenVerified:true,
+      publishedAcceptanceVerified:!!verifyPublished});
   } catch (error) {
     if (published) {
       try {
