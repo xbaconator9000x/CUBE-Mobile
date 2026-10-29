@@ -3,8 +3,8 @@
   "upstream": "kcradi/CUBHMA@3044393183e01af2ae1e907fb37e4a75eda6a8dc",
   "authoritativeBranch": "main",
   "checkpoint": {
-    "sequence": 9,
-    "lastIntegratedCommit": "d3b6b9089ed867c54bcc7a7379450d39eb8f0f68",
+    "sequence": 10,
+    "lastIntegratedCommit": "abf27e23525592d8042b188acc1526d13b1733dd",
     "lastRun": "2026-10-29"
   },
   "tasks": [
@@ -342,21 +342,14 @@
       "checkpoint": {
         "date": "2026-10-29",
         "kind": "partial",
-        "summary": "Previously merged read-only ROM/TOML provenance comparator (#250); current candidate extends local manifest smoke with optional separately supplied ROM profile, exact cross-source conflict checks and stable no-symlink local reads. All claims remain untrusted and read-only.",
+        "summary": "Merged #250 read-only ROM/TOML provenance comparator and #259 local exact ROM-profile/ordered TOML cross-source smoke with stable symlink-rejecting reads. Source, queue and Android CI passed; user-supplied claims are not independent CUBE authentication.",
         "remaining": [
-          "Merge only after source, Android and queue CI pass",
-          "Authenticate genuine legally held CUBE ROM and ordered metadata provenance independently",
-          "Wire read-only status into mobile/offline UI and validate device/emulator acceptance"
+          "Independently authenticate genuine legally held CUBE ROM and ordered TOML metadata",
+          "Wire read-only cross-source status into modular/offline UI and validate real device/emulator acceptance"
         ],
-        "branch": "watchdog/q016-rom-metadata-provenance-binding-20261029",
-        "mergedPr": 250,
-        "mergedCommit": "3d21ddd703e1113aa242149de98f11cecf66256a",
-        "reviewCandidate": {
-          "branch": "watchdog/q016-local-rom-toml-cross-source-20261029",
-          "kind": "unmerged-implementation",
-          "sourceTests": "pending",
-          "androidCI": "pending"
-        }
+        "branch": "watchdog/q016-local-rom-toml-cross-source-20261029",
+        "mergedPr": 259,
+        "mergedCommit": "ffdc3695246826918e62ff45d69e2e959560bdf4"
       }
     },
     {
@@ -420,21 +413,14 @@
       "checkpoint": {
         "date": "2026-10-29",
         "kind": "partial",
-        "summary": "Existing non-destructive SAF export abort (#253); new candidate protects ACTION_OPEN_DOCUMENT import picker results across WebView reload and Activity recreation with a persistent outstanding-result ticket and no stale callback reuse. Physical Android provider acceptance remains unavailable.",
+        "summary": "Merged #253 non-destructive SAF export abort and #260 import-picker stale-result protection across WebView reload/Activity recreation. Source, native Android unit, APK build, emulator offline smoke and queue CI green; real hardware SAF provider acceptance unavailable.",
         "remaining": [
-          "Merge only after source, Android native unit and queue CI pass",
           "Physical Android SAF import/export, cancellation, process-recreation and screen reader tests across providers",
-          "Authenticated CUBE ROM workflow and release candidate acceptance"
+          "Authenticated CUBE ROM workflow and real signed release candidate acceptance"
         ],
-        "branch": "watchdog/q018-saf-nondestructive-abort-20261029",
-        "mergedPr": 253,
-        "mergedCommit": "459b922724054a0e0bb48a4cc8e178d085068c09",
-        "reviewCandidate": {
-          "branch": "watchdog/q018-import-picker-lifecycle-20261029",
-          "kind": "unmerged-implementation",
-          "sourceTests": "pending",
-          "androidCI": "pending"
-        }
+        "branch": "watchdog/q018-import-picker-lifecycle-20261029",
+        "mergedPr": 260,
+        "mergedCommit": "abf27e23525592d8042b188acc1526d13b1733dd"
       }
     },
     {

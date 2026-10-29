@@ -43,9 +43,9 @@
       "id": "patching",
       "effortUnits": 5,
       "completion": {
-        "low": 0.17,
-        "mid": 0.32,
-        "high": 0.49
+        "low": 0.175,
+        "mid": 0.335,
+        "high": 0.5
       },
       "upstreamPath": "src/HexManiac.Core/Models/Code/BpsPatch.cs",
       "localEvidence": [
@@ -53,7 +53,7 @@
         "tests/bps-export.test.mjs",
         "tests/local-bps-diff.test.mjs"
       ],
-      "rationale": "Partial IPS/BPS workbench plus source-bound sparse BPS1 encoder and opt-in local CLI with exact SHA-256/expected-byte checks, CRC32 replay, atomic no-overwrite patch publication and source preservation. Mobile BPS export, independently authenticated CUBE compatibility, semantic ownership, gameplay and device acceptance remain unverified."
+      "rationale": "BPS1 and IPS workbench, exact-source/target replay, raw expected-byte plans, no-overwrite Save As and explicit crash recovery now include private owner-controlled output directories, two-link inode ownership and non-destructive fail-closed rollback (PR #257). No authenticated CUBE semantic save, game-emulator roundtrip or device acceptance."
     },
     {
       "id": "pointers",
@@ -73,15 +73,15 @@
       "id": "metadata",
       "effortUnits": 9,
       "completion": {
-        "low": 0.12,
-        "mid": 0.22,
-        "high": 0.37
+        "low": 0.125,
+        "mid": 0.235,
+        "high": 0.385
       },
       "upstreamPath": "src/HexManiac.Core/Models/StoredMetadata.cs",
       "localEvidence": [
         "tests/metadata-layout.test.mjs"
       ],
-      "rationale": "TOML identity and bounded anchors exist; full overlay/format DSL and provenance unverified."
+      "rationale": "Read-only HMA TOML identity, bounded anchors, exact ordered metadata manifests and a local optional ROM-profile cross-source consistency check (PR #259) now reject symlinked/changing inputs and conflicting claims. Registries are uncurated; full format DSL, independent provenance and safe writes remain unverified."
     },
     {
       "id": "tables",
@@ -438,9 +438,9 @@
       "id": "android-platform",
       "effortUnits": 13,
       "completion": {
-        "low": 0.07,
-        "mid": 0.2,
-        "high": 0.34
+        "low": 0.075,
+        "mid": 0.21,
+        "high": 0.35
       },
       "sourceRefs": [
         "FULL_PORT_PLAN.md",
@@ -448,9 +448,12 @@
         "android/app/src/main/java/com/pokebacon/cubemobile/MainActivity.java",
         "android/app/src/main/java/com/pokebacon/cubemobile/NativeExport.java",
         ".github/workflows/android-build.yml",
-        "tests/android-export-bridge.test.mjs"
+        "tests/android-export-bridge.test.mjs",
+        "android/app/src/main/java/com/pokebacon/cubemobile/ImportPickerGate.java",
+        "android/app/src/test/java/com/pokebacon/cubemobile/ImportPickerGateTest.java",
+        "tests/android-import-picker-lifecycle.test.mjs"
       ],
-      "rationale": "Initial Android debug APK now compiles in CI from the exact standalone offline HTML. WebViewAssetLoader shell, SAF ROM/TOML import, Back navigation, and user-selected bounded blob export with streaming/reopen verification have code and synthetic protocol tests. No physical-device lifecycle, performance, accessibility, real CUBE ROM/TOML or emulator acceptance; not a production release."
+      "rationale": "Android debug APK, offline WebViewAssetLoader, SAF import/export, Back navigation, signed disposable CI candidate and bounded blob readback are implemented in part. Native import-picker ticket ownership now survives WebView reload/Activity recreation without stale callback reuse (PR #260), with JUnit and CI checks. No physical-device provider, real release signing or genuine CUBE ROM acceptance."
     },
     {
       "id": "emulator-interoperability",
@@ -484,16 +487,35 @@
       "id": "mobile-ux-accessibility",
       "effortUnits": 8,
       "completion": {
-        "low": 0.1,
-        "mid": 0.205,
-        "high": 0.345
+        "low": 0.105,
+        "mid": 0.22,
+        "high": 0.36
       },
       "sourceRefs": [
         "src/app.js",
         "src/styles.css",
-        "tests/mobile-cube-combined-transaction.test.mjs"
+        "tests/mobile-cube-combined-transaction.test.mjs",
+        "tests/mobile-cube-canvas-keyboard.test.mjs"
       ],
-      "rationale": "Touch-first navigation and atomic CUBE warp/event queues with combined rollback action; accessibility, Android packaging and device UX acceptance remain unverified. CUBE raw connection editing is now touch-accessible in modular/offline UI; no Android hardware acceptance. Script-pointer retarget queue added to touch and offline UI; not device-validated."
+      "rationale": "Touch-first CUBE map/warp/event/script-reference queues and partial raw map rendering are present. Read-only CUBE canvas now has keyboard focus, arrow/Enter/Space cell selection through guarded click path and modular/offline parity (PR #256). Complete accessible event editing, physical-device keyboard/screen-reader and authenticated ROM acceptance remain unverified."
     }
-  ]
+  ],
+  "lastReassessmentDate": "2026-10-29",
+  "reassessment": {
+    "kind": "judgemental-proportional-partial-credit-not-measured-hours",
+    "reviewedMergedPrs": [
+      256,
+      257,
+      259,
+      260
+    ],
+    "scope": "Only four previously partial WBS items were modestly reassessed for source/CI-backed keyboard access, BPS publication integrity, local provenance checks and native import lifecycle. No increase in six-evidence strict parity; no independent ROM/device acceptance. Original 286-unit denominator, 50% planning milestone, low-confidence bounds and upstream pin unchanged.",
+    "evidencePaths": [
+      "scripts/local-bps-publication-safety.mjs",
+      "tests/local-bps-publication-safety.test.mjs",
+      "tests/local-hma-cross-source.test.mjs",
+      "android/app/src/test/java/com/pokebacon/cubemobile/ImportPickerGateTest.java",
+      "tests/mobile-cube-canvas-keyboard.test.mjs"
+    ]
+  }
 }
