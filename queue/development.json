@@ -335,19 +335,28 @@
         "src/rom-compatibility.js",
         "src/hma-rom-provenance-binding.js",
         "tests/hma-rom-provenance-binding.test.mjs",
-        "docs/ROM_TOML_CROSS_SOURCE_BINDING.md"
+        "docs/ROM_TOML_CROSS_SOURCE_BINDING.md",
+        "scripts/local-hma-manifest-smoke.mjs",
+        "tests/local-hma-cross-source.test.mjs"
       ],
       "checkpoint": {
         "date": "2026-10-29",
         "kind": "partial",
-        "summary": "Implemented read-only intersection of exact ROM profile and ordered TOML manifest with header, layout, upstream commit, digest and stale-snapshot conflict checks. No curated ROM evidence, no mobile UI wiring, no write authority.",
+        "summary": "Previously merged read-only ROM/TOML provenance comparator (#250); current candidate extends local manifest smoke with optional separately supplied ROM profile, exact cross-source conflict checks and stable no-symlink local reads. All claims remain untrusted and read-only.",
         "remaining": [
-          "Authenticate genuine legally held CUBE ROM and ordered metadata provenance",
-          "Wire status into touch/offline UI and validate independent device/emulator acceptance"
+          "Merge only after source, Android and queue CI pass",
+          "Authenticate genuine legally held CUBE ROM and ordered metadata provenance independently",
+          "Wire read-only status into mobile/offline UI and validate device/emulator acceptance"
         ],
         "branch": "watchdog/q016-rom-metadata-provenance-binding-20261029",
         "mergedPr": 250,
-        "mergedCommit": "3d21ddd703e1113aa242149de98f11cecf66256a"
+        "mergedCommit": "3d21ddd703e1113aa242149de98f11cecf66256a",
+        "reviewCandidate": {
+          "branch": "watchdog/q016-local-rom-toml-cross-source-20261029",
+          "kind": "unmerged-implementation",
+          "sourceTests": "pending",
+          "androidCI": "pending"
+        }
       }
     },
     {

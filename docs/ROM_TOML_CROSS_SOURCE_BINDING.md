@@ -20,3 +20,11 @@ The cross-source comparison never enables semantic writes, relocation or claims 
 ## Remaining Q016 acceptance
 
 Independently authenticate a legally held CUBE ROM and matching ordered TOML files, establish a source-grounded manifest/provenance chain, and wire the resulting read-only status into the touch/offline UI. Do not curate a profile from a user-supplied hash, filename, ROM header or TOML layout marker. Q003 and downstream semantic editing remain blocked until genuine evidence exists.
+
+## Local-only cross-source acceptance command
+
+The existing `npm run smoke:cube-manifest -- --rom /private/owned.gba --manifest /private/ordered.json --metadata /private/default.toml` workflow now accepts **optional** `--profile /private/rom-profile.json`. Supply each `--metadata` argument in the exact manifest order. The separate profile is a single JSON object containing `sha256`, `length`, `gameCode`, `revision`, `layout`, `metadataSha256`, `sourceCommit` and `evidenceUrl`. It must agree with the independently supplied ordered TOML manifest and the actual local ROM bytes. The CLI reports `crossSourceStatus` and `crossSourceClaimsConsistent` without printing private paths, hashes, ROM or TOML contents.
+
+All ROM, manifest, profile and TOML inputs are now read using the shared stable local file reader, which rejects symlink traversal, changing pathname/inode/size/timestamps and oversized files. The separate profile is **not a curated registry**. A consistent user-supplied profile is only an exact-byte *claim*, never authenticated CUBE compatibility or semantic write authority. The legacy profile has one `metadataSha256` and cannot authenticate an ordered multi-file overlay: the explicit `multi-file-profile-unbound` status remains a blocker. When a profile is supplied, optional raw bank inspection is refused unless both sources report consistent exact-byte claims. Without `--profile`, the previous manifest-only read-only smoke remains available.
+
+The new local regression tests cover single-file agreement, multi-file unbound profiles, layout/digest conflicts, unknown ROM profiles, symlink inputs, malformed/aliased profile files and CLI privacy. Genuine independently authenticated ROM/metadata, emulator and Android hardware acceptance are still missing.
