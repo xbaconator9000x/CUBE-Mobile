@@ -7,6 +7,8 @@
 import {readStableLocalFile} from './local-input-safety.mjs';
 import {compareRomHmaProvenance} from '../src/hma-rom-provenance-binding.js';
 import {validateRomProfileRegistry} from '../src/rom-compatibility.js';
+import {validateLocalOrderedProfileOverlay,compareLocalOrderedProfileOverlay}
+ from '../src/hma-ordered-profile.js';
 import {basename,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {RomModel} from '../src/core.js';
@@ -56,13 +58,14 @@ export async function inspectLocalHmaManifest(argv){
  try{manifest=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(manifestBytes));}
  catch(_error){throw new RangeError('Manifest is not valid UTF-8 JSON');}
  const registry=validateHmaMetadataManifests([manifest]);
- let profiles=null;
+ let profiles=null,orderedProfile=null;
  if(args.profile){
   const bytes=await boundedRead(args.profile,128*1024);
   let profile;
   try{profile=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));}
   catch(_error){throw new RangeError('ROM profile is not valid UTF-8 JSON');}
   profiles=validateRomProfileRegistry([profile]);
+  orderedProfile=validateLocalOrderedProfileOverlay(profile);
  }
  const rom=await boundedRead(args.rom,128*1024*1024);
  const model=new RomModel('local-rom',rom);
@@ -79,11 +82,16 @@ export async function inspectLocalHmaManifest(argv){
  const checked=compareHmaMetadataManifest(model,fingerprint,records,{manifests:registry});
  const cross=profiles?compareRomHmaProvenance(model,fingerprint,records,
   {profiles,manifests:registry}):null;
+ const orderedResult=cross?.status==='multi-file-profile-unbound'&&orderedProfile?
+  compareLocalOrderedProfileOverlay(orderedProfile,registry[0],records):null;
+ const crossSourceStatus=orderedResult?.status||cross?.status||'not-requested';
+ const crossSourceClaimsConsistent=crossSourceStatus==='consistent-exact-byte-claims'||
+  crossSourceStatus==='consistent-ordered-byte-claims';
  let bank=null;
  if(args.targetWords!==null){
   if(checked.status!=='exact-file-set-match')
    throw new RangeError('Ordered file set does not match supplied manifest; bank inspection refused');
-  if(cross&&!cross.consistentExactByteClaims)
+  if(cross&&!crossSourceClaimsConsistent)
    throw new RangeError('Cross-source ROM/TOML claims are not consistent; bank inspection refused');
   const decoder=new TextDecoder('utf-8',{fatal:true});
   const sources=files.map(file=>({name:file.name,text:decoder.decode(file.bytes)}));
@@ -108,16 +116,15 @@ export async function inspectLocalHmaManifest(argv){
   status:checked.status,exactFileSetMatch:checked.exactFileSetMatch,
   metadataFilesProvided:records.length,
   manifestFilesDeclared:registry[0].files.length,
-  separateProfileProvided:!!profiles,
-  crossSourceStatus:cross?.status||'not-requested',
-  crossSourceClaimsConsistent:cross?.consistentExactByteClaims||false,
+  separateProfileProvided:!!profiles,orderedProfileProvided:!!orderedProfile,
+  crossSourceStatus,crossSourceClaimsConsistent,
   ...(bank||{}),
   romModified:false,romExported:false,metadataExported:false,
   independentlyAuthenticated:false,cubeLayoutAuthenticated:false,
   safeSemanticEditingVerified:false,romSaveReopenVerified:false,
   emulatorVerified:false,androidHardwareVerified:false,
   independentParityEvidence:false,
-  warning:'Caller-supplied exact-byte ROM profile, ordered TOML manifest and optional raw bank census are consistency checks only; they do not authenticate CUBE maps or permit semantic editing.'
+  warning:'Caller-supplied exact-byte ROM profile, optional ordered profile overlay, ordered TOML manifest and raw bank census are consistency checks only; they do not authenticate CUBE maps or permit semantic editing.'
  });
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
