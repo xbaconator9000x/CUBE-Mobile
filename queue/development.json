@@ -3,7 +3,7 @@
   "upstream": "kcradi/CUBHMA@3044393183e01af2ae1e907fb37e4a75eda6a8dc",
   "authoritativeBranch": "main",
   "checkpoint": {
-    "sequence": 2,
+    "sequence": 3,
     "lastIntegratedCommit": "95b04a5c2420486fb9f4747b4d3c0c48e8e0931e",
     "lastRun": "2026-10-29"
   },
@@ -314,6 +314,104 @@
       "blocker": null,
       "evidence": [],
       "checkpoint": null
+    },
+    {
+      "id": "Q016",
+      "title": "Read-only ROM/TOML provenance binding",
+      "priority": 2,
+      "dependsOn": [
+        "Q002"
+      ],
+      "paths": [
+        "src/rom-compatibility.js"
+      ],
+      "status": "pending",
+      "effortHours": 8,
+      "validation": "Bind exact local ROM and matching TOML SHA-256 read-only; reject mismatches and never grant semantic writes",
+      "owner": null,
+      "branch": null,
+      "blocker": null,
+      "evidence": [],
+      "checkpoint": null
+    },
+    {
+      "id": "Q017",
+      "title": "BPS Save As failure recovery and independent reopen",
+      "priority": 3,
+      "dependsOn": [],
+      "paths": [
+        "scripts/local-bps-apply-saveas.mjs"
+      ],
+      "status": "pending",
+      "effortHours": 8,
+      "validation": "Atomic no-overwrite save, failure rollback, exact reopen and source preservation without copyrighted ROM assets",
+      "owner": null,
+      "branch": null,
+      "blocker": null,
+      "evidence": [],
+      "checkpoint": null
+    },
+    {
+      "id": "Q018",
+      "title": "Android SAF lifecycle and export recovery",
+      "priority": 4,
+      "dependsOn": [],
+      "paths": [
+        "android/app/src/main/java/com/pokebacon/cubemobile/MainActivity.java"
+      ],
+      "status": "pending",
+      "effortHours": 8,
+      "validation": "Realistic picker cancel, activity recreation, Android Back and safe document export tests; hardware remains separately gated",
+      "owner": null,
+      "branch": null,
+      "blocker": null,
+      "evidence": [],
+      "checkpoint": null
+    },
+    {
+      "id": "Q019",
+      "title": "Touch map/event accessibility and offline UI parity",
+      "priority": 5,
+      "dependsOn": [
+        "Q002"
+      ],
+      "paths": [
+        "src/app.js"
+      ],
+      "status": "pending",
+      "effortHours": 7,
+      "validation": "Touch/keyboard navigation, event form accessibility and fail-closed unsupported editing with UI regression tests",
+      "owner": null,
+      "branch": null,
+      "blocker": null,
+      "evidence": [],
+      "checkpoint": null
+    },
+    {
+      "id": "Q020",
+      "title": "Activate continuous Codex coding worker",
+      "priority": 0,
+      "dependsOn": [],
+      "paths": [
+        ".github/workflows/continuous-development.yml"
+      ],
+      "status": "blocked",
+      "effortHours": 4,
+      "validation": "First authenticated Codex run, branch CI and reviewed green PR, immediate main CI continuation",
+      "owner": null,
+      "branch": null,
+      "blocker": "Requires repository Actions variable CUBE_AUTOCODE_ENABLED=true, OPENAI_API_KEY secret and first live workflow dispatch; external configuration and billing are not verified",
+      "evidence": [
+        ".github/workflows/continuous-development.yml",
+        "scripts/continuous-agent.mjs",
+        "tests/continuous-agent.test.mjs",
+        "docs/CONTINUOUS_CODING_WORKER.md"
+      ],
+      "checkpoint": {
+        "date": "2026-10-29",
+        "kind": "partial",
+        "summary": "Prepared fail-closed opt-in Codex worker, CI dispatch and self-chaining workflow; no live agent execution or authenticated activation evidence."
+      }
     }
   ]
 }
