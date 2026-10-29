@@ -957,7 +957,7 @@ function buildVerifiedBpsDiff(source, edits) {
   // Android WebView memory for large ROMs; replay below remains independent.
   const out = [66, 80, 83, 49]; // BPS1
   number(out, source.length);
-  number(out, target.length);
+  number(out, source.length);
   number(out, 0); // no metadata, no identifying ROM information
   let cursor = 0, index = 0;
   while (cursor < source.length) {
