@@ -40,8 +40,7 @@ final class NativeExport {
     private final ExportPickerGate pickerGate = new ExportPickerGate();
     private String session;
     private long expected;
-    private long written;
-    private boolean writeAttempted;
+    private final ExportWriteState writeState = new ExportWriteState();
     private int nextIndex;
     private Uri destination;
     private OutputStream output;
@@ -135,6 +134,10 @@ final class NativeExport {
             callback("__cubeNativeCancel", id);
             return;
         }
+        // Reset before opening the picker: an earlier successful export must
+        // not make a new, never-written document eligible for deletion.
+        writeState.reset();
+        nextIndex = 0;
         pending = true;
         session = id;
         expected = size;
@@ -196,8 +199,7 @@ final class NativeExport {
             output = activity.getContentResolver().openOutputStream(destination, "w");
             if (output == null) throw new IOException("No output stream");
             writingDigest = MessageDigest.getInstance("SHA-256");
-            written = 0;
-            writeAttempted = false;
+            writeState.reset();
             nextIndex = 0;
             callback("__cubeNativeBegin", session);
         } catch (Exception failure) {
@@ -213,21 +215,21 @@ final class NativeExport {
             throw new IOException("Oversized export chunk");
         byte[] bytes = Base64.decode(encoded, Base64.DEFAULT);
         if (bytes.length == 0 || bytes.length > CHUNK_BYTES ||
-            written + bytes.length > expected)
+            writeState.bytesWritten() + bytes.length > expected)
             throw new IOException("Invalid export chunk");
         if (!ExportChunkIntegrity.verify(bytes, data.getString("sha256")))
             throw new IOException("Export chunk digest differs from source Blob");
-        writeAttempted = true; // A provider may partially write before throwing.
+        writeState.beforeWrite(); // A provider may partially write before throwing.
         output.write(bytes);
         writingDigest.update(bytes);
-        written += bytes.length;
+        writeState.committed(bytes.length);
         int acknowledged = nextIndex++;
         webView.evaluateJavascript("window.__cubeNativeAck&&window.__cubeNativeAck(" +
             JSONObject.quote(session) + "," + acknowledged + ")", null);
     }
 
     private void finish() throws Exception {
-        if (!pending || output == null || written != expected || verifying)
+        if (!pending || output == null || writeState.bytesWritten() != expected || verifying)
             throw new IOException("Incomplete export");
         output.flush();
         output.close();
@@ -262,6 +264,7 @@ final class NativeExport {
                     pending = false;
                     writingDigest = null;
                     session = null;
+                    writeState.reset();
                     callback("__cubeNativeComplete", verifiedSession);
                     Toast.makeText(activity, "Export saved and verified",
                         Toast.LENGTH_SHORT).show();
@@ -283,7 +286,7 @@ final class NativeExport {
         try { if (output != null) output.close(); } catch (IOException ignored) { }
         output = null;
         boolean hadDestination = destination != null;
-        boolean mayContainOurBytes = writeAttempted || written > 0;
+        boolean mayContainOurBytes = writeState.mayContainOurBytes();
         boolean removed = false;
         // Do not delete a provider document we merely opened but never wrote;
         // it could be a pre-existing zero-byte alias despite the picker intent.
@@ -298,7 +301,7 @@ final class NativeExport {
         pending = false;
         session = null;
         writingDigest = null;
-        writeAttempted = false;
+        writeState.reset();
         callback("__cubeNativeCancel", cancelled);
         String notice = !hadDestination ? message :
             !mayContainOurBytes ? message + "; empty document may remain" :
