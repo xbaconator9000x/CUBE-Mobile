@@ -3,8 +3,8 @@
   "upstream": "kcradi/CUBHMA@3044393183e01af2ae1e907fb37e4a75eda6a8dc",
   "authoritativeBranch": "main",
   "checkpoint": {
-    "sequence": 8,
-    "lastIntegratedCommit": "822fa099aacd8525b07f3fbeecaedf6f57ff149b",
+    "sequence": 9,
+    "lastIntegratedCommit": "d3b6b9089ed867c54bcc7a7379450d39eb8f0f68",
     "lastRun": "2026-10-29"
   },
   "tasks": [
@@ -375,22 +375,15 @@
       "checkpoint": {
         "date": "2026-10-29",
         "kind": "partial",
-        "summary": "Existing exact-target crash recovery (merged #252); current Q017 candidate adds private output-directory enforcement, two-link ownership verification, durable stage cleanup and fail-closed rollback. Real-ROM/emulator acceptance remains unavailable.",
+        "summary": "Merged #252 crash recovery and #257 private-directory, two-link ownership-checked BPS publication, directory durability and fail-closed rollback. Synthetic source/queue and Android build CI green; real-ROM and physical-device acceptance still unavailable.",
         "remaining": [
-          "Merge only after source, Android and queue CI pass",
-          "Validate legally held genuine CUBE ROM/BPS in independent emulator reopen",
+          "Authenticate legally held CUBE ROM and BPS against independent emulator reopen",
           "Physical Android file-provider and save/reopen acceptance remain separate",
           "Pre-publication orphan stages require manual review"
         ],
-        "branch": "watchdog/q017-bps-crash-recovery-main-reconciled-20261029",
-        "mergedPr": 252,
-        "mergedCommit": "36f65c7e99636d29ed7f33f23ed2a0c994f9733c",
-        "reviewCandidate": {
-          "branch": "watchdog/q017-bps-private-publication-hardening-20261029",
-          "kind": "unmerged-implementation",
-          "sourceTests": "pending",
-          "androidCI": "pending"
-        }
+        "branch": "watchdog/q017-bps-private-publication-hardening-20261029",
+        "mergedPr": 257,
+        "mergedCommit": "d3b6b9089ed867c54bcc7a7379450d39eb8f0f68"
       }
     },
     {
@@ -452,12 +445,14 @@
       "checkpoint": {
         "date": "2026-10-29",
         "kind": "partial",
-        "summary": "Keyboard-focusable CUBE map canvas with arrow/Enter/Space cell selection routed through existing guarded touch click, accessible label/focus ring and modular/offline parity. Hardware accessibility acceptance outstanding.",
+        "summary": "Merged #256 accessible CUBE map keyboard navigation with source, Android and emulator CI green. Hardware keyboard/screen reader, full event forms and genuine ROM acceptance remain unverified.",
         "remaining": [
           "Real Android touch, hardware keyboard and screen-reader validation",
           "Full map/event editor accessibility and authentic CUBE ROM compatibility"
         ],
-        "branch": "watchdog/q019-cube-canvas-keyboard-20261029"
+        "branch": "watchdog/q019-cube-canvas-keyboard-20261029",
+        "mergedPr": 256,
+        "mergedCommit": "5f647b2af8daa7308a411ca6a04b0675b4919683"
       }
     },
     {
