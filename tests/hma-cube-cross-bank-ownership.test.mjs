@@ -122,3 +122,77 @@ test('high-alias catalogs bound retained findings, count all overlaps and focus 
  assert.throws(()=>auditHmaCubeCrossBankOwnership(bytes,summary,{...opts,maxFindings:0}),/budget/);
  assert.throws(()=>auditHmaCubeCrossBankOwnership(bytes,summary,{...opts,focusMapId:'bad'}),/focused/);
 });
+
+
+test('transitive cross-bank ownership graph distinguishes direct byte aliases from connected maps',async()=>{
+ const {bytes,summary}=await fixture(),before=bytes.slice();
+ // 0:0 shares 6 blockmap bytes with 1:0; 1:0 shares 6 with 2:0.
+ // 0:0 and 2:0 do not overlap each other.
+ ptr(bytes,0x2cc,0x306);
+ ptr(bytes,0x18,0x140);ptr(bytes,0x140,0x900);
+ ptr(bytes,0x900,0x940);
+ u32(bytes,0x940,3);u32(bytes,0x944,2);
+ ptr(bytes,0x948,0x400);ptr(bytes,0x94c,0x30c);
+ ptr(bytes,0x950,0x500);ptr(bytes,0x954,0x540);
+ const census=[{bankIndex:0,mapCount:1},{bankIndex:1,mapCount:1},
+  {bankIndex:2,mapCount:1}];
+ const report=auditHmaCubeCrossBankOwnership(bytes,summary,{
+  banks:census,focusMapId:'0:0',maxFindings:1
+ });
+ assert.equal(report.decoded,3);
+ assert.equal(report.totalRelationshipCount,2);
+ assert.equal(report.directAliasMapPairCount,2);
+ assert.equal(report.crossBankDirectAliasMapPairCount,2);
+ assert.equal(report.aliasComponents.length,1);
+ assert.deepEqual(report.aliasComponents[0].mapIds,['0:0','1:0','2:0']);
+ assert.deepEqual(report.aliasComponents[0].bankIndices,[0,1,2]);
+ assert.equal(report.aliasComponents[0].directPairCount,2);
+ assert.equal(report.aliasComponents[0].transitiveOnlyPairsPossible,true);
+ assert.equal(report.mapAliasSummaries[0].directAliasMapCount,1);
+ assert.equal(report.mapAliasSummaries[1].directAliasMapCount,2);
+ assert.equal(report.mapAliasSummaries[2].directAliasMapCount,1);
+ assert.ok(report.mapAliasSummaries.every(m=>m.componentMapCount===3));
+ assert.equal(report.relationships.length,1); // focus is a display limit, not graph limit
+ assert.equal(report.completeOwnershipProven,false);
+ assert.equal(report.writeAuthorized,false);
+ assert.ok(Object.isFrozen(report.aliasComponents[0].mapIds));
+ assert.deepEqual(bytes.slice(0,0x10),before.slice(0,0x10));
+});
+
+test('truncated overlap findings cannot truncate complete alias components or direct pairs',async()=>{
+ const text=(await readFile(new URL('./fixtures/cubhmacube-map-bank-anchor.toml',import.meta.url),'utf8'))
+  .replace('Address = 0x102D520','Address = 0x10');
+ const bytes=new Uint8Array(0x5000);
+ const summary=inspectHmaMapBankAnchorSources([{name:'cube_emerald.toml',text}],{romSize:bytes.length});
+ ptr(bytes,0x10,0x1000);
+ for(let i=0;i<32;i++)ptr(bytes,0x1000+i*4,0x2000);
+ ptr(bytes,0x2000,0x2100);
+ u32(bytes,0x2100,2);u32(bytes,0x2104,1);
+ for(const [at,to] of [[0x2108,0x2300],[0x210c,0x2200],
+  [0x2110,0x2400],[0x2114,0x2440]])ptr(bytes,at,to);
+ const report=auditHmaCubeCrossBankOwnership(bytes,summary,{
+  banks:[{bankIndex:0,mapCount:32}],maxFindings:1
+ });
+ assert.equal(report.relationshipFindingsTruncated,true);
+ assert.equal(report.relationships.length,1);
+ assert.equal(report.aliasComponents.length,1);
+ assert.equal(report.aliasComponents[0].mapCount,32);
+ assert.equal(report.directAliasMapPairCount,32*31/2);
+ assert.equal(report.aliasComponents[0].directPairCount,32*31/2);
+ assert.equal(report.aliasComponents[0].transitiveOnlyPairsPossible,false);
+ assert.equal(report.mapAliasSummaries[31].directAliasMapCount,31);
+ assert.equal(report.writeAuthorized,false);
+});
+
+test('invalid map slot stays visible and is never mistaken for an isolated decoded map',async()=>{
+ const {bytes,summary}=await fixture();
+ ptr(bytes,0x120,0);
+ const report=auditHmaCubeCrossBankOwnership(bytes,summary,{banks});
+ assert.equal(report.invalid,1);
+ assert.equal(report.mapAliasSummaries.length,2);
+ assert.equal(report.mapAliasSummaries[1].id,'1:0');
+ assert.equal(report.mapAliasSummaries[1].claimCount,0);
+ assert.equal(report.mapAliasSummaries[1].componentMapCount,0);
+ assert.equal(report.aliasComponents.length,0);
+ assert.equal(report.completeOwnershipProven,false);
+});
