@@ -1739,9 +1739,18 @@ function clearCubeWarpTrace(){
   $('cube-warp-trace-open').disabled=true;
   $('cube-warp-trace-status').textContent='Inspect CUBE warps, then supply an explicit destination-bank map count.';
 }
+function filteredCubeEventRecords(kind,records,filterKind,indexText){
+  if(filterKind!=='all'&&filterKind!==kind)return [];
+  if(indexText==='')return records;
+  if(!/^(0|[1-9][0-9]*)$/.test(indexText))return [];
+  const index=Number(indexText);
+  return Number.isSafeInteger(index)&&index<=65535?
+    records.filter(record=>record.index===index):[];
+}
 function drawCubeWarpEvidence(){
   const status=$('cube-warps-status'),list=$('cube-warps-list');
   list.replaceChildren();
+  const filterStatus=$('cube-warps-filter-status');
   const snapshot=cubeWarpEvidence;
   if(cubeBatchReadySnapshot!==snapshot){
    cubeBatchEditors.ready(Boolean(snapshot));cubeBatchReadySnapshot=snapshot;
@@ -1751,6 +1760,7 @@ function drawCubeWarpEvidence(){
   $('cube-warp-edit-load').disabled=!snapshot;
   if(!snapshot){
     status.textContent='No CUBE custom event arrays inspected. Select a map and inspect raw warps.';
+    filterStatus.textContent='Inspect CUBE events to filter records.';
     return;
   }
   let fresh;
@@ -1763,12 +1773,27 @@ function drawCubeWarpEvidence(){
   }catch(_err){
     cubeWarpEvidence=null;$('cube-warp-trace').disabled=true;clearCubeWarpTrace();
     status.textContent='CUBE event records changed or expired. Inspect again before navigation.';
+    filterStatus.textContent='Source expired. Reinspect before using record filters.';
     return;
   }
   status.textContent='Event counts: '+fresh.counts.objects+' objects, '+fresh.counts.warps+
     ' warps, '+fresh.counts.scripts+' triggers, '+fresh.counts.signposts+
     ' signs. Raw records only; target map counts and gameplay access are unverified.';
-  if(fresh.eventsOffset===null)return;
+  if(fresh.eventsOffset===null){
+    filterStatus.textContent='This map has no CUBE event group to filter.';
+    return;
+  }
+  const filterKind=$('cube-warps-kind-filter').value;
+  const indexInput=$('cube-warps-index-filter');
+  const filterIndex=indexInput.value.trim();
+  if(!['all','objects','warps','scripts','signposts'].includes(filterKind)||
+     indexInput.validity?.badInput||
+     (filterIndex!==''&&(!/^(0|[1-9][0-9]*)$/.test(filterIndex)||
+       !Number.isSafeInteger(Number(filterIndex))||Number(filterIndex)>65535))){
+    filterStatus.textContent='Invalid event filter. Choose a record type and a nonnegative index up to 65535.';
+    return;
+  }
+  let visibleRecords=0;
   const head=document.createElement('button');head.type='button';head.className='subtle-button';
   head.textContent='Event group at 0x'+hex(fresh.eventsOffset);
   head.addEventListener('click',()=>safeRun(()=>{
@@ -1780,7 +1805,8 @@ function drawCubeWarpEvidence(){
   list.append(head);
   const labels={objects:'Object',warps:'Warp',scripts:'Trigger',signposts:'Sign'};
   for(const [kind,records] of Object.entries(fresh.arrays)){
-    for(const record of records){
+    for(const record of filteredCubeEventRecords(kind,records,filterKind,filterIndex)){
+      visibleRecords++;
       const button=document.createElement('button');button.type='button';
       button.className='subtle-button';
       let info='';
@@ -1813,11 +1839,13 @@ function drawCubeWarpEvidence(){
         if(kind==='warps'){
           $('cube-batch-warp-index').value=String(record.index);
           $('cube-batch-warp-load').click();
+          $('cube-batch-warp-load').focus();
           $('cube-batch-warp-load').scrollIntoView?.({block:'center',behavior:'smooth'});
         }else{
           $('cube-batch-event-kind').value=kind;
           $('cube-batch-event-index').value=String(record.index);
           $('cube-batch-event-load').click();
+          $('cube-batch-event-load').focus();
           $('cube-batch-event-load').scrollIntoView?.({block:'center',behavior:'smooth'});
         }
       }));
@@ -1838,7 +1866,23 @@ function drawCubeWarpEvidence(){
       }
     }
   }
+  filterStatus.textContent=visibleRecords+' matching record(s) of '+
+    (fresh.counts.objects+fresh.counts.warps+fresh.counts.scripts+fresh.counts.signposts)+
+    ' inspected; filtering changes only this read-only list.';
+  if(!visibleRecords){
+    const empty=document.createElement('p');
+    empty.className='empty-state';
+    empty.textContent='No CUBE records match the selected type and index.';
+    list.append(empty);
+  }
 }
+for(const id of ['cube-warps-kind-filter','cube-warps-index-filter'])
+  $(id).addEventListener('input',drawCubeWarpEvidence);
+$('cube-warps-filter-clear').addEventListener('click',()=>{
+  $('cube-warps-kind-filter').value='all';
+  $('cube-warps-index-filter').value='';
+  drawCubeWarpEvidence();
+});
 const cubeWarpRawFields=['x','y','elevation','warpId','targetMap','targetBank'];
 function freshCubeWarpEditSource(snapshot){
   if(!snapshot||!cubeMapEvidence||snapshot.options!==cubeMapEvidence.options)
