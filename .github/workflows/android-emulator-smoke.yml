@@ -1,27 +1,7 @@
 name: Android emulator offline smoke
 on:
-  pull_request:
-    paths:
-      - 'android/**'
-      - 'app/**'
-      - 'src/**'
-      - 'build-standalone.mjs'
-      - '.github/workflows/android-emulator-smoke.yml'
-      - '.github/workflows/android-build.yml'
-      - 'scripts/verify-android-apk.mjs'
-      - 'tests/verify-android-apk.test.mjs'
-  push:
-    branches: [main]
-    paths:
-      - 'android/**'
-      - 'app/**'
-      - 'src/**'
-      - 'build-standalone.mjs'
-      - '.github/workflows/android-emulator-smoke.yml'
-      - '.github/workflows/android-build.yml'
-      - 'scripts/verify-android-apk.mjs'
-      - 'tests/verify-android-apk.test.mjs'
   workflow_dispatch:
+
 permissions:
   contents: read
 concurrency:

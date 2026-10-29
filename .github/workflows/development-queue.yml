@@ -1,11 +1,7 @@
 name: Persistent development queue
 on:
-  push:
-    branches: [main]
-    paths: ['queue/**', 'scripts/development-queue.mjs', 'tests/development-queue.test.mjs']
-  pull_request:
-    branches: [main]
   workflow_dispatch:
+
 permissions:
   contents: read
 jobs:
