@@ -27,6 +27,13 @@ function boundedRelationships(claims,{focusMapId=null,maxFindings=1024}={}){
  const sorted=claims.map((c,i)=>({...c,sequence:i}))
   .sort((a,b)=>a.start-b.start||a.sequence-b.sequence);
  const relationships=[],sameMapRelationships=[];
+ // Complete adjacency is calculated even if retained overlap findings truncate.
+ // Connected maps may only share bytes transitively, not pairwise.
+ const adjacency=new Map(),sameMapCounts=new Map(),claimCounts=new Map();
+ for(const c of claims){
+  if(!adjacency.has(c.id))adjacency.set(c.id,new Set());
+  claimCounts.set(c.id,(claimCounts.get(c.id)??0)+1);
+ }
  let totalRelationshipCount=0,sameMapStructuralOverlapCount=0,crossBankRelationshipCount=0;
  let focusedRelationshipCount=0,focusedSameMapRelationshipCount=0;
  let relationshipFindingsTruncated=false,active=[];
@@ -35,8 +42,12 @@ function boundedRelationships(claims,{focusMapId=null,maxFindings=1024}={}){
   for(const other of active){
    if(!overlaps(other,claim))continue;
    const same=other.id===claim.id;
-   if(same)sameMapStructuralOverlapCount++;
-   else{
+   if(same){
+    sameMapStructuralOverlapCount++;
+    sameMapCounts.set(claim.id,(sameMapCounts.get(claim.id)??0)+1);
+   }else{
+    adjacency.get(other.id).add(claim.id);
+    adjacency.get(claim.id).add(other.id);
     totalRelationshipCount++;
     if(other.id.split(':')[0]!==claim.id.split(':')[0])
      crossBankRelationshipCount++;
@@ -56,12 +67,58 @@ function boundedRelationships(claims,{focusMapId=null,maxFindings=1024}={}){
   }
   active.push(claim);
  }
+ const compareIds=(a,b)=>{
+  const [ab,am]=a.split(':').map(Number),[bb,bm]=b.split(':').map(Number);
+  return ab-bb||am-bm;
+ };
+ const visited=new Set(),aliasComponents=[],componentByMap=new Map();
+ for(const id of [...adjacency.keys()].sort(compareIds)){
+  if(visited.has(id))continue;
+  const queue=[id],members=[];visited.add(id);
+  for(let at=0;at<queue.length;at++){
+   const current=queue[at];members.push(current);
+   for(const next of adjacency.get(current))if(!visited.has(next)){
+    visited.add(next);queue.push(next);
+   }
+  }
+  members.sort(compareIds);
+  if(members.length===1)continue;
+  const bankIndices=[...new Set(members.map(x=>Number(x.split(':')[0])))].sort((a,b)=>a-b);
+  const directPairCount=members.reduce((sum,x)=>sum+adjacency.get(x).size,0)/2;
+  const component=Object.freeze({
+   id:members[0],mapIds:Object.freeze(members),mapCount:members.length,
+   bankIndices:Object.freeze(bankIndices),crossBank:bankIndices.length>1,
+   directPairCount,
+   transitiveOnlyPairsPossible:directPairCount<members.length*(members.length-1)/2
+  });
+  aliasComponents.push(component);
+  for(const member of members)componentByMap.set(member,component);
+ }
+ const directAliasMapPairCount=[...adjacency.values()]
+  .reduce((sum,neighbors)=>sum+neighbors.size,0)/2;
+ let crossBankDirectAliasMapPairCount=0;
+ for(const [id,neighbors] of adjacency)for(const other of neighbors)
+  if(compareIds(id,other)<0&&id.split(':')[0]!==other.split(':')[0])
+   crossBankDirectAliasMapPairCount++;
+ const mapAliasSummaries=[...adjacency.keys()].sort(compareIds).map(id=>{
+  const neighbors=adjacency.get(id),component=componentByMap.get(id);
+  return Object.freeze({
+   id,claimCount:claimCounts.get(id),directAliasMapCount:neighbors.size,
+   crossBankDirectAliasMapCount:[...neighbors].filter(x=>
+    x.split(':')[0]!==id.split(':')[0]).length,
+   sameMapStructuralOverlapCount:sameMapCounts.get(id)??0,
+   componentId:component?.id??null,componentMapCount:component?.mapCount??1
+  });
+ });
  return Object.freeze({
   relationships:Object.freeze(relationships),
   sameMapRelationships:Object.freeze(sameMapRelationships),
   totalRelationshipCount,sameMapStructuralOverlapCount,crossBankRelationshipCount,
   focusedRelationshipCount,focusedSameMapRelationshipCount,
-  relationshipFindingsTruncated,findingBudgetPerCategory:maxFindings,focusMapId
+  relationshipFindingsTruncated,findingBudgetPerCategory:maxFindings,focusMapId,
+  aliasComponents:Object.freeze(aliasComponents),
+  mapAliasSummaries:Object.freeze(mapAliasSummaries),
+  directAliasMapPairCount,crossBankDirectAliasMapPairCount
  });
 }
 export function auditHmaCubeCrossBankOwnership(source,summary,{banks,includeEvents=false,includeConnections=false,includeMapScripts=false,focusMapId=null,maxFindings=1024}={}) {
@@ -157,6 +214,17 @@ export function auditHmaCubeCrossBankOwnership(source,summary,{banks,includeEven
     requestedBanks:Object.freeze(banks.map(x=>Object.freeze({...x}))),
     requestedMaps:budget,decoded:budget-invalid,invalid,
     maps:Object.freeze(maps),relationships:Object.freeze(relationships),
+    aliasComponents:findings.aliasComponents,
+    // Invalid requested map slots are explicitly incomplete, never clean.
+    mapAliasSummaries:Object.freeze(maps.map(map=>
+      findings.mapAliasSummaries.find(x=>x.id===map.id)??Object.freeze({
+       id:map.id,claimCount:0,directAliasMapCount:0,
+       crossBankDirectAliasMapCount:0,sameMapStructuralOverlapCount:0,
+       componentId:null,componentMapCount:0
+      })
+    )),
+    directAliasMapPairCount:findings.directAliasMapPairCount,
+    crossBankDirectAliasMapPairCount:findings.crossBankDirectAliasMapPairCount,
     includeEvents,eventClaimsInspected:includeEvents?claims.filter(c=>c.kind.startsWith('event')).length:0,
     eventIssues:Object.freeze(eventIssues),
     includeConnections,connectionClaimsInspected:includeConnections?
