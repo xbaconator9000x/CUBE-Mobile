@@ -85,10 +85,10 @@ test('modular CUBE canvas has accessible focus and offline parity',()=>{
   for(const page of [html,offline]){
     assert.match(page,/id="cube-map-render-canvas" hidden tabindex="0" role="button"/);
     assert.match(page,/aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Enter Space"/);
-    assert.match(page,/#cube-map-render-canvas:focus-visible/);
     assert.match(page,/Arrow keys move the cell selection/);
   }
   assert.match(css,/#cube-map-render-canvas:focus-visible/);
+  assert.match(offline,/#cube-map-render-canvas:focus-visible/);
   assert.match(app,/canvas\.dispatchEvent\(new MouseEvent\('click'/);
   assert.match(offline,/canvas\.dispatchEvent\(new MouseEvent\('click'/);
 });
