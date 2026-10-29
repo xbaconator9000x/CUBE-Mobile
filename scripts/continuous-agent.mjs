@@ -8,6 +8,16 @@ const runnerFiles = new Set([
   '.github/workflows/continuous-development.yml',
   'scripts/continuous-agent.mjs',
   'tests/continuous-agent.test.mjs',
+  'scripts/development-queue.mjs',
+  'scripts/repository-safety.mjs',
+  'scripts/parity-audit.mjs',
+  'scripts/engineering-audit.mjs',
+]);
+const protectedWorkflows = new Set([
+  '.github/workflows/ci.yml',
+  '.github/workflows/android-build.yml',
+  '.github/workflows/android-emulator-smoke.yml',
+  '.github/workflows/development-queue.yml',
 ]);
 
 export function chooseTask(queue) {
@@ -39,10 +49,11 @@ export function verifyReadme(text) {
     throw new Error('README opening changed');
 }
 
-export function verifyStagedPaths(paths) {
+export function verifyStagedPaths(paths, task = null) {
   if (!paths.length) throw new Error('No changes staged');
   for (const path of paths) {
-    if (!path || path.includes('..') || prohibited.test(path) || runnerFiles.has(path))
+    if (!path || path.includes('..') || prohibited.test(path) || runnerFiles.has(path) ||
+        (protectedWorkflows.has(path) && !task?.paths?.includes(path)))
       throw new Error('Unsafe or runner-controlled staged path: ' + path);
   }
 }
@@ -127,8 +138,11 @@ async function main() {
   } else if (command === 'verify') {
     verifyReadme(readFileSync('README.md', 'utf8'));
     const paths = execFileSync('git', ['diff', '--cached', '--name-only', '-z']).toString().split('\0').filter(Boolean);
-    verifyStagedPaths(paths);
-    reconcile(JSON.parse(readFileSync('queue/development.json', 'utf8')));
+    const queue = JSON.parse(readFileSync('queue/development.json', 'utf8'));
+    reconcile(queue);
+    const task = queue.tasks.find(t => t.id === process.env.TASK_ID);
+    if (!task) throw new Error('Active task not found in queue');
+    verifyStagedPaths(paths, task);
   } else if (command === 'checkpoint') {
     const [taskId, branch, sha] = process.argv.slice(3);
     const queue = JSON.parse(readFileSync('queue/development.json', 'utf8'));
