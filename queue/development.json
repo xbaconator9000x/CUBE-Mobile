@@ -3,8 +3,8 @@
   "upstream": "kcradi/CUBHMA@3044393183e01af2ae1e907fb37e4a75eda6a8dc",
   "authoritativeBranch": "main",
   "checkpoint": {
-    "sequence": 11,
-    "lastIntegratedCommit": "abf27e23525592d8042b188acc1526d13b1733dd",
+    "sequence": 12,
+    "lastIntegratedCommit": "5aa3d32cdcb158f86271ff8643ba796c5bb4a136",
     "lastRun": "2026-10-29"
   },
   "tasks": [
@@ -337,21 +337,22 @@
         "tests/hma-rom-provenance-binding.test.mjs",
         "docs/ROM_TOML_CROSS_SOURCE_BINDING.md",
         "scripts/local-hma-manifest-smoke.mjs",
-        "tests/local-hma-cross-source.test.mjs"
+        "tests/local-hma-cross-source.test.mjs",
+        "src/hma-ordered-profile.js",
+        "tests/hma-ordered-profile.test.mjs",
+        "docs/LOCAL_ORDERED_PROFILE.md"
       ],
       "checkpoint": {
         "date": "2026-10-29",
-        "kind": "partial-candidate",
-        "summary": "Candidate: opt-in multi-file ROM profile now binds every ordered TOML name, size and SHA-256 against the separate manifest and exact local bytes; preserves legacy single-file behavior and rejects conflicting claims. Synthetic tests added; CI and merge pending.",
+        "kind": "partial",
+        "summary": "Merged #262: optional local ROM profile binds every ordered TOML overlay by exact filename, length and SHA-256, cross-checking separately supplied manifest and local bytes; malformed, mismatched or reordered claims fail closed. Source, Android, emulator and queue CI green. User-supplied claims do not authenticate CUBE or enable writes.",
         "remaining": [
-          "Review PR CI and merge only if green",
           "Independently authenticate genuine legally held CUBE ROM and ordered TOML metadata",
-          "Wire read-only cross-source status into modular/offline UI and validate real Android hardware"
+          "Wire read-only cross-source status into modular/offline UI and validate physical Android hardware"
         ],
-        "branch": "watchdog/q016-local-rom-toml-cross-source-20261029",
-        "mergedPr": 259,
-        "mergedCommit": "ffdc3695246826918e62ff45d69e2e959560bdf4",
-        "candidateBranch": "watchdog/q016-ordered-overlay-cross-source-20261029"
+        "branch": "watchdog/q016-ordered-overlay-cross-source-20261029",
+        "mergedPr": 262,
+        "mergedCommit": "d4ce29f49bc18f8a45de01b96ed1eb8e6cdc59e3"
       }
     },
     {
@@ -374,20 +375,22 @@
         "tests/local-bps-recovery.test.mjs",
         "docs/LOCAL_BPS_SAVEAS_RECOVERY.md",
         "scripts/local-bps-publication-safety.mjs",
-        "tests/local-bps-publication-safety.test.mjs"
+        "tests/local-bps-publication-safety.test.mjs",
+        "tests/local-bps-recovery-replay.test.mjs",
+        "docs/LOCAL_BPS_RECOVERY_REPLAY.md"
       ],
       "checkpoint": {
         "date": "2026-10-29",
         "kind": "partial",
-        "summary": "Merged #252 crash recovery and #257 private-directory, two-link ownership-checked BPS publication, directory durability and fail-closed rollback. Synthetic source/queue and Android build CI green; real-ROM and physical-device acceptance still unavailable.",
+        "summary": "Merged #263: opt-in exact source-bound BPS crash recovery independently replays source and patch against published ROM before deleting an owned staging hardlink, preserving target-only recovery and fail-closed mismatch behavior. Source, Android and queue CI green; real ROM/hardware acceptance unavailable.",
         "remaining": [
-          "Authenticate legally held CUBE ROM and BPS against independent emulator reopen",
-          "Physical Android file-provider and save/reopen acceptance remain separate",
-          "Pre-publication orphan stages require manual review"
+          "Independently validate genuine CUBE ROM/BPS against game emulator and saved-ROM reopen",
+          "Physical Android SAF provider save/reopen acceptance remains separate",
+          "Pre-publication orphan stages still require manual review"
         ],
-        "branch": "watchdog/q017-bps-private-publication-hardening-20261029",
-        "mergedPr": 257,
-        "mergedCommit": "d3b6b9089ed867c54bcc7a7379450d39eb8f0f68"
+        "branch": "watchdog/q017-recovery-inode-version-20261029",
+        "mergedPr": 263,
+        "mergedCommit": "5aa3d32cdcb158f86271ff8643ba796c5bb4a136"
       }
     },
     {
