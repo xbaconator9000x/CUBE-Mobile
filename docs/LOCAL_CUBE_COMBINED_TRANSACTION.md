@@ -9,3 +9,7 @@ The command checks the exact caller-declared ROM SHA-256, requires unambiguous c
 **Limits:** Bank declarations are caller supplied and capped at 8 banks / 256 maps; they are not a complete ROM pointer graph. Even zero detected conflicts cannot prove exclusive ownership. The SHA-256 is user supplied, not independently authenticated. There is no edited-ROM export, global alias proof, script execution, emulator acceptance, Android hardware verification or strict six-evidence feature parity. The utility never authorizes writes. `scripts/local-rom-atomic-saveas.mjs` remains a separate, byte-identical unmodified-ROM Save As operation.
 
 This workflow is intended to gather reproducible acceptance evidence locally without committing or uploading copyrighted ROM files or private data. Review its aggregate results alongside actual CUBE/CUBHMA upstream behavior before any future write-capable feature is considered.
+
+## Exact pinned metadata provenance (29 October 2026)
+
+The aggregate report now distinguishes exact byte-for-byte pinned upstream CUBE Emerald TOML from locally modified or synthetic metadata via `upstreamMetadataExactBytesMatched`. The original upstream TOML is identified by SHA-256 `09bf893bb7bf06fefe88e3721129ca443927f9e36bc3320316a6bdb383b3f068` at CUBHMA commit `3044393183e01af2ae1e907fb37e4a75eda6a8dc`. The metadata input is reopened and byte-compared after rehearsal. Even an exact upstream metadata match is **not** proof of ROM build provenance, pointer exclusivity or semantic write safety. No edited-ROM or patch export is enabled here.

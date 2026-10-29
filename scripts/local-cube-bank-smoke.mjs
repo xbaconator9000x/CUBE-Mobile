@@ -4,7 +4,8 @@
  * User-provided expected hash is NOT independently curated authentication.
  * Emits aggregate counts only: never ROM bytes, addresses or local paths.
  */
-import {readFile,stat} from 'node:fs/promises';
+import {readStableLocalFile} from './local-input-safety.mjs';
+import {inspectPinnedCubeEmeraldToml} from './pinned-cube-metadata.mjs';
 import {createHash} from 'node:crypto';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -18,13 +19,13 @@ import {inspectHmaCubeMapScripts} from '../src/hma-cube-map-script-table.js';
 
 const SHA=/^[0-9a-f]{64}$/i;
 export function parseLocalCubeBankSmokeArgs(argv){
- if(!Array.isArray(argv)||argv.length<6||argv.length>26||argv.length%2!==0)
+ if(!Array.isArray(argv)||argv.length<6||argv.length>28||argv.length%2!==0)
   throw new RangeError('Usage: --rom <local.gba> --metadata <local.toml> --expected-sha256 <64 hex>');
  const options={};
  for(let i=0;i<argv.length;i+=2){
   const key=argv[i],value=argv[i+1];
   if(!['--rom','--metadata','--expected-sha256','--target-words','--bank-index','--map-index','--map-count','--render-map','--expected-render-sha256',
-      '--viewport-x','--viewport-y','--viewport-width','--viewport-height'].includes(key)||
+      '--viewport-x','--viewport-y','--viewport-width','--viewport-height','--require-pinned-toml'].includes(key)||
      Object.hasOwn(options,key)||typeof value!=='string'||!value)
     throw new RangeError('Invalid local smoke arguments');
   options[key]=value;
@@ -34,6 +35,8 @@ export function parseLocalCubeBankSmokeArgs(argv){
     (options['--target-words']!==undefined&&
      !/^(?:[1-9]|1[0-6])$/.test(options['--target-words'])))
   throw new RangeError('ROM, metadata and separately supplied exact SHA-256 are required');
+ if(options['--require-pinned-toml']!==undefined&&options['--require-pinned-toml']!=='1')
+  throw new RangeError('Use --require-pinned-toml 1 for exact upstream TOML provenance');
  if(options['--render-map']!==undefined&&options['--render-map']!=='1')
   throw new RangeError('Use --render-map 1 for a bounded local render check');
  const viewKeys=['--viewport-x','--viewport-y','--viewport-width','--viewport-height'];
@@ -80,22 +83,16 @@ export function fingerprintHmaCubeRenderedViewport(image){
  return createHash('sha256').update('cube-mobile-rgba-v1\\0')
   .update(dims).update(image.pixels).digest('hex');
 }
-async function boundedRead(path,max){
- const before=await stat(path);
- if(!before.isFile()||before.size<1||before.size>max)
-  throw new RangeError('Local input exceeds size budget');
- const bytes=await readFile(path);
- if(bytes.length!==before.size)
-  throw new RangeError('Local input changed while reading');
- return bytes;
-}
 export async function inspectLocalCubeBankSmoke(argv){
  const args=parseLocalCubeBankSmokeArgs(argv);
- const rom=await boundedRead(args['--rom'],128*1024*1024);
+ const rom=await readStableLocalFile(args['--rom'],128*1024*1024);
  const digest=createHash('sha256').update(rom).digest('hex');
  if(digest!==args['--expected-sha256'].toLowerCase())
   throw new RangeError('ROM SHA-256 differs from separately supplied expectation');
- const toml=await boundedRead(args['--metadata'],4*1024*1024);
+ const toml=await readStableLocalFile(args['--metadata'],4*1024*1024);
+ const upstream=inspectPinnedCubeEmeraldToml(toml);
+ if(args['--require-pinned-toml']!==undefined&&!upstream.exactUpstreamBytes)
+  throw new RangeError('Exact pinned upstream CUBE Emerald TOML required');
  const text=new TextDecoder('utf-8',{fatal:true}).decode(toml);
  const metadata=inspectHmaMapBankAnchorSources([{name:'local-metadata',text}],{romSize:rom.length});
  if(!['custom-candidate','vanilla-marker'].includes(metadata.status))
@@ -121,7 +118,14 @@ export async function inspectLocalCubeBankSmoke(argv){
  if(render&&expectedRender!==undefined&&
     fingerprintHmaCubeRenderedViewport(render)!==expectedRender.toLowerCase())
   throw new RangeError('CUBE render differs from supplied RGBA reference');
+ const reopenedRom=await readStableLocalFile(args['--rom'],128*1024*1024);
+ const reopenedToml=await readStableLocalFile(args['--metadata'],4*1024*1024);
+ if(!reopenedRom.equals(rom)||!reopenedToml.equals(toml))
+  throw new RangeError('Local ROM or metadata changed during inspection');
  return Object.freeze({
+  upstreamMetadataExactBytesMatched:upstream.exactUpstreamBytes,
+  upstreamMetadataPinnedRequired:args['--require-pinned-toml']!==undefined,
+  romBuildProvenanceVerified:false,
   schema:custom?'cube-mobile-local-cube-bank-table-smoke/3':'cube-mobile-local-cube-bank-table-smoke/2',
   hashMatchedUserDeclaration:true,
   metadataDeclarationStatus:metadata.status,
@@ -169,7 +173,7 @@ export async function inspectLocalCubeBankSmoke(argv){
   safeSemanticEditingVerified:false,romSaveReopenVerified:false,
   emulatorVerified:false,androidHardwareVerified:false,
   independentParityEvidence:false,
-  warning:'User-SHA-matched metadata and optional RGBA reference comparisons are not independently authenticated. They do not verify gameplay, device compatibility or strict parity.'
+  warning:'Exact pinned upstream TOML provenance is verified only when the original unmodified upstream bytes match; it does not authenticate the ROM. User-SHA-matched metadata and optional RGBA reference comparisons are not independently authenticated. They do not verify gameplay, device compatibility or strict parity.'
  });
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){

@@ -12,7 +12,7 @@ function same(a,b){
 }
 export async function readStableLocalFile(path,max){
  if(typeof path!=='string'||!path||path.includes('\0')||
-    !Number.isSafeInteger(max)||max<1||max>64*1024*1024)
+    !Number.isSafeInteger(max)||max<1||max>128*1024*1024)
   throw RangeError('Invalid bounded local input request');
  const canonical=resolve(path);
  if(await realpath(canonical)!==canonical)

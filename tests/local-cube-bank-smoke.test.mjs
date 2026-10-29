@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,writeFile,rm,readFile} from 'node:fs/promises';
+import {mkdtemp,writeFile,rm,readFile,symlink} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createHash} from 'node:crypto';
@@ -35,6 +35,8 @@ test('local CUBE bank smoke returns aggregate-only raw evidence with exact user 
   assert.equal(report.repeatedTargets,1);
   assert.equal(report.inRomPointerWords,2);
   assert.equal(report.independentlyAuthenticated,false);
+  assert.equal(report.upstreamMetadataExactBytesMatched,false);
+  assert.equal(report.romBuildProvenanceVerified,false);
   assert.equal(report.romModified,false);
   assert.equal(report.independentParityEvidence,false);
   const serialized=JSON.stringify(report);
@@ -98,5 +100,25 @@ test('optional target window arguments fail closed on unsafe counts',async()=>{
    assert.throws(()=>parseLocalCubeBankSmokeArgs(args),RangeError);
    await assert.rejects(inspectLocalCubeBankSmoke(args),RangeError);
   }
+ });
+});
+
+test('pinned TOML requirement refuses modified metadata without touching the ROM',async()=>{
+ await fixture(async({rom,toml,hash,bytes})=>{
+  const base=['--rom',rom,'--metadata',toml,'--expected-sha256',hash];
+  const args=[...base,'--require-pinned-toml','1'];
+  assert.throws(()=>parseLocalCubeBankSmokeArgs([...base,'--require-pinned-toml','0']),RangeError);
+  await assert.rejects(inspectLocalCubeBankSmoke(args),/pinned upstream/i);
+  assert.deepEqual(await readFile(rom),Buffer.from(bytes));
+ });
+});
+test('local bank smoke rejects ROM and metadata symlinks through the shared safe reader',async()=>{
+ await fixture(async({dir,rom,toml,hash,bytes})=>{
+  const aliasRom=join(dir,'alias.gba'),aliasToml=join(dir,'alias.toml');
+  await symlink(rom,aliasRom);await symlink(toml,aliasToml);
+  const base=['--rom',rom,'--metadata',toml,'--expected-sha256',hash];
+  await assert.rejects(inspectLocalCubeBankSmoke(base.map((v,i)=>i===1?aliasRom:v)),/symlink/i);
+  await assert.rejects(inspectLocalCubeBankSmoke(base.map((v,i)=>i===3?aliasToml:v)),/symlink/i);
+  assert.deepEqual(await readFile(rom),Buffer.from(bytes));
  });
 });
