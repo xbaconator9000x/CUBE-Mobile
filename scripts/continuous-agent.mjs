@@ -101,9 +101,13 @@ async function github(path, options = {}) {
   return response.status === 204 ? null : response.json();
 }
 
-export async function verifyDispatchedChecks(branch, sha, workflows = ['ci.yml', 'android-build.yml']) {
-  if (!/^autocode\/Q\d{3}-\d+$/.test(branch) || !/^[a-f0-9]{40}$/.test(sha))
+export function validateCIRef(branch, sha) {
+  if (!(branch === 'main' || /^autocode\/Q\d{3}-\d+$/.test(branch)) || !/^[a-f0-9]{40}$/.test(sha))
     throw new Error('Invalid branch or commit for CI');
+}
+
+export async function verifyDispatchedChecks(branch, sha, workflows = ['ci.yml', 'android-build.yml']) {
+  validateCIRef(branch, sha);
   const started = Date.now() - 8000;
   await Promise.all(workflows.map(workflow => github(`actions/workflows/${workflow}/dispatches`, {
     method: 'POST', body: JSON.stringify({ref: branch}),
@@ -149,7 +153,7 @@ async function main() {
     recordPartialCheckpoint(queue, taskId, branch, sha);
     writeFileSync('queue/development.json', JSON.stringify(queue, null, 2) + '\n');
   } else if (command === 'ci') {
-    await verifyDispatchedChecks(process.argv[3], process.argv[4]);
+    await verifyDispatchedChecks(process.argv[3], process.argv[4], process.argv.length > 5 ? process.argv.slice(5) : undefined);
   } else throw new Error('Usage: continuous-agent.mjs select|verify|checkpoint|ci');
 }
 
