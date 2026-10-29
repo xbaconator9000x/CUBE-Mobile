@@ -247,10 +247,10 @@
         "kind": "partial",
         "branch": "agent/q012-signed-release-gate-20261029",
         "pr": 247,
-        "summary": "Signed release candidate implementation in PR #247: main-only manually dispatched protected signing, v2 signature/certificate pin, exact offline payload and ROM exclusion checks, provenance and tests. Not signed or hardware-verified without private credentials/device.",
+        "summary": "PR #247 adds main-only protected signed-candidate workflow, release signing gate, pinned v2 APK certificate/payload verification, disposable CI signing roundtrip and SHA-256 provenance. CI-only signing does not prove real release certificate or hardware.",
         "remaining": [
-          "green PR CI and merge",
-          "run signed candidate with privately configured release-signing environment and pin",
+          "merge after all PR CI green",
+          "dispatch signed candidate with privately configured release-signing environment and real certificate pin",
           "physical Android device installation and SAF import/export smoke",
           "authentic CUBE ROM acceptance"
         ]
