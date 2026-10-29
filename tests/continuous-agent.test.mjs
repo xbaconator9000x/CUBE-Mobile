@@ -10,10 +10,18 @@ import {
 } from '../scripts/continuous-agent.mjs';
 const queue = JSON.parse(readFileSync(new URL('../queue/development.json', import.meta.url), 'utf8'));
 
-test('selects the highest priority dependency-eligible task, never blocked tasks', () => {
+test('selects a dependency-eligible task, preferring fresh work to repeated partials', () => {
   const selected = chooseTask(queue);
-  assert.equal(selected?.id || null, reconcile(queue).parallelBatch[0] || null);
+  assert.ok(reconcile(queue).parallelBatch.includes(selected?.id));
   assert.notEqual(selected?.id, 'Q003');
+  const fresh = structuredClone(queue);
+  for (const task of fresh.tasks) task.checkpoint = null;
+  assert.equal(chooseTask(fresh)?.id, reconcile(fresh).parallelBatch[0]);
+  const first = chooseTask(fresh);
+  first.checkpoint = {kind:'partial',agentAttempts:1};
+  const next = chooseTask(fresh);
+  assert.notEqual(next?.id, first.id);
+  assert.equal(next?.id, reconcile(fresh).parallelBatch[1]);
 });
 test('returns null when all tasks are done or blocked', () => {
   const q = structuredClone(queue);
@@ -48,6 +56,20 @@ test('checkpoint remains partial until independently accepted', () => {
   assert.equal(task.checkpoint.baseCommit, 'a'.repeat(40));
   assert.throws(() => recordPartialCheckpoint(q, 'Q999', 'bad-branch', 'a'.repeat(40)), /Invalid/);
 });
+test('automated partial checkpoints increment attempts and clear stale merged PR claims', () => {
+  const q={tasks:[{id:'Q999',status:'pending',checkpoint:{
+    kind:'partial',agentAttempts:2,mergedPr:123,mergedCommit:'b'.repeat(40)
+  }}]};
+  const task=q.tasks[0];
+  recordPartialCheckpoint(q,'Q999','autocode/Q999-123','a'.repeat(40));
+  assert.equal(task.checkpoint.agentAttempts,3);
+  assert.equal(task.checkpoint.mergedPr,undefined);
+  assert.equal(task.checkpoint.mergedCommit,undefined);
+  recordPartialCheckpoint(q,'Q999','autocode/Q999-456','c'.repeat(40));
+  assert.equal(task.checkpoint.agentAttempts,4);
+  assert.equal(task.checkpoint.baseCommit,'c'.repeat(40));
+});
+
 test('stale in-progress work returns to pending after a new checkpoint', () => {
   const q = {tasks:[{id:'Q999',status:'in_progress',owner:'runner',branch:'old',checkpoint:null}]};
   const t = q.tasks[0];
