@@ -128,7 +128,7 @@ test('invalid and oversized plans, symlink input and duplicate banks refuse safe
 
 test('five-kind BPS replay matches every semantic preview byte without writing ROM',async()=>{
  await fixture(async({args,rom,metadata,plan,bytes,hash,dir})=>{
-  const edits=[[0x9401,2],[0x800,1],[0x824,0],[0xa24,0xfd],[0x830,0x10]];
+  const edits=[[0x301,2],[0x800,1],[0x824,0],[0xa24,0xfd],[0x830,0x10]];
   const target=Buffer.from(bytes);
   for(const [at,value] of edits)target[at]=value;
   const patch=join(dir,'semantic.bps');
@@ -157,7 +157,7 @@ test('five-kind BPS replay matches every semantic preview byte without writing R
 test('CUBE BPS semantic acceptance rejects an undeclared byte even with valid BPS CRC and SHA',async()=>{
  await fixture(async({args,rom,bytes,dir})=>{
   const patch=join(dir,'mismatch.bps');
-  const edits=[[0x9401,2],[0x800,1],[0x824,0],[0xa24,0xfd],[0x830,0x10],[0xd00,99]];
+  const edits=[[0x301,2],[0x800,1],[0x824,0],[0xa24,0xfd],[0x830,0x10],[0xd00,99]];
   const target=Buffer.from(bytes);
   for(const [at,value] of edits)target[at]=value;
   await writeFile(patch,buildVerifiedBpsDiff(bytes,edits));
@@ -171,7 +171,7 @@ test('CUBE BPS semantic acceptance rejects an undeclared byte even with valid BP
 test('CUBE BPS acceptance refuses stale hash, duplicate paths and malformed arguments',async()=>{
  await fixture(async({args,rom,bytes,dir})=>{
   const patch=join(dir,'semantic.bps');
-  const edits=[[0x9401,2],[0x800,1],[0x824,0],[0xa24,0xfd],[0x830,0x10]];
+  const edits=[[0x301,2],[0x800,1],[0x824,0],[0xa24,0xfd],[0x830,0x10]];
   const target=Buffer.from(bytes);
   for(const [at,value] of edits)target[at]=value;
   await writeFile(patch,buildVerifiedBpsDiff(bytes,edits));
