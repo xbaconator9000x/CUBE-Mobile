@@ -8,6 +8,7 @@ import {constants} from 'node:fs';
 import {resolve} from 'node:path';
 
 const same=(a,b)=>a&&b&&a.dev===b.dev&&a.ino===b.ino&&a.size===b.size;
+const sameDirectory=(a,b)=>a&&b&&a.dev===b.dev&&a.ino===b.ino;
 async function optionalStat(path){
  try{return await lstat(path);}catch(error){if(error?.code==='ENOENT')return null;throw error;}
 }
@@ -21,7 +22,7 @@ export async function assertPrivateBpsDirectory(path,identity=null){
  if(!stat.isDirectory()||(stat.mode&0o022)!==0||
     (typeof process.getuid==='function'&&stat.uid!==process.getuid()))
   throw new RangeError('BPS Save As requires a private owner-controlled output directory');
- if(identity&&!same(stat,identity))
+ if(identity&&!sameDirectory(stat,identity))
   throw new RangeError('BPS Save As output directory changed identity');
  return stat;
 }
