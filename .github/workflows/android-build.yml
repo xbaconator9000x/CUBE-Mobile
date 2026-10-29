@@ -41,14 +41,18 @@ jobs:
       - name: Compile Android shell and run native picker lifecycle unit tests
         working-directory: android
         run: gradle --no-daemon --stacktrace :app:assembleDebug :app:testDebugUnitTest
-      - name: Inspect APK asset and ROM safety
+      - name: Verify debug APK identity, offline bytes, permissions and provenance
         run: |
+          node --test tests/verify-android-apk.test.mjs
           APK=$(find android/app/build/outputs/apk/debug -name '*.apk' -print -quit)
           test -n "$APK"
-          unzip -Z1 "$APK" | grep -Fx 'assets/index.html'
-          if unzip -Z1 "$APK" | grep -Ei '[.](gba|gbc|rom|sav|srm)$'; then exit 1; fi
+          AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          test -x "$AAPT"
+          node scripts/verify-android-apk.mjs "$APK" "$AAPT"
       - uses: actions/upload-artifact@v4
         with:
           name: cube-mobile-debug-apk
-          path: android/app/build/outputs/apk/debug/*.apk
+          path: |
+            android/app/build/outputs/apk/debug/*.apk
+            android/app/build/outputs/apk/debug/*.apk.provenance.json
           if-no-files-found: error
