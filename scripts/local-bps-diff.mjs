@@ -31,7 +31,7 @@ export function parseLocalBpsArgs(argv) {
     throw new RangeError('Patch destination must differ from ROM source');
   return args;
 }
-function parsePlan(bytes, source) {
+export function parseExpectedBytePlan(bytes, source) {
   let plan;
   try { plan = JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes)); }
   catch { throw new RangeError('Edit plan must be UTF-8 JSON'); }
@@ -60,7 +60,7 @@ export async function exportLocalBpsDiff(argv) {
   const expected = args['--expected-sha256'].toLowerCase();
   if (source.length < 0xC0 || digest(source) !== expected)
     throw new RangeError('Source ROM does not match exact expected SHA-256');
-  const edits = parsePlan(await readStableLocalFile(args['--plan'],2*1024*1024),source);
+  const edits = parseExpectedBytePlan(await readStableLocalFile(args['--plan'],2*1024*1024),source);
   const patch = buildVerifiedBpsDiff(source,edits);
   const target = applyBps(source,patch);
   const changed = edits.filter(([at,value]) => source[at] !== value).length;
