@@ -14,8 +14,9 @@ test('mobile and standalone expose bounded read-only ordered manifest import and
   assert.match(text,/id="metadata-manifest-picker"/);
   assert.match(text,/id="metadata-manifest-clear"/);
   assert.match(text,/id="metadata-manifest-status"/);
-  assert.match(text,/This is a caller-supplied claim, not independent CUBE authentication/);
  }
+ assert.match(app,/This is a caller-supplied claim, not independent CUBE authentication/);
+ assert.match(offline,/This is a caller-supplied claim, not independent CUBE authentication/);
  assert.match(app,/validateHmaMetadataManifests\(\[JSON\.parse\(text\)\]\)/);
  assert.match(app,/compareHmaMetadataManifest\(model,fingerprintResult,metadataFingerprints/);
  assert.match(app,/file\.size>64\*1024/);
