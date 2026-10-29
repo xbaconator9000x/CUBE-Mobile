@@ -49,7 +49,8 @@ export function buildVerifiedBpsDiff(source, edits) {
       source.length < 0xC0 || source.length > MAX_ROM)
     throw new RangeError('BPS source must be a 192-byte to 64 MiB ROM');
   const changes = checkedEdits(source, edits);
-  const target = source.slice();
+  // Buffer.slice() aliases its input; always copy, including Node Buffer inputs.
+  const target = Uint8Array.from(source);
   for (const [at, value] of changes) target[at] = value;
   const out = [66, 80, 83, 49]; // BPS1
   number(out, source.length);
