@@ -92,3 +92,33 @@ test('invalid event arrays remain visible without hiding decoded map slots',asyn
   banks,includeEvents:'yes'
  }),/boolean/);
 });
+
+test('high-alias catalogs bound retained findings, count all overlaps and focus the edited map',async()=>{
+ const text=(await readFile(new URL('./fixtures/cubhmacube-map-bank-anchor.toml',import.meta.url),'utf8'))
+  .replace('Address = 0x102D520','Address = 0x10');
+ const bytes=new Uint8Array(0x5000);
+ const summary=inspectHmaMapBankAnchorSources([{name:'cube_emerald.toml',text}],{romSize:bytes.length});
+ ptr(bytes,0x10,0x1000);
+ for(let i=0;i<128;i++)ptr(bytes,0x1000+i*4,0x2000);
+ ptr(bytes,0x2000,0x2100);
+ u32(bytes,0x2100,2);u32(bytes,0x2104,1);
+ for(const [at,to] of [[0x2108,0x2300],[0x210c,0x2200],[0x2110,0x2400],[0x2114,0x2440]])
+  ptr(bytes,at,to);
+ const original=bytes.slice(),opts={banks:[{bankIndex:0,mapCount:128}]};
+ const global=auditHmaCubeCrossBankOwnership(bytes,summary,opts);
+ assert.equal(global.decoded,128);
+ assert.equal(global.totalRelationshipCount,3*128*127/2);
+ assert.equal(global.crossBankRelationshipCount,0);
+ assert.equal(global.relationships.length,1024);
+ assert.equal(global.relationshipFindingsTruncated,true);
+ const focused=auditHmaCubeCrossBankOwnership(bytes,summary,{...opts,focusMapId:'0:127'});
+ assert.equal(focused.totalRelationshipCount,global.totalRelationshipCount);
+ assert.equal(focused.focusedRelationshipCount,3*127);
+ assert.equal(focused.relationships.length,3*127);
+ assert.equal(focused.relationshipFindingsTruncated,false);
+ assert.ok(focused.relationships.every(r=>r.first==='0:127'||r.second==='0:127'));
+ assert.deepEqual(bytes,original);
+ assert.equal(global.writeAuthorized,false);
+ assert.throws(()=>auditHmaCubeCrossBankOwnership(bytes,summary,{...opts,maxFindings:0}),/budget/);
+ assert.throws(()=>auditHmaCubeCrossBankOwnership(bytes,summary,{...opts,focusMapId:'bad'}),/focused/);
+});

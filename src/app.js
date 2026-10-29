@@ -1198,11 +1198,12 @@ $('cube-ownership-scan').addEventListener('click',()=>safeRun(()=>{
   $('cube-ownership-status').textContent=
     report.decoded+'/'+report.requestedMaps+' maps decoded across '+
     banks.length+' explicitly counted banks; '+report.crossBankRelationshipCount+
-    ' cross-bank overlap(s), '+report.sameMapRelationships.length+' within-map overlap(s), '+
+    ' cross-bank overlap(s), '+report.sameMapStructuralOverlapCount+' within-map overlap(s), '+
      report.eventIssues.length+' invalid event array(s), '+report.connectionIssues.length+
      ' invalid connection array(s), '+report.mapScriptIssues.length+
      ' invalid map-script table(s), '+report.invalid+
-     ' invalid maps. Partial census only; exclusive ownership and safe editing NOT proven.';
+     ' invalid maps. '+(report.relationshipFindingsTruncated?'Overlap findings truncated; totals remain complete. ':'')+
+     'Partial census only; exclusive ownership and safe editing NOT proven.';
   for(const relationship of [...report.relationships,...report.sameMapRelationships].slice(0,80)){
     const button=document.createElement('button');button.type='button';
     button.className='subtle-button';
@@ -1230,7 +1231,7 @@ $('cube-ownership-scan').addEventListener('click',()=>safeRun(()=>{
     }));
     list.append(button);
   }
-  if(report.relationships.length+report.sameMapRelationships.length>80)
+  if(report.relationshipFindingsTruncated||report.relationships.length+report.sameMapRelationships.length>80)
     list.append(semanticChild('p','Showing first 80 overlaps. Narrow explicit bank counts to inspect further.','palette-note'));
 }));
 

@@ -161,3 +161,15 @@ test('script-pointer ownership audit counts exact changed bytes and detects shar
  assert.deepEqual(bytes.slice(0,0x244),before.slice(0,0x244));
  assert.deepEqual(original.slice(0,0x10),before.slice(0,0x10));
 });
+
+test('truncated focused ownership evidence fails closed rather than claiming clean coverage',async()=>{
+ const {bytes,summary}=await fixture();
+ ptr(bytes,0x120,0x200); // second map shares header, layout, blockmap and events
+ const result=auditHmaCubeEditOwnershipImpact(bytes,summary,{...opts,maxFindings:1});
+ assert.equal(result.relationshipFindingsTruncated,true);
+ assert.equal(result.censusIncomplete,true);
+ assert.equal(result.noDetectedOverlapInInspectedMaps,false);
+ assert.equal(result.writeAuthorized,false);
+ assert.equal(result.exclusiveOwnershipProven,false);
+ assert.ok(result.totalRelationshipCount>1);
+});

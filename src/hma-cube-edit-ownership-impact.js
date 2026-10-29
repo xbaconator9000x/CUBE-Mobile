@@ -104,7 +104,8 @@ export function auditHmaCubeEditOwnershipImpact(source,summary,options={}) {
  if(changes.size!==rehearsal.changedBytes)
   throw new RangeError('Ownership edit bytes disagree with combined rollback');
  const census=auditHmaCubeCrossBankOwnership(source,summary,{
-  banks,includeEvents:true,includeConnections:true,includeMapScripts:true
+  banks,includeEvents:true,includeConnections:true,includeMapScripts:true,
+  focusMapId:sourceId,maxFindings:options.maxFindings??1024
  });
  const relevant=[...census.relationships,...census.sameMapRelationships];
  const conflicts=[];
@@ -125,7 +126,8 @@ export function auditHmaCubeEditOwnershipImpact(source,summary,options={}) {
  const sourceDecoded=census.maps.some(m=>m.id===sourceId&&m.status==='decoded');
  const incomplete=census.invalid>0||census.eventIssues.length>0||
   census.connectionIssues.length>0||census.mapScriptIssues.length>0||
-  census.sameMapStructuralAmbiguityDetected||!sourceDecoded;
+  census.sameMapStructuralAmbiguityDetected||
+  census.relationshipFindingsTruncated||!sourceDecoded;
  return Object.freeze({
   sourceMap:sourceId,changedBytes:changes.size,
   inspectedMaps:census.requestedMaps,decodedMaps:census.decoded,
@@ -134,6 +136,9 @@ export function auditHmaCubeEditOwnershipImpact(source,summary,options={}) {
   mapScriptIssueCount:census.mapScriptIssues.length,
   mapScriptClaimsInspected:census.mapScriptClaimsInspected,
   sameMapStructuralOverlapCount:census.sameMapStructuralOverlapCount,
+  relationshipFindingsTruncated:census.relationshipFindingsTruncated,
+  focusedRelationshipCount:census.focusedRelationshipCount,
+  totalRelationshipCount:census.totalRelationshipCount,
   conflicts:Object.freeze(conflicts),
   changedBytesTouchSharedClaims:conflicts.length>0,
   censusIncomplete:incomplete,
