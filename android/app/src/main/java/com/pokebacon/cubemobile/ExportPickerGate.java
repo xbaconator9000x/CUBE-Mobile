@@ -8,21 +8,29 @@ package com.pokebacon.cubemobile;
  */
 final class ExportPickerGate {
     private String launchedSession;
+    private boolean restoredOutstanding;
 
     boolean begin(String session) {
-        if (launchedSession != null || session == null || session.isEmpty())
+        if (restoredOutstanding || launchedSession != null || session == null || session.isEmpty())
             return false;
         launchedSession = session;
         return true;
     }
 
+    /** Keep the old Android result ticket after Activity recreation, never its JS session. */
+    void restoreOutstanding() {
+        launchedSession = null;
+        restoredOutstanding = true;
+    }
+
     boolean isInFlight() {
-        return launchedSession != null;
+        return restoredOutstanding || launchedSession != null;
     }
 
     String consume() {
         String previous = launchedSession;
         launchedSession = null;
+        restoredOutstanding = false;
         return previous;
     }
 }
