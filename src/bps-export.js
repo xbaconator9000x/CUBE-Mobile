@@ -7,6 +7,21 @@ import {crc32, applyBps} from './core.js';
 
 const MAX_ROM = 64 * 1024 * 1024;
 const MAX_EDITS = 65536;
+const CRC_TABLE = Uint32Array.from({length:256},(_,i)=>{
+  let c=i;
+  for(let j=0;j<8;j++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);
+  return c>>>0;
+});
+/** CRC32 of a sparse virtual target, without allocating a full ROM copy. */
+function crc32Sparse(source,changes) {
+  let crc=0xFFFFFFFF, next=0;
+  for(let i=0;i<source.length;i++){
+    const value=next<changes.length&&changes[next][0]===i
+      ?changes[next++][1]:source[i];
+    crc=CRC_TABLE[(crc^value)&255]^(crc>>>8);
+  }
+  return (crc^0xFFFFFFFF)>>>0;
+}
 function number(out, value) {
   if (!Number.isSafeInteger(value) || value < 0) throw new RangeError('Invalid BPS number');
   while (true) {
@@ -49,9 +64,8 @@ export function buildVerifiedBpsDiff(source, edits) {
       source.length < 0xC0 || source.length > MAX_ROM)
     throw new RangeError('BPS source must be a 192-byte to 64 MiB ROM');
   const changes = checkedEdits(source, edits);
-  // Buffer.slice() aliases its input; always copy, including Node Buffer inputs.
-  const target = Uint8Array.from(source);
-  for (const [at, value] of changes) target[at] = value;
+  // Keep only sparse changed bytes. A second full-ROM target clone can exhaust
+  // Android WebView memory for large ROMs; replay below remains independent.
   const out = [66, 80, 83, 49]; // BPS1
   number(out, source.length);
   number(out, target.length);
@@ -59,12 +73,12 @@ export function buildVerifiedBpsDiff(source, edits) {
   let cursor = 0, index = 0;
   while (cursor < source.length) {
     if (index < changes.length && changes[index][0] === cursor) {
-      const start = cursor;
+      const start = cursor, first = index;
       while (index < changes.length && changes[index][0] === cursor) {
         cursor++; index++;
       }
       number(out, ((cursor - start - 1) * 4) + 1); // TargetRead
-      for (let i = start; i < cursor; i++) out.push(target[i]);
+      for (let i = first; i < index; i++) out.push(changes[i][1]);
     } else {
       const end = index < changes.length ? changes[index][0] : source.length;
       number(out, (end - cursor - 1) * 4); // SourceRead
@@ -72,12 +86,18 @@ export function buildVerifiedBpsDiff(source, edits) {
     }
   }
   uint32(out, crc32(source));
-  uint32(out, crc32(target));
+  uint32(out, crc32Sparse(source, changes));
   uint32(out, crc32(Uint8Array.from(out)));
   const patch = Uint8Array.from(out);
   const reopened = applyBps(source, patch);
-  if (reopened.length !== target.length ||
-      !reopened.every((byte, i) => byte === target[i]))
-    throw new RangeError('BPS self-replay disagrees with staged changes');
+  if (reopened.length !== source.length)
+    throw new RangeError('BPS self-replay changed source ROM length');
+  let next = 0;
+  for (let i = 0; i < source.length; i++) {
+    const expected = next < changes.length && changes[next][0] === i
+      ? changes[next++][1] : source[i];
+    if (reopened[i] !== expected)
+      throw new RangeError('BPS self-replay disagrees with staged changes');
+  }
   return patch;
 }

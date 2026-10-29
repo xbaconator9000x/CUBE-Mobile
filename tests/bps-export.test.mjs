@@ -59,3 +59,20 @@ test('Node Buffer inputs never mutate source bytes while building BPS', () => {
   assert.deepEqual(applyBps(source, patch), expected);
   assert.deepEqual(source, before);
 });
+
+test('large sparse BPS export uses virtual target CRC and independently replays every byte', () => {
+  const source=Buffer.alloc(4*1024*1024);
+  for(let i=0;i<source.length;i++)source[i]=(i*13+(i>>>12))&255;
+  const before=Buffer.from(source);
+  const edits=[];
+  for(let i=0;i<1200;i++) {
+    const at=(i*3001+17)%source.length;
+    edits.push([at,source[at]^0x5A]);
+  }
+  const patch=buildVerifiedBpsDiff(source,edits);
+  const target=applyBps(source,patch);
+  for(const [at,value] of edits)assert.equal(target[at],value);
+  assert.deepEqual(source,before);
+  assert.equal(le32(patch,patch.length-8),crc32(target));
+  assert.ok(patch.length<10000);
+});
