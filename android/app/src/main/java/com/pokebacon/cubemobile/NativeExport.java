@@ -287,16 +287,11 @@ final class NativeExport {
         output = null;
         boolean hadDestination = destination != null;
         boolean mayContainOurBytes = writeState.mayContainOurBytes();
-        boolean removed = false;
-        // Do not delete a provider document we merely opened but never wrote;
-        // it could be a pre-existing zero-byte alias despite the picker intent.
-        if (hadDestination && mayContainOurBytes) {
-            try {
-                removed = activity.getContentResolver().delete(destination, null, null) > 0;
-            } catch (Exception ignored) {
-                // The provider may reject deletion; never report false rollback.
-            }
-        }
+        // ACTION_CREATE_DOCUMENT is user-selected, but an untrusted provider
+        // can return a pre-existing empty document alias. We cannot prove
+        // exclusive ownership from a successful picker result or write alone.
+        // Deleting that URI on abort could destroy user data. Keep any partial
+        // output for explicit user review; never claim destructive rollback.
         destination = null;
         pending = false;
         session = null;
@@ -305,7 +300,6 @@ final class NativeExport {
         callback("__cubeNativeCancel", cancelled);
         String notice = !hadDestination ? message :
             !mayContainOurBytes ? message + "; empty document may remain" :
-            removed ? message + "; incomplete document deleted" :
             message + "; partial document may remain, please delete it";
         Toast.makeText(activity, notice, Toast.LENGTH_LONG).show();
     }
