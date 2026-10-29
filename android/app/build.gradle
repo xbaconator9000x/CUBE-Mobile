@@ -1,6 +1,20 @@
 plugins {
     id 'com.android.application'
 }
+
+// Release signing is opt-in and only supplied by the protected release job.
+// Debug and pull-request builds never need or receive signing credentials.
+def releaseSigningKeys = [
+    'CUBE_RELEASE_KEYSTORE_PATH',
+    'CUBE_RELEASE_STORE_PASSWORD',
+    'CUBE_RELEASE_KEY_ALIAS',
+    'CUBE_RELEASE_KEY_PASSWORD'
+]
+def releaseSigningReady = releaseSigningKeys.every { key ->
+    def value = System.getenv(key)
+    value != null && !value.trim().isEmpty()
+}
+
 android {
     namespace 'com.pokebacon.cubemobile'
     compileSdk 35
@@ -12,10 +26,32 @@ android {
         versionName '0.5.9'
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
+    signingConfigs {
+        release {
+            if (releaseSigningReady) {
+                storeFile file(System.getenv('CUBE_RELEASE_KEYSTORE_PATH'))
+                storePassword System.getenv('CUBE_RELEASE_STORE_PASSWORD')
+                keyAlias System.getenv('CUBE_RELEASE_KEY_ALIAS')
+                keyPassword System.getenv('CUBE_RELEASE_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            if (releaseSigningReady) signingConfig signingConfigs.release
+        }
+    }
     sourceSets {
         main {
             assets.srcDirs += ["$buildDir/generated/cubeAssets"]
         }
+    }
+}
+// Never let a local/CI assembleRelease silently produce an unsigned candidate.
+gradle.taskGraph.whenReady { graph ->
+    if ((graph.hasTask(':app:assembleRelease') || graph.hasTask(':app:bundleRelease')) &&
+        !releaseSigningReady) {
+        throw new GradleException('Release signing environment is incomplete')
     }
 }
 dependencies {
