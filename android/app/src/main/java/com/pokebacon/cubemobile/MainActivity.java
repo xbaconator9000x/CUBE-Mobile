@@ -27,10 +27,12 @@ import java.util.ArrayList;
 public final class MainActivity extends Activity {
     private static final int PICK_FILE = 1001;
     private static final String IMPORTED_DOCUMENTS_STATE = "cube.importedDocuments";
+    private static final String IMPORT_PICKER_STATE = "cube.importPickerOutstanding";
     private static final String APP_URL =
         "https://appassets.androidplatform.net/assets/index.html";
     private WebView webView;
     private ValueCallback<Uri[]> fileCallback;
+    private final ImportPickerGate importPickerGate = new ImportPickerGate();
     private NativeExport nativeExport;
     private final ImportedDocumentGuard importedDocuments = new ImportedDocumentGuard();
     private OnBackInvokedCallback modernBackCallback;
@@ -44,6 +46,11 @@ public final class MainActivity extends Activity {
             } catch (RuntimeException malformedState) {
                 importedDocuments.invalidate();
             }
+        }
+        if (state != null && state.getBoolean(IMPORT_PICKER_STATE, false)) {
+            // An old Android picker may still return after Activity recreation.
+            // Keep its ticket occupied, but never restore the old JS callback.
+            importPickerGate.restoreOutstanding();
         }
         WebView.setWebContentsDebuggingEnabled(false);
         webView = new WebView(this);
@@ -70,6 +77,11 @@ public final class MainActivity extends Activity {
                 // A reload destroys the JS session state even at the same URL.
                 // Cancel the native session rather than accepting stale chunks.
                 if (nativeExport != null) nativeExport.close();
+                if (fileCallback != null) {
+                    fileCallback.onReceiveValue(null);
+                    fileCallback = null;
+                    importPickerGate.invalidate();
+                }
             }
             @Override public void onPageFinished(WebView view, String url) {
                 if (APP_URL.equals(url)) nativeExport.inject();
@@ -100,7 +112,12 @@ public final class MainActivity extends Activity {
         webView.setWebChromeClient(new WebChromeClient() {
             @Override public boolean onShowFileChooser(WebView view,
                 ValueCallback<Uri[]> callback, FileChooserParams params) {
-                if (fileCallback != null) fileCallback.onReceiveValue(null);
+                if (!importPickerGate.begin()) {
+                    // Never deliver a late result from an earlier picker to
+                    // this new WebView callback.
+                    callback.onReceiveValue(null);
+                    return true;
+                }
                 fileCallback = callback;
                 Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                 intent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -110,6 +127,7 @@ public final class MainActivity extends Activity {
                 try {
                     startActivityForResult(intent, PICK_FILE);
                 } catch (RuntimeException ex) {
+                    importPickerGate.consume();
                     fileCallback.onReceiveValue(null);
                     fileCallback = null;
                     Toast.makeText(MainActivity.this,
@@ -137,9 +155,11 @@ public final class MainActivity extends Activity {
             nativeExport.onResult(resultCode, data);
             return;
         }
-        if (requestCode != PICK_FILE || fileCallback == null) return;
+        if (requestCode != PICK_FILE) return;
+        boolean deliver = importPickerGate.consume();
         ValueCallback<Uri[]> callback = fileCallback;
         fileCallback = null;
+        if (!deliver || callback == null) return;
         Uri[] selected = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
         if (selected != null) {
             // Reject the entire picker selection if any URI is invalid or
@@ -189,6 +209,7 @@ public final class MainActivity extends Activity {
         // Keep the protected input identities through process/activity
         // recreation. A null snapshot intentionally restores as fail-closed.
         outState.putStringArrayList(IMPORTED_DOCUMENTS_STATE, importedDocuments.snapshot());
+        outState.putBoolean(IMPORT_PICKER_STATE, importPickerGate.isInFlight());
         super.onSaveInstanceState(outState);
     }
 
@@ -201,6 +222,7 @@ public final class MainActivity extends Activity {
             fileCallback.onReceiveValue(null);
             fileCallback = null;
         }
+        importPickerGate.invalidate();
         if (nativeExport != null) nativeExport.dispose();
         if (webView != null) {
             webView.destroy();
