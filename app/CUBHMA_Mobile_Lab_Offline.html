@@ -7973,6 +7973,77 @@ function inspectHmaCubeMapScripts(source,summary,{
   scriptInstructionsDecoded:false,writeAuthorized:false});
 }
 
+/**
+ * Bounded raw script-pointer reference index for a single declared CUBE map.
+ * This is NOT an opcode decoder, interpreter, global pointer graph or
+ * permission to relocate/repoint scripts. Exact pointer sources are retained.
+ */
+function inspectHmaCubeMapScriptReferences(source,summary,options={}){
+ const maxReferences=options.maxReferences??256;
+ if(!Number.isSafeInteger(maxReferences)||maxReferences<1||maxReferences>4096)
+  throw new RangeError('Script reference finding budget must be 1–4096');
+ const report=inspectHmaCubeMapScripts(source,summary,options);
+ if(!report.hasTable)return Object.freeze({
+  bankIndex:report.bankIndex,mapIndex:report.mapIndex,mapCount:report.mapCount,
+  references:Object.freeze([]),totalReferenceCount:0,
+  referenceFindingsTruncated:false,aliasGroups:Object.freeze([]),
+  structuralTargetWarnings:Object.freeze([]),readOnly:true,
+  romAuthenticated:false,scriptSemanticsVerified:false,writeAuthorized:false
+ });
+ const map=inspectHmaCubeMapEntry(reader(source),summary,options);
+ const ranges=[
+  ...structuralRanges(map).map(([start,size],i)=>({start,size,
+   kind:['map-header','map-layout','blockmap','bank-map-pointers'][i]})),
+  {start:report.tableOffset,size:report.tableBytes,kind:'map-script-table'}
+ ];
+ const all=[];
+ for(const entry of report.entries){
+  if(entry.conditional){
+   const size=entry.conditions.length*8+2;
+   ranges.push({start:entry.targetOffset,size,kind:'conditional-script-table'});
+   all.push({kind:'conditional-table',entryIndex:entry.index,
+    conditionIndex:null,pointerSource:entry.pointerSource,
+    rawPointer:entry.rawPointer,targetOffset:entry.targetOffset});
+   for(const condition of entry.conditions)all.push({
+    kind:'conditional-script',entryIndex:entry.index,
+    conditionIndex:condition.index,pointerSource:condition.sourceOffset+4,
+    rawPointer:condition.rawPointer,targetOffset:condition.targetOffset
+   });
+  }else all.push({kind:'direct-script',entryIndex:entry.index,
+   conditionIndex:null,pointerSource:entry.pointerSource,
+   rawPointer:entry.rawPointer,targetOffset:entry.targetOffset});
+ }
+ all.sort((a,b)=>a.pointerSource-b.pointerSource||a.targetOffset-b.targetOffset);
+ const groups=new Map(),warnings=[];
+ for(const ref of all){
+  const category=ref.kind==='conditional-table'?'table':'script';
+  const key=category+':'+ref.targetOffset;
+  if(!groups.has(key))groups.set(key,[]);
+  groups.get(key).push(ref);
+  if(category==='script')for(const range of ranges)
+   if(ref.targetOffset>=range.start&&ref.targetOffset<range.start+range.size)
+    warnings.push(Object.freeze({
+     pointerSource:ref.pointerSource,targetOffset:ref.targetOffset,
+     entryIndex:ref.entryIndex,conditionIndex:ref.conditionIndex,
+     overlaps:range.kind
+    }));
+ }
+ const aliasGroups=[...groups].filter(([,refs])=>refs.length>1).map(([key,refs])=>
+  Object.freeze({category:key.split(':')[0],targetOffset:refs[0].targetOffset,
+   referenceCount:refs.length,pointerSources:Object.freeze(refs.map(r=>r.pointerSource))}));
+ return Object.freeze({
+  bankIndex:report.bankIndex,mapIndex:report.mapIndex,mapCount:report.mapCount,
+  references:Object.freeze(all.slice(0,maxReferences).map(ref=>Object.freeze(ref))),
+  totalReferenceCount:all.length,referenceFindingsTruncated:all.length>maxReferences,
+  aliasGroups:Object.freeze(aliasGroups),
+  structuralTargetWarnings:Object.freeze(warnings),
+  rawPointerSourcesVerified:true,readOnly:true,
+  romAuthenticated:false,scriptSemanticsVerified:false,
+  scriptInstructionsDecoded:false,exclusiveOwnershipProven:false,
+  writeAuthorized:false
+ });
+}
+
 return inspectHmaCubeMapScripts;
 })();
 const auditHmaCubeCrossBankOwnership=(()=>{
