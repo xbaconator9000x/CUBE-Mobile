@@ -17,7 +17,7 @@ import {parseLocalCubeScriptTransactionArgs} from './local-cube-script-transacti
 
 const KINDS=['cells','warps','events','connections','scripts'];
 function sha(bytes){return createHash('sha256').update(bytes).digest('hex');}
-function declaredBanks(raw,bankIndex,mapCount){
+export function declaredBanks(raw,bankIndex,mapCount){
  if(typeof raw!=='string'||!/^[0-9]+:[0-9]+(?:,[0-9]+:[0-9]+)*$/.test(raw))
   throw RangeError('Explicit bank:count declarations are required');
  const banks=raw.split(',').map(pair=>{
@@ -33,7 +33,7 @@ function declaredBanks(raw,bankIndex,mapCount){
   throw RangeError('Bank census must be bounded and include the selected map bank');
  return banks;
 }
-function parsePlan(bytes){
+export function parsePlan(bytes){
  let plan;
  try{plan=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));}
  catch{throw RangeError('Transaction plan is not valid UTF-8 JSON');}

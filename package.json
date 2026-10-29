@@ -17,6 +17,7 @@
     "smoke:cube-scripts": "node scripts/local-cube-script-transaction.mjs",
     "rom:saveas:local": "node scripts/local-rom-atomic-saveas.mjs",
     "smoke:cube-combined": "node scripts/local-cube-combined-transaction.mjs",
+    "rom:cube:bps:accept": "node scripts/local-cube-bps-acceptance.mjs",
     "rom:bps:local": "node scripts/local-bps-diff.mjs",
     "rom:bps:verify": "node scripts/local-bps-verify.mjs",
     "rom:bps:saveas": "node scripts/local-bps-apply-saveas.mjs"
