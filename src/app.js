@@ -1,4 +1,5 @@
 import {RomModel, MAX_BYTES, hex, parseOffset, parseHexBytes, applyBps, applyIps, crc32, paletteAt, gba4bppTile, decodeLz10, scanLz10Graphics} from './core.js';
+import {buildVerifiedBpsDiff} from './bps-export.js';
 import {parseHmaNamedAnchors,collectHmaNamedAnchors,readAnchorInspection,groupAnchors,filterAnchors,previewHmaFixedTable,resolveHmaStockMetadata,checkHmaMetadataSources,inspectHmaPointerReferences,parseHmaOffsetPointers,resolveHmaTableLayouts,collectHmaLists,collectHmaMatchedWords} from './semantic.js';
 import {inspectFixedTextBytes} from './text-inspection.js';
 import {decodeHmaPcsFallback} from './pcs-default.js';
@@ -85,7 +86,7 @@ const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
 ctx.imageSmoothingEnabled=false;
 window.__cubeAppBootStage='canvas';
-const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-summary-scan','map-preview-cell','map-visual-compare','map-visual-compare-queue','map-layout-inspect','map-bank-inspect','map-atlas-inspect','map-atlas-probe','map-warp-inspect','map-connection-inspect','map-event-inspect','map-script-pointer-inspect','map-script-map-audit','map-script-operand-atlas-audit','map-blockset-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','discard-button','edit-unlock'];
+const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-summary-scan','map-preview-cell','map-visual-compare','map-visual-compare-queue','map-layout-inspect','map-bank-inspect','map-atlas-inspect','map-atlas-probe','map-warp-inspect','map-connection-inspect','map-event-inspect','map-script-pointer-inspect','map-script-map-audit','map-script-operand-atlas-audit','map-blockset-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','export-bps','discard-button','edit-unlock'];
 const tabs={home:['YOUR WORKSPACE','ROM Workbench'],hex:['BINARY INSPECTOR','Hex editor'],anchors:['ROM SEMANTICS','Named data'],maps:['RAW MAP CELLS','Blockmap inspector'],graphics:['GBA GRAPHICS','Graphics explorer'],patches:['PATCH WORKFLOW','Patch tools'],changes:['REVIEW & EXPORT','Changes']};
 function toast(message,bad=false){const t=$('toast');t.textContent=message;t.classList.toggle('error',bad);t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),4300);}
 function safeRun(fn){try{const result=fn();if(result?.catch) result.catch(err=>toast(err.message||String(err),true));}catch(err){toast(err.message||String(err),true);}}
@@ -464,6 +465,17 @@ $('apply-patch').addEventListener('click',async()=>{
   }catch(err){toast(err.message||String(err),true);}
 });
 $('export-ips').addEventListener('click',()=>safeRun(()=>{ensureModel();const bytes=model.exportIps();downloadFile(`${safeName(model.name)}_mobilelab.ips`,bytes);toast(`IPS diff exported (${bytes.length} bytes)`);}));
+$('export-bps').addEventListener('click',()=>safeRun(()=>{
+ const current=ensureModel();
+ if(current.appliedPatch)throw Error('Reopen the patched ROM copy before exporting a BPS diff; this export covers staged raw edits only.');
+ if(!current.edits.size)throw Error('Stage a raw byte edit before exporting a BPS diff.');
+ // buildVerifiedBpsDiff validates 1–65536 edits, a <=64 MiB source,
+ // independent BPS replay, CRC32 and unchanged source bytes.
+ const bytes=buildVerifiedBpsDiff(current.base,current.edits);
+ if(model!==current)throw Error('ROM changed during BPS generation; retry');
+ downloadFile(`${safeName(current.name)}_mobilelab.bps`,bytes);
+ toast(`BPS raw-edit diff exported (${bytes.length} bytes). Original ROM unchanged.`);
+}));
 function drawChanges(){
   if(!model){$('header-diagnostics').textContent='Open a ROM to inspect its GBA header checksum.';$('summary-byte-count').textContent='0';$('summary-patched').textContent='NO';$('summary-size').textContent='—';$('change-list-info').textContent='No edits';$('changes-list').innerHTML='<div class="empty-state">Open a ROM and make a raw edit to see changes here.</div>';return;}
   const h=model.header();$('header-diagnostics').textContent=`${h.code} · fixed byte: ${h.fixedValid?'valid':'invalid'} · stored 0x${hex(h.stored,2)} · expected 0x${hex(h.expected,2)} · ${h.checksumValid?'checksum OK':'checksum mismatch'}`;
