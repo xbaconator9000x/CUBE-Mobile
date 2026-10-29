@@ -1,9 +1,8 @@
 name: Continuous CUBE coding worker
 on:
   workflow_dispatch:
-  workflow_run:
-    workflows: ['Verify mobile source']
-    types: [completed]
+  push:
+    branches: [main]
 permissions:
   contents: write
   pull-requests: write
@@ -13,13 +12,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   implement:
-    if: >-
-      vars.CUBE_AUTOCODE_ENABLED == 'true' &&
-      (github.event_name == 'workflow_dispatch' ||
-       (github.event.workflow_run.conclusion == 'success' &&
-        github.event.workflow_run.head_branch == 'main' &&
-        github.event.workflow_run.head_repository.full_name == github.repository &&
-        (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')))
+    if: vars.CUBE_AUTOCODE_ENABLED == 'true' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 70
     steps:
@@ -115,5 +108,7 @@ jobs:
             exit 0
           fi
           gh pr merge "$PR_URL" --squash --delete-branch
-          echo 'Merged verified PR; dispatching main CI to trigger next eligible task.'
-          gh workflow run ci.yml --ref main
+          echo 'Merged verified PR; verifying main CI before immediately dispatching the next coding run.'
+          MAIN_SHA=$(git ls-remote origin refs/heads/main | cut -f1)
+          node scripts/continuous-agent.mjs ci main "$MAIN_SHA" ci.yml
+          gh workflow run continuous-development.yml --ref main
