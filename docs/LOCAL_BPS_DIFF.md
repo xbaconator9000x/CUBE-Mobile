@@ -34,3 +34,7 @@ The encoder uses BPS1 SourceRead and TargetRead operations with source/target/pa
 The BPS format and CRC expectations are source-grounded against `kcradi/CUBHMA` pinned at `3044393183e01af2ae1e907fb37e4a75eda6a8dc`, `src/HexManiac.Core/Models/Code/BpsPatch.cs`.
 
 **Limitations:** A user-declared SHA-256 does not establish ROM provenance. A BPS diff is not an ownership-checked CUBE semantic edit, collision editor, full map exporter or verified game-emulator/hardware release. Never treat the existence of a patch or a successful replay as evidence of exclusive ROM pointer ownership.
+
+## Published-artifact replay and rollback
+
+After atomic no-overwrite publication, the local exporter now reopens the actual published BPS file and runs the separate [read-only BPS acceptance](LOCAL_BPS_VERIFY.md) against the original source and an exact expected target SHA-256 calculated from the verified virtual edit result. This second replay checks patch/source/target CRC32 and full target identity from the published pathname. It runs **before** the private stage is unlinked, so a failed post-publication check removes only the new destination inode and the private stage. Existing files and the source ROM are never overwritten. The report includes `publishedPatchReplayed` and `publishedTargetSha256Verified`; these do not authenticate CUBE semantics, pointer ownership or game-emulator behavior.
