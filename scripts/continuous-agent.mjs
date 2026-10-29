@@ -12,6 +12,7 @@ const runnerFiles = new Set([
   'scripts/repository-safety.mjs',
   'scripts/parity-audit.mjs',
   'scripts/engineering-audit.mjs',
+  'package.json',
 ]);
 const protectedWorkflows = new Set([
   '.github/workflows/ci.yml',
@@ -41,7 +42,7 @@ Primary paths: ${task.paths.join(', ')}
 
 Read the current main-derived repository and pinned upstream provenance before editing. Make a substantial, source-grounded working implementation, with regression tests and documentation where needed. Reuse licensed upstream code only with attribution. Do not substitute synthetic tests for genuine ROM, emulator or Android acceptance. Never commit ROM/save assets, credentials or private information. Preserve the README opening exactly as two lines '# Test' and 'This is a test.' with the blank line between them. Fail closed on unverified ROM writes and never enable unsafe semantic write authority. Do not modify the continuous worker workflow or its runner/test files.
 
-Update queue/development.json with truthful evidence and a partial checkpoint if work is incomplete; mark the task done ONLY if all of its stated acceptance requirements are actually met. If blocked by external ROM/device evidence, record the blocker and move to other independent work only if it remains within this task's scope. Do not fabricate acceptance. You may edit tests, docs and related source beyond the primary paths when necessary. Finish with a concise summary of implementation and tests. Do not create a PR or push; the workflow handles that after verification.`;
+Update queue/development.json with truthful evidence and a partial checkpoint if work is incomplete; mark the task done ONLY if all of its stated acceptance requirements are actually met. If blocked by external ROM/device evidence, record the blocker and move to other independent work only if it remains within this task's scope. Do not fabricate acceptance. You may edit tests, docs and related source beyond the primary paths when necessary. Finish with a concise summary of implementation and tests. Do not commit, create a PR or push; the workflow handles those operations after verification.`;
 }
 
 export function verifyReadme(text) {
