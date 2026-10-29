@@ -8,6 +8,7 @@ import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {applyBps} from '../src/core.js';
 import {exportLocalBpsDiff} from '../scripts/local-bps-diff.mjs';
+import {publishNewPatchArtifact} from '../scripts/local-atomic-patch-artifact.mjs';
 
 const cli=fileURLToPath(new URL('../scripts/local-bps-diff.mjs',import.meta.url));
 async function fixture(run) {
@@ -30,6 +31,8 @@ test('local BPS export is source-bound, atomic, replayable and aggregate-only',a
     const result=await exportLocalBpsDiff(f.args);
     assert.equal(result.patchReplayVerified,true);
     assert.equal(result.destinationReopenVerified,true);
+    assert.equal(result.publishedPatchReplayed,true);
+    assert.equal(result.publishedTargetSha256Verified,true);
     assert.equal(result.changedBytes,2);
     assert.equal(result.semanticWritesAllowed,false);
     assert.ok(!JSON.stringify(result).includes(f.sha));
@@ -73,5 +76,41 @@ test('symlink output directory and existing symlink destination are rejected',as
     await symlink(f.rom,f.out);
     await assert.rejects(exportLocalBpsDiff(f.args),/already exists/);
     assert.deepEqual(await readFile(f.rom),f.bytes);
+  });
+});
+
+test('failed post-publication verifier removes only the new patch inode and its stage',async()=>{
+  await fixture(async f=>{
+    let called=0;
+    await assert.rejects(publishNewPatchArtifact(f.out+'.rejected',Buffer.alloc(19),{
+      verifyPublished:async pathname=>{
+        called++;
+        assert.deepEqual(await readFile(pathname),Buffer.alloc(19));
+        throw new RangeError('Simulated independent replay rejection');
+      }
+    }),/Simulated independent replay rejection/);
+    assert.equal(called,1);
+    const names=await readdir(f.dir);
+    assert.ok(!names.some(n=>n.includes('.cube-patch-stage-')));
+    assert.ok(!names.some(n=>n.endsWith('.rejected')));
+    assert.deepEqual(await readFile(f.rom),f.bytes);
+  });
+});
+
+test('successful published verifier runs before the stage is removed',async()=>{
+  await fixture(async f=>{
+    let called=0;
+    const artifact=f.out+'.verified',payload=Buffer.alloc(19,0x41);
+    const result=await publishNewPatchArtifact(artifact,payload,{
+      verifyPublished:async pathname=>{
+        called++;
+        assert.deepEqual(await readFile(pathname),payload);
+        assert.ok((await readdir(f.dir)).some(n=>n.includes('.cube-patch-stage-')));
+      }
+    });
+    assert.equal(called,1);
+    assert.equal(result.publishedAcceptanceVerified,true);
+    assert.deepEqual(await readFile(artifact),payload);
+    assert.ok(!(await readdir(f.dir)).some(n=>n.includes('.cube-patch-stage-')));
   });
 });
