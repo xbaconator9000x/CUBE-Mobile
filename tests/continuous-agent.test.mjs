@@ -32,7 +32,7 @@ test('README test notice is immutable', () => {
 });
 test('rejects copyrighted ROMs, secrets, and worker self-modification', () => {
   assert.doesNotThrow(() => verifyStagedPaths(['src/app.js', 'tests/app.test.mjs']));
-  for (const file of ['game.gba', '.env', 'secrets/pin.key', 'android/keystore.p12', '.github/workflows/continuous-development.yml', 'scripts/continuous-agent.mjs'])
+  for (const file of ['game.gba', '.env', 'secrets/pin.key', 'android/keystore.p12', '.github/workflows/continuous-development.yml', 'scripts/continuous-agent.mjs', 'package.json'])
     assert.throws(() => verifyStagedPaths([file]), /Unsafe/);
   assert.throws(() => verifyStagedPaths(['.github/workflows/ci.yml']), /Unsafe/);
   assert.doesNotThrow(() => verifyStagedPaths(['.github/workflows/android-build.yml'], {paths:['.github/workflows/android-build.yml']}));
