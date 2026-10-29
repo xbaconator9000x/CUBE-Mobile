@@ -7,6 +7,7 @@ import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {buildVerifiedBpsDiff} from '../src/bps-export.js';
+import {exportLocalBpsDiff} from '../scripts/local-bps-diff.mjs';
 import {parseLocalBpsSaveAsArgs,saveLocalBpsTargetAs} from '../scripts/local-bps-apply-saveas.mjs';
 
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -126,5 +127,27 @@ test('CLI reports only aggregate acceptance and generically refuses a second Sav
   assert.ok(!second.stderr.includes(f.dir)&&!second.stderr.includes(f.targetHash));
   assert.deepEqual(await readFile(f.out),f.target);
   assert.deepEqual(await readFile(f.rom),f.source);
+ });
+});
+
+test('complete local expected-byte plan -> published BPS -> verified target ROM copy',async()=>{
+ await fixture(async f=>{
+  await rm(f.patch);
+  const plan=join(f.dir,'explicit-edits.json');
+  await writeFile(plan,JSON.stringify({edits:[
+   {offset:0,expected:f.source[0],value:91},
+   {offset:4096,expected:f.source[4096],value:117},
+   {offset:8191,expected:f.source[8191],value:23}
+  ]}));
+  const exported=await exportLocalBpsDiff([
+   '--rom',f.rom,'--expected-sha256',f.sourceHash,
+   '--plan',plan,'--out',f.patch
+  ]);
+  assert.equal(exported.publishedPatchReplayed,true);
+  const saved=await saveLocalBpsTargetAs(f.args);
+  assert.equal(saved.destinationReopenVerified,true);
+  assert.deepEqual(await readFile(f.out),f.target);
+  assert.deepEqual(await readFile(f.rom),f.source);
+  assert.deepEqual(await readFile(f.patch),f.bps);
  });
 });
