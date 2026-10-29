@@ -75,3 +75,4 @@
 .map-overlay-legend{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
 .map-overlay-legend-item{display:inline-flex;align-items:center;gap:5px;font-size:.8rem;padding:3px 6px;border:1px solid var(--border,#64748b);border-radius:5px}
 .map-overlay-swatch{display:inline-block;width:14px;height:14px;border:1px solid rgba(0,0,0,.35);border-radius:3px}
+#cube-map-render-canvas:focus-visible{outline:3px solid var(--violet);outline-offset:4px}

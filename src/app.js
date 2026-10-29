@@ -1406,6 +1406,8 @@ $('cube-map-render').addEventListener('click',()=>safeRun(()=>{
   canvas.style.width=(rendered.width*2)+'px';
   canvas.style.height=(rendered.height*2)+'px';
   canvas.hidden=false;
+  canvas.setAttribute('aria-label',
+    'Read-only CUBE map. Arrow keys move the cell selection; Enter or Space inspects it.');
   cubeRenderEvidence={rom:model,options,x,y,overlayMode,
     warpOverlayJson:warpOverlayReport?JSON.stringify(warpOverlayReport):null,map:rendered.map,
     pixels:rendered.pixels.slice(),cellsJson:JSON.stringify(rendered.cells),
@@ -1466,7 +1468,35 @@ $('cube-map-render-canvas').addEventListener('click',event=>safeRun(()=>{
     ' · behavior 0x'+hex(hit.attribute.behavior,2)+' · layer '+hit.attribute.layer+
     ' · blockmap 0x'+hex(hit.cell.byteOffset)+' · attributes 0x'+
     hex(hit.attribute.attributeOffset)+'. Not verified walkability.';
+  canvas.setAttribute('aria-label','Selected CUBE cell '+hit.cell.x+','+
+    hit.cell.y+', tile '+hit.cell.tileId+
+    '. Arrow keys move selection; Enter or Space inspects.');
 }));
+$('cube-map-render-canvas').addEventListener('keydown',event=>{
+  if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Enter',' '].includes(event.key))
+    return;
+  const canvas=$('cube-map-render-canvas'),snapshot=cubeRenderEvidence;
+  if(!snapshot||canvas.hidden||!canvas.width||!canvas.height)return;
+  const columns=canvas.width/16,rows=canvas.height/16;
+  if(!Number.isSafeInteger(columns)||!Number.isSafeInteger(rows)||
+     columns<1||rows<1)return;
+  const selected=cubeRenderSelection?.snapshot===snapshot?cubeRenderSelection:null;
+  let col=selected?selected.x-snapshot.x:0;
+  let row=selected?selected.y-snapshot.y:0;
+  if(event.key==='ArrowLeft')col=Math.max(0,col-1);
+  if(event.key==='ArrowRight')col=Math.min(columns-1,col+1);
+  if(event.key==='ArrowUp')row=Math.max(0,row-1);
+  if(event.key==='ArrowDown')row=Math.min(rows-1,row+1);
+  if(col<0||col>=columns||row<0||row>=rows)return;
+  event.preventDefault(); // Do not scroll the page while navigating the map.
+  const rect=canvas.getBoundingClientRect();
+  if(!rect.width||!rect.height)return;
+  // Reuse the exact same stale-ROM/overlay checks and source-byte selection
+  // path as touch, rather than creating a weaker keyboard-only inspection.
+  canvas.dispatchEvent(new MouseEvent('click',{bubbles:true,
+    clientX:rect.left+(col+.5)*rect.width/columns,
+    clientY:rect.top+(row+.5)*rect.height/rows}));
+});
 $('cube-map-batch-add').addEventListener('click',()=>safeRun(()=>{
   const selected=cubeRenderSelection,snapshot=selected?.snapshot;
   if(!snapshot||snapshot!==cubeRenderEvidence||snapshot.rom!==model||
