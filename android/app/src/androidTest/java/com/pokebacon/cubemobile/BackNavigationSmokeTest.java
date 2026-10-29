@@ -40,7 +40,8 @@ public class BackNavigationSmokeTest {
                 "JSON.stringify({hash:location.hash,homeHidden:" +
                 "document.getElementById('home-button')?.hidden," +
                 "dialogs:document.querySelectorAll('dialog[open]').length," +
-                "routeFn:typeof gotoTab,scriptCount:document.scripts.length," +
+                "routeFn:typeof gotoTab,bootStage:window.__cubeAppBootStage," +
+                "appReady:window.__cubeAppReady,scriptCount:document.scripts.length," +
                 "currentTab:(function(){try{return currentTab}catch(e){return e.name}})()," +
                 "canvas2d:!!document.getElementById('tile-canvas')?.getContext('2d')," +
                 "tabCount:document.querySelectorAll('[data-tab]').length," +
