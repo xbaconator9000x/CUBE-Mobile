@@ -66,3 +66,47 @@ export function compareRomIdentity(model,fingerprint,{expectedSha256='',profiles
     semanticWritesAllowed:false
   };
 }
+
+
+/**
+ * Cross-check two separately validated *claims* about the same ROM and
+ * ordered TOML evidence. The manifest's file set is checked by
+ * compareHmaMetadataManifest before calling this helper. This only detects
+ * contradictory declarations; it never establishes independent provenance.
+ *
+ * A single-file profile digest cannot authenticate an ordered multi-file
+ * metadata overlay. Do not silently treat the first file as the whole set.
+ */
+export function compareRomProfileManifestClaims(profile,manifest,metadataFiles){
+  const [p]=validateRomProfileRegistry([profile]);
+  if(!manifest||typeof manifest!=='object'||Array.isArray(manifest)||
+     typeof manifest.romSha256!=='string'||!SHA256.test(manifest.romSha256)||
+     !Number.isSafeInteger(manifest.romLength)||
+     !GAME_CODE.test(manifest.gameCode)||
+     !Number.isInteger(manifest.revision)||manifest.revision<0||manifest.revision>255||
+     !['stock','expansion','custom'].includes(manifest.layout)||
+     typeof manifest.sourceCommit!=='string'||!COMMIT.test(manifest.sourceCommit)||
+     !Number.isSafeInteger(manifest.fileCount)||manifest.fileCount<1||manifest.fileCount>16||
+     !Array.isArray(metadataFiles)||metadataFiles.length!==manifest.fileCount||
+     metadataFiles.some(f=>!f||typeof f.sha256!=='string'||!SHA256.test(f.sha256)||
+       !Number.isSafeInteger(f.length)||f.length<1))
+    throw new RangeError('Invalid cross-source ROM/metadata evidence');
+  let status;
+  if(p.sha256!==manifest.romSha256.toLowerCase()||
+     p.length!==manifest.romLength||p.gameCode!==manifest.gameCode||
+     p.revision!==manifest.revision)
+    status='rom-identity-conflict';
+  else if(p.layout!==manifest.layout)
+    status='layout-conflict';
+  else if(p.sourceCommit!==manifest.sourceCommit.toLowerCase())
+    status='source-revision-conflict';
+  else if(metadataFiles.length!==1)
+    status='multi-file-profile-unbound';
+  else if(p.metadataSha256!==metadataFiles[0].sha256.toLowerCase())
+    status='profile-metadata-digest-conflict';
+  else status='consistent-exact-byte-claims';
+  return Object.freeze({status,
+    consistentExactByteClaims:status==='consistent-exact-byte-claims',
+    independentlyAuthenticated:false,metadataAuthenticated:false,
+    cubeLayoutAuthenticated:false,semanticWritesAllowed:false,readOnly:true});
+}
