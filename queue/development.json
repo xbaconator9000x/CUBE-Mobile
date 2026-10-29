@@ -3,8 +3,8 @@
   "upstream": "kcradi/CUBHMA@3044393183e01af2ae1e907fb37e4a75eda6a8dc",
   "authoritativeBranch": "main",
   "checkpoint": {
-    "sequence": 14,
-    "lastIntegratedCommit": "d32bfe511278d414b4a21de2f993a0c06f15745c",
+    "sequence": 15,
+    "lastIntegratedCommit": "84857d4f484f62c795c106096cd28988a854a02e",
     "lastRun": "2026-10-29"
   },
   "tasks": [
@@ -325,12 +325,12 @@
       "paths": [
         "src/rom-compatibility.js"
       ],
-      "status": "pending",
+      "status": "blocked",
       "effortHours": 8,
       "validation": "Bind exact local ROM and matching TOML SHA-256 read-only; reject mismatches and never grant semantic writes",
       "owner": null,
       "branch": null,
-      "blocker": null,
+      "blocker": "Remaining acceptance requires independently authenticated legal CUBE ROM and matching ordered TOML provenance plus physical Android SAF/screen-reader evidence; no safe semantic write permission.",
       "evidence": [
         "src/rom-compatibility.js",
         "src/hma-rom-provenance-binding.js",
@@ -370,12 +370,12 @@
       "paths": [
         "scripts/local-bps-apply-saveas.mjs"
       ],
-      "status": "pending",
+      "status": "blocked",
       "effortHours": 8,
       "validation": "Atomic no-overwrite save, failure rollback, exact reopen and source preservation without copyrighted ROM assets",
       "owner": null,
       "branch": null,
-      "blocker": null,
+      "blocker": "Remaining acceptance requires authentic legal CUBE ROM/BPS emulator save-reopen and physical Android SAF/release-signing evidence; synthetic recovery tests are already green.",
       "evidence": [
         "scripts/local-bps-apply-saveas.mjs",
         "scripts/local-bps-recovery.mjs",
@@ -427,19 +427,21 @@
         "android/app/src/main/java/com/pokebacon/cubemobile/ExportPickerGate.java",
         "android/app/src/test/java/com/pokebacon/cubemobile/ExportPickerGateTest.java",
         "tests/android-export-picker-recreation.test.mjs",
-        "docs/ANDROID_EXPORT_PICKER_RECREATION.md"
+        "docs/ANDROID_EXPORT_PICKER_RECREATION.md",
+        "tests/android-import-state-failclosed.test.mjs",
+        "docs/ANDROID_IMPORT_STATE_FAILCLOSED.md"
       ],
       "checkpoint": {
         "date": "2026-10-29",
         "kind": "partial",
-        "summary": "Merged #266: Android ACTION_CREATE_DOCUMENT export picker now retains an outstanding stale result ticket across Activity recreation, preventing a late old save-picker result from binding to a newer WebView export session. Two native gate tests plus Node integration test; source, Android APK, queue and emulator PR CI green. Hardware acceptance remains outstanding.",
+        "branch": "watchdog/q018-import-state-safety-20261029-r6",
+        "mergedPr": 271,
+        "mergedCommit": "84857d4f484f62c795c106096cd28988a854a02e",
+        "summary": "Merged #271: missing/malformed imported-document Activity state now fails closed; malformed third-party picker results cancel safely after ticket consumption. 985/985 source tests and Android build, emulator and queue PR CI green. Earlier import/export picker lifecycle fixes remain.",
         "remaining": [
-          "Physical Android SAF import/export, cancellation, Activity/process recreation and screen-reader testing across providers",
-          "Authenticated CUBE ROM save/reopen and production-signed candidate validation"
-        ],
-        "branch": "watchdog/q018-export-picker-recreation-20261029",
-        "mergedPr": 266,
-        "mergedCommit": "2a06bc93ddf9054b6af476a6d17891302996251b"
+          "Physical Android SAF import/export and process recreation across providers",
+          "Authenticated CUBE ROM save/reopen and real production release signing"
+        ]
       }
     },
     {
@@ -464,19 +466,21 @@
         "index.html",
         "app/CUBHMA_Mobile_Lab_Offline.html",
         "tests/mobile-cube-canvas-keyboard.test.mjs",
-        "docs/CUBE_CANVAS_KEYBOARD.md"
+        "docs/CUBE_CANVAS_KEYBOARD.md",
+        "tests/mobile-cube-event-navigation.test.mjs",
+        "docs/CUBE_EVENT_NAVIGATION.md"
       ],
       "checkpoint": {
         "date": "2026-10-29",
         "kind": "partial",
-        "summary": "Merged #256 accessible CUBE map keyboard navigation with source, Android and emulator CI green. Hardware keyboard/screen reader, full event forms and genuine ROM acceptance remain unverified.",
+        "branch": "watchdog/q019-event-navigation-20261029-r6",
+        "mergedPr": 270,
+        "mergedCommit": "6799b4a3f980462e8e84aac62d6d755e89ef7041",
+        "summary": "Merged #270: keyboard-accessible CUBE event type/index filters, live matching count, clear action and focus transfer into guarded copy-only editor; modular/offline parity. 986/986 source tests and Android build, emulator and queue PR CI green.",
         "remaining": [
-          "Real Android touch, hardware keyboard and screen-reader validation",
-          "Full map/event editor accessibility and authentic CUBE ROM compatibility"
-        ],
-        "branch": "watchdog/q019-cube-canvas-keyboard-20261029",
-        "mergedPr": 256,
-        "mergedCommit": "5f647b2af8daa7308a411ca6a04b0675b4919683"
+          "Physical Android touch, hardware keyboard and TalkBack acceptance",
+          "Complete semantic event editor and independently authenticated CUBE ROM compatibility"
+        ]
       }
     },
     {
@@ -511,6 +515,99 @@
         "mergedPr": 255,
         "mergedCommit": "822fa099aacd8525b07f3fbeecaedf6f57ff149b"
       }
+    },
+    {
+      "id": "Q021",
+      "title": "CUBE event record field coverage and guarded copy-only proposals",
+      "priority": 2,
+      "dependsOn": [
+        "Q002"
+      ],
+      "paths": [
+        "src/hma-cube-event-position.js"
+      ],
+      "status": "pending",
+      "effortHours": 14,
+      "validation": "Expand source-grounded typed object/trigger/signpost raw fields beyond positions with exact expected bytes, unknown-field preservation, combined rollback and synthetic tests; no unauthenticated ROM writes.",
+      "owner": null,
+      "branch": null,
+      "blocker": null,
+      "evidence": [],
+      "checkpoint": null
+    },
+    {
+      "id": "Q022",
+      "title": "CUBE map script grammar and pointer-reference navigation",
+      "priority": 2,
+      "dependsOn": [
+        "Q002"
+      ],
+      "paths": [
+        "src/hma-cube-map-script-table.js"
+      ],
+      "status": "pending",
+      "effortHours": 14,
+      "validation": "Source-grounded bounded script/conditional table decoding and raw reference navigation with malformed-pointer/overlap regression; do not execute scripts or authorize writes.",
+      "owner": null,
+      "branch": null,
+      "blocker": null,
+      "evidence": [],
+      "checkpoint": null
+    },
+    {
+      "id": "Q023",
+      "title": "CUBE cross-bank structural ownership and alias graph",
+      "priority": 2,
+      "dependsOn": [
+        "Q002"
+      ],
+      "paths": [
+        "src/hma-cube-cross-bank-ownership.js"
+      ],
+      "status": "pending",
+      "effortHours": 16,
+      "validation": "Expand bounded explicit-bank pointer ownership claims across map, event, connection and script structures; prove truncation and alias diagnostics with synthetic tests, never infer global write authority.",
+      "owner": null,
+      "branch": null,
+      "blocker": null,
+      "evidence": [],
+      "checkpoint": null
+    },
+    {
+      "id": "Q024",
+      "title": "Cross-kind copy-only transaction expected-byte and replay evidence",
+      "priority": 3,
+      "dependsOn": [
+        "Q002"
+      ],
+      "paths": [
+        "src/hma-cube-combined-transaction.js"
+      ],
+      "status": "pending",
+      "effortHours": 16,
+      "validation": "Source-bound changed-byte plan, independent staged replay and complete rollback across map/warp/event/connection/script proposals on synthetic fixtures; no unverified semantic export.",
+      "owner": null,
+      "branch": null,
+      "blocker": null,
+      "evidence": [],
+      "checkpoint": null
+    },
+    {
+      "id": "Q025",
+      "title": "Android instrumented SAF and accessibility regression harness",
+      "priority": 4,
+      "dependsOn": [],
+      "paths": [
+        "android/app/src/androidTest/java/com/pokebacon/cubemobile/SafRoundtripTest.java"
+      ],
+      "status": "pending",
+      "effortHours": 18,
+      "validation": "Automated Android emulator provider-backed picker cancel/recreation, import protection, export readback and Back accessibility smoke with native instrumentation; physical hardware remains separately required.",
+      "owner": null,
+      "branch": null,
+      "blocker": null,
+      "evidence": [],
+      "checkpoint": null
     }
   ]
 }
