@@ -340,19 +340,24 @@
         "tests/local-hma-cross-source.test.mjs",
         "src/hma-ordered-profile.js",
         "tests/hma-ordered-profile.test.mjs",
-        "docs/LOCAL_ORDERED_PROFILE.md"
+        "docs/LOCAL_ORDERED_PROFILE.md",
+        "src/app.js",
+        "index.html",
+        "build-standalone.mjs",
+        "app/CUBHMA_Mobile_Lab_Offline.html",
+        "tests/mobile-ordered-manifest.test.mjs",
+        "docs/MOBILE_ORDERED_MANIFEST.md"
       ],
       "checkpoint": {
         "date": "2026-10-29",
-        "kind": "partial",
-        "summary": "Merged #262: optional local ROM profile binds every ordered TOML overlay by exact filename, length and SHA-256, cross-checking separately supplied manifest and local bytes; malformed, mismatched or reordered claims fail closed. Source, Android, emulator and queue CI green. User-supplied claims do not authenticate CUBE or enable writes.",
+        "kind": "partial-candidate",
+        "summary": "Candidate read-only ordered ROM/TOML manifest import and exact-byte status in modular/offline Named data UI; synthetic tests and CI pending. Caller-supplied claims cannot authorize writes.",
         "remaining": [
-          "Independently authenticate genuine legally held CUBE ROM and ordered TOML metadata",
-          "Wire read-only cross-source status into modular/offline UI and validate physical Android hardware"
+          "Green source, Android and queue CI and reviewed PR merge",
+          "Independent legally held CUBE ROM and matching authenticated metadata",
+          "Physical Android SAF manifest/TOML import and screen-reader acceptance"
         ],
-        "branch": "watchdog/q016-ordered-overlay-cross-source-20261029",
-        "mergedPr": 262,
-        "mergedCommit": "d4ce29f49bc18f8a45de01b96ed1eb8e6cdc59e3"
+        "branch": "watchdog/q016-mobile-manifest-status-20261029"
       }
     },
     {
