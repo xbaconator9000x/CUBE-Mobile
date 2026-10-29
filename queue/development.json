@@ -1,0 +1,300 @@
+{
+  "schema": "cube-mobile-queue/1",
+  "upstream": "kcradi/CUBHMA@3044393183e01af2ae1e907fb37e4a75eda6a8dc",
+  "authoritativeBranch": "main",
+  "checkpoint": {
+    "sequence": 0,
+    "lastIntegratedCommit": null,
+    "lastRun": null
+  },
+  "tasks": [
+    {
+      "id": "Q001",
+      "title": "CI/build blockers",
+      "priority": 0,
+      "dependsOn": [],
+      "paths": [
+        ".github/workflows/ci.yml"
+      ],
+      "status": "done",
+      "effortHours": 2,
+      "validation": "CI, standalone and safety checks green",
+      "owner": null,
+      "branch": null,
+      "blocker": null,
+      "evidence": [
+        ".github/workflows/ci.yml"
+      ],
+      "checkpoint": null
+    },
+    {
+      "id": "Q002",
+      "title": "Reuse pinned CUBHMA format metadata",
+      "priority": 1,
+      "dependsOn": [],
+      "paths": [
+        "src/hma-map-bank-metadata.js"
+      ],
+      "status": "done",
+      "effortHours": 5,
+      "validation": "Pinned upstream format tests",
+      "owner": null,
+      "branch": null,
+      "blocker": null,
+      "evidence": [
+        ".github/workflows/ci.yml"
+      ],
+      "checkpoint": null
+    },
+    {
+      "id": "Q003",
+      "title": "Authenticated CUBE ROM/layout fixtures",
+      "priority": 1,
+      "dependsOn": [
+        "Q002"
+      ],
+      "paths": [
+        "src/hma-metadata-manifest.js"
+      ],
+      "status": "blocked",
+      "effortHours": 12,
+      "validation": "Locally authenticated legal ROM plus manifest; no ROM in Git",
+      "owner": null,
+      "branch": null,
+      "blocker": "Requires legally supplied local authentic ROM and authenticated CUBE manifest",
+      "evidence": [],
+      "checkpoint": null
+    },
+    {
+      "id": "Q004",
+      "title": "End-to-end open/edit/save/reopen",
+      "priority": 2,
+      "dependsOn": [
+        "Q003"
+      ],
+      "paths": [
+        "src/hma-cube-combined-transaction.js"
+      ],
+      "status": "pending",
+      "effortHours": 15,
+      "validation": "Byte exact roundtrip and reopen on authenticated ROM",
+      "owner": null,
+      "branch": null,
+      "blocker": null,
+      "evidence": [],
+      "checkpoint": null
+    },
+    {
+      "id": "Q005",
+      "title": "Map bank discovery and selection",
+      "priority": 2,
+      "dependsOn": [
+        "Q003"
+      ],
+      "paths": [
+        "src/hma-cube-map-discovery.js"
+      ],
+      "status": "pending",
+      "effortHours": 10,
+      "validation": "Multiple bank fixtures and invalid pointer rejection",
+      "owner": null,
+      "branch": null,
+      "blocker": null,
+      "evidence": [],
+      "checkpoint": null
+    },
+    {
+      "id": "Q006",
+      "title": "Map rendering and layers",
+      "priority": 3,
+      "dependsOn": [
+        "Q005"
+      ],
+      "paths": [
+        "src/hma-cube-map-render.js"
+      ],
+      "status": "pending",
+      "effortHours": 12,
+      "validation": "Real CUBE metatiles, overlays, scroll and visual tests",
+      "owner": null,
+      "branch": null,
+      "blocker": null,
+      "evidence": [],
+      "checkpoint": null
+    },
+    {
+      "id": "Q007",
+      "title": "Collision editing and rollback",
+      "priority": 3,
+      "dependsOn": [
+        "Q004",
+        "Q005"
+      ],
+      "paths": [
+        "src/hma-cube-cell-batch.js"
+      ],
+      "status": "pending",
+      "effortHours": 10,
+      "validation": "Atomic edit, rollback, save/reopen",
+      "owner": null,
+      "branch": null,
+      "blocker": null,
+      "evidence": [],
+      "checkpoint": null
+    },
+    {
+      "id": "Q008",
+      "title": "Warp/event editing and validation",
+      "priority": 3,
+      "dependsOn": [
+        "Q004",
+        "Q005"
+      ],
+      "paths": [
+        "src/hma-cube-event-batch.js"
+      ],
+      "status": "pending",
+      "effortHours": 12,
+      "validation": "Full event variants, navigation and save/reopen",
+      "owner": null,
+      "branch": null,
+      "blocker": null,
+      "evidence": [],
+      "checkpoint": null
+    },
+    {
+      "id": "Q009",
+      "title": "Script grammar and editing",
+      "priority": 4,
+      "dependsOn": [
+        "Q004"
+      ],
+      "paths": [
+        "src/vanilla-script-prefix.js"
+      ],
+      "status": "pending",
+      "effortHours": 16,
+      "validation": "CUBE script semantics and roundtrip",
+      "owner": null,
+      "branch": null,
+      "blocker": null,
+      "evidence": [],
+      "checkpoint": null
+    },
+    {
+      "id": "Q010",
+      "title": "Desktop editor feature parity",
+      "priority": 5,
+      "dependsOn": [
+        "Q004"
+      ],
+      "paths": [
+        "src/semantic.js"
+      ],
+      "status": "pending",
+      "effortHours": 24,
+      "validation": "Typed tables, text, assets, graphics, pointers",
+      "owner": null,
+      "branch": null,
+      "blocker": null,
+      "evidence": [],
+      "checkpoint": null
+    },
+    {
+      "id": "Q011",
+      "title": "Touch UX and navigation",
+      "priority": 6,
+      "dependsOn": [
+        "Q005"
+      ],
+      "paths": [
+        "src/app.js"
+      ],
+      "status": "pending",
+      "effortHours": 9,
+      "validation": "Android touch navigation and accessibility",
+      "owner": null,
+      "branch": null,
+      "blocker": null,
+      "evidence": [],
+      "checkpoint": null
+    },
+    {
+      "id": "Q012",
+      "title": "Android APK packaging",
+      "priority": 6,
+      "dependsOn": [],
+      "paths": [
+        ".github/workflows/android-build.yml"
+      ],
+      "status": "pending",
+      "effortHours": 8,
+      "validation": "Signed installable candidate and device smoke",
+      "owner": null,
+      "branch": null,
+      "blocker": null,
+      "evidence": [],
+      "checkpoint": null
+    },
+    {
+      "id": "Q013",
+      "title": "Emulator and Android compatibility",
+      "priority": 7,
+      "dependsOn": [
+        "Q004",
+        "Q012"
+      ],
+      "paths": [
+        ".github/workflows/android-emulator-smoke.yml"
+      ],
+      "status": "pending",
+      "effortHours": 12,
+      "validation": "Emulator plus physical Android evidence",
+      "owner": null,
+      "branch": null,
+      "blocker": null,
+      "evidence": [],
+      "checkpoint": null
+    },
+    {
+      "id": "Q014",
+      "title": "Regression and release validation",
+      "priority": 8,
+      "dependsOn": [
+        "Q009",
+        "Q010",
+        "Q013"
+      ],
+      "paths": [
+        ".github/workflows/ci.yml"
+      ],
+      "status": "pending",
+      "effortHours": 12,
+      "validation": "Reproducible release artifacts, regression, provenance",
+      "owner": null,
+      "branch": null,
+      "blocker": null,
+      "evidence": [],
+      "checkpoint": null
+    },
+    {
+      "id": "Q015",
+      "title": "BPS patch roundtrip interoperability",
+      "priority": 4,
+      "dependsOn": [
+        "Q004"
+      ],
+      "paths": [
+        "src/bps-export.js"
+      ],
+      "status": "pending",
+      "effortHours": 7,
+      "validation": "BPS export/apply independent byte comparison",
+      "owner": null,
+      "branch": null,
+      "blocker": null,
+      "evidence": [],
+      "checkpoint": null
+    }
+  ]
+}

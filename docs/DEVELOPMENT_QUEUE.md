@@ -1,0 +1,11 @@
+# CUBE Mobile persistent development queue
+
+GitHub `main:queue/development.json` is the authoritative queue; this is NOT a replacement for `parity/engineering-wbs.json` or strict parity acceptance. `queue/next-batch.json` is a disposable derived artifact and should not be committed. Queue work-hour estimates are provisional planning units, not measured productivity or total project hours.
+
+Run `node scripts/development-queue.mjs` for the next dependency-eligible, path-disjoint batch. The scheduler rejects cycles, unknown dependencies, duplicate IDs and premature completion. It does not automatically write to main or claim verified completion. Before starting a task, create a branch, record `in_progress`, branch and owner in a queue PR/checkpoint; after CI and integration, mark `done` with evidence and merged commit. Failed tasks remain `failed` with diagnostic checkpoint; other independent tasks remain eligible. Use branch PRs and GitHub CI as the safe integration boundary.
+
+For concurrent work, use disjoint `paths` and separate branches; avoid committing competing queue edits without rebasing against main. A single queue integrator serializes queue updates. After interruption, inspect main, open PRs and CI before reconciling; never assume an in-progress task is complete. `blocked` requires a concrete blocker and does not block independent work.
+
+The workflow validates scheduling and uploads an ephemeral next-batch report; **it does not autonomously merge, dispatch code generation, or modify queue state**. The existing hourly ChatGPT watchdog consumes main and performs coding. GitHub Actions cannot independently implement tasks merely by being scheduled. For verified completion, preserve test logs, authenticated ROM compatibility evidence and Android results, excluding ROM binaries and secrets from Git.
+
+Initial tasks reflect the repository's current structural and editing modules and upstream provenance. `done` means prerequisite infrastructure exists, not independently verified feature parity. The most important blocked dependency is authenticated local CUBE ROM/manifest validation. Continue parallel Android packaging, BPS infrastructure, and other non-conflicting tasks where possible.

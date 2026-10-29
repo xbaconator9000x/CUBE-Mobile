@@ -1,0 +1,28 @@
+name: Persistent development queue
+on:
+  push:
+    branches: [main]
+    paths: ['queue/**', 'scripts/development-queue.mjs', 'tests/development-queue.test.mjs']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate queue and select dependency-safe batch
+        run: node scripts/development-queue.mjs --output
+      - name: Test queue scheduling
+        run: node --test tests/development-queue.test.mjs
+      - name: Publish ephemeral queue checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: next-development-batch
+          path: queue/next-batch.json
+          retention-days: 7
