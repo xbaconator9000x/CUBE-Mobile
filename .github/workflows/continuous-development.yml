@@ -107,6 +107,12 @@ jobs:
             echo '::warning::Required review is outstanding; leaving the green PR for approval.'
             exit 0
           fi
+          BASE_SHA=$(git merge-base HEAD origin/main)
+          CURRENT_MAIN=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [[ "$BASE_SHA" != "$CURRENT_MAIN" ]]; then
+            echo '::error::Main moved during CI; refusing to merge a stale candidate.'
+            exit 1
+          fi
           gh pr merge "$PR_URL" --squash --delete-branch
           echo 'Merged verified PR; verifying main CI before immediately dispatching the next coding run.'
           MAIN_SHA=$(git ls-remote origin refs/heads/main | cut -f1)
