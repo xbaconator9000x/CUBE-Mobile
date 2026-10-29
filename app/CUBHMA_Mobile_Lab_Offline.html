@@ -80,6 +80,7 @@
 .map-overlay-legend{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
 .map-overlay-legend-item{display:inline-flex;align-items:center;gap:5px;font-size:.8rem;padding:3px 6px;border:1px solid var(--border,#64748b);border-radius:5px}
 .map-overlay-swatch{display:inline-block;width:14px;height:14px;border:1px solid rgba(0,0,0,.35);border-radius:3px}
+#cube-map-render-canvas:focus-visible{outline:3px solid var(--violet);outline-offset:4px}
 </style>
 </head><body>
 <div class="shell" id="app">
@@ -188,7 +189,7 @@
     <button type="button" id="cube-map-render-jump" class="subtle-button" disabled>Open selected rendered cell in hex</button>
   </div>
   <output id="cube-map-render-status" class="palette-note" aria-live="polite">CUBE custom lighting/FRLG variants are not rendered. No ROM authenticity or passability is inferred.</output>
-  <div style="overflow-x:auto"><canvas id="cube-map-render-canvas" hidden aria-label="Read-only CUBE Emerald rendered metatile preview" style="max-width:none;image-rendering:pixelated"></canvas></div>
+  <div style="overflow-x:auto"><canvas id="cube-map-render-canvas" hidden tabindex="0" role="button" aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Enter Space" aria-label="Read-only CUBE map. Arrow keys move the cell selection; Enter or Space inspects it." style="max-width:none;image-rendering:pixelated"></canvas></div>
   <output id="cube-map-overlay-legend" class="palette-note" aria-live="polite">No CUBE raw overlay selected.</output>
   <output id="cube-map-render-selection" class="palette-note" aria-live="polite">Tap a rendered CUBE cell to inspect its raw blockmap and attribute offsets.</output>
   <div class="input-row" aria-label="CUBE read-only cell visual proposal">
@@ -11523,6 +11524,8 @@ $('cube-map-render').addEventListener('click',()=>safeRun(()=>{
   canvas.style.width=(rendered.width*2)+'px';
   canvas.style.height=(rendered.height*2)+'px';
   canvas.hidden=false;
+  canvas.setAttribute('aria-label',
+    'Read-only CUBE map. Arrow keys move the cell selection; Enter or Space inspects it.');
   cubeRenderEvidence={rom:model,options,x,y,overlayMode,
     warpOverlayJson:warpOverlayReport?JSON.stringify(warpOverlayReport):null,map:rendered.map,
     pixels:rendered.pixels.slice(),cellsJson:JSON.stringify(rendered.cells),
@@ -11583,7 +11586,35 @@ $('cube-map-render-canvas').addEventListener('click',event=>safeRun(()=>{
     ' · behavior 0x'+hex(hit.attribute.behavior,2)+' · layer '+hit.attribute.layer+
     ' · blockmap 0x'+hex(hit.cell.byteOffset)+' · attributes 0x'+
     hex(hit.attribute.attributeOffset)+'. Not verified walkability.';
+  canvas.setAttribute('aria-label','Selected CUBE cell '+hit.cell.x+','+
+    hit.cell.y+', tile '+hit.cell.tileId+
+    '. Arrow keys move selection; Enter or Space inspects.');
 }));
+$('cube-map-render-canvas').addEventListener('keydown',event=>{
+  if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Enter',' '].includes(event.key))
+    return;
+  const canvas=$('cube-map-render-canvas'),snapshot=cubeRenderEvidence;
+  if(!snapshot||canvas.hidden||!canvas.width||!canvas.height)return;
+  const columns=canvas.width/16,rows=canvas.height/16;
+  if(!Number.isSafeInteger(columns)||!Number.isSafeInteger(rows)||
+     columns<1||rows<1)return;
+  const selected=cubeRenderSelection?.snapshot===snapshot?cubeRenderSelection:null;
+  let col=selected?selected.x-snapshot.x:0;
+  let row=selected?selected.y-snapshot.y:0;
+  if(event.key==='ArrowLeft')col=Math.max(0,col-1);
+  if(event.key==='ArrowRight')col=Math.min(columns-1,col+1);
+  if(event.key==='ArrowUp')row=Math.max(0,row-1);
+  if(event.key==='ArrowDown')row=Math.min(rows-1,row+1);
+  if(col<0||col>=columns||row<0||row>=rows)return;
+  event.preventDefault(); // Do not scroll the page while navigating the map.
+  const rect=canvas.getBoundingClientRect();
+  if(!rect.width||!rect.height)return;
+  // Reuse the exact same stale-ROM/overlay checks and source-byte selection
+  // path as touch, rather than creating a weaker keyboard-only inspection.
+  canvas.dispatchEvent(new MouseEvent('click',{bubbles:true,
+    clientX:rect.left+(col+.5)*rect.width/columns,
+    clientY:rect.top+(row+.5)*rect.height/rows}));
+});
 $('cube-map-batch-add').addEventListener('click',()=>safeRun(()=>{
   const selected=cubeRenderSelection,snapshot=selected?.snapshot;
   if(!snapshot||snapshot!==cubeRenderEvidence||snapshot.rom!==model||
