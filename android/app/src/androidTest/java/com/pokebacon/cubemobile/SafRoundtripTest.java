@@ -111,7 +111,7 @@ public class SafRoundtripTest {
                     "help.getAttribute('aria-label')==='Help and safety' && " +
                     "!!home && !!home.getAttribute('aria-label') && " +
                     "!!picker && picker.type==='file' && " +
-                    "!!document.querySelector('label[for=\\\"rom-picker\\\"]') && " +
+                    "!!document.querySelector('label[for=rom-picker]') && " +
                     "!!status && status.getAttribute('aria-live')==='polite';})()",
                     value -> { result.set(value); latch.countDown(); }));
                 if (latch.await(5, TimeUnit.SECONDS) &&
