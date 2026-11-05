@@ -44,11 +44,24 @@
 .semantic-warning{background:#4d302c;color:#ffe5dc;padding:12px;border-radius:10px;margin:10px 0}
 .semantic-bytes{font-family:ui-monospace,monospace;white-space:pre-wrap;word-break:break-all;font-size:12px;color:#bcd3ed;line-height:1.6;padding:12px;background:#0c172b;border-radius:12px}
 @media(max-width:850px){.semantic-grid{grid-template-columns:1fr}.anchor-list{max-height:42vh}.semantic-card{padding:15px}}
-/* Six tools, one fixed row on narrow Android screens. */
+/* Keep all seven sections visible in one fixed row on narrow Android screens. */
 @media(max-width:820px){
- .bottom-nav{grid-template-columns:repeat(6,minmax(0,1fr));height:68px;overflow:hidden}
- .mobile-tab{min-width:0;max-width:100%;font-size:9.5px;padding:3px 0;white-space:nowrap}
+ .bottom-nav{grid-template-columns:repeat(7,minmax(0,1fr));height:calc(67px + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom)}
+ .mobile-tab{min-width:0;max-width:100%;min-height:64px;font-size:clamp(8px,2.4vw,10px);padding:0 1px;white-space:nowrap}
  .mobile-tab span{font-size:21px}
+}
+.import-status{display:block;margin:10px 0 0;padding:10px 12px;border:1px solid #35445e;border-radius:10px;background:#111c30;color:#c5d0e3;font-size:12px}
+.import-status[data-state="loading"]{border-color:#655db4;color:#e3defe}
+.import-status[data-state="error"]{border-color:#84515a;color:#ffd2d4}
+.import-status[data-state="ready"]{border-color:#386857;color:#a8e8c8}
+@media(max-width:590px){
+ .primary-button,.secondary-button,.subtle-button{white-space:normal;overflow-wrap:anywhere}
+ .input-row{flex-wrap:wrap;min-width:0}
+ .input-row>*{min-width:0;max-width:100%}
+ .toolbar-card{grid-template-columns:minmax(0,1fr)}
+ .toolbar-card>*{min-width:0;max-width:100%}
+ .toolbar-card .input-row{flex-wrap:wrap;min-width:0}
+ .toolbar-card .subtle-button,.toolbar-card .secondary-button{white-space:normal;overflow-wrap:anywhere}
 }
 #anchor-group{width:100%;min-height:46px;border-radius:11px;padding:11px 13px;background:#0d1727;color:#f4f5fc;border:1px solid #35425a}
 
@@ -104,6 +117,7 @@
   <div class="hero"><div class="hero-content"><div class="hero-kicker">YOUR ROM. YOUR DEVICE.</div><h2>A smarter way to<br><em>work on the go.</em></h2><p>Explore, inspect and safely edit GBA ROM data in your browser. No uploads. No installation required.</p><label for="rom-picker" class="primary-button">＋ Open a GBA ROM <span>›</span></label><div class="hero-note">Supports .gba files · up to 128 MiB</div></div><div class="hero-art" aria-hidden="true"><div class="art-frame"><div class="art-top"><span></span><span></span><span></span><b>ROM / INSPECTOR</b></div><div class="art-lines"><i>0001A0</i><strong>50 4F 4B 45 4D 4F 4E</strong><i>0001B0</i><strong>96 00 00 00 00 00 00</strong><i>0001C0</i><strong>FF FF <u>20 48</u> FF FF FF</strong></div><div class="art-bottom">DATA INTEGRITY <span>● PROTECTED</span></div></div></div></div>
   <div class="section-heading"><h3>Current session</h3><span id="session-state" class="muted">No ROM loaded</span></div>
   <div class="rom-panel" id="rom-panel"><div class="rom-placeholder"><div class="big-file-icon">◇</div><div><strong>No ROM loaded yet</strong><p>Choose a legally obtained GBA ROM to get started. Your file stays on this device.</p></div></div></div>
+  <output id="rom-import-status" class="import-status" role="status" aria-live="polite">Files are opened locally and never uploaded. Browsing starts read-only; ROM layout and metadata are not authenticated.</output>
   <div class="toolbar-card" aria-label="Local ROM identity">
     <div class="input-wrap"><label>Exact ROM identity (read-only)</label>
       <div class="input-row"><button type="button" class="subtle-button" id="rom-fingerprint" disabled>Compute SHA-256</button></div>
@@ -10603,7 +10617,7 @@ let activeRenderedMap=null,selectedRenderedHit=null;
 let cubeCatalogEvidence=null,cubeWarpTraceEvidence=null,cubeConnectionTraceEvidence=null,cubeOwnershipEvidence=null,cubeWarpAuditEvidence=null,cubeWarpEditSelection=null;
 let cubeCellBatchQueue=[],cubeCellBatchSnapshot=null;
 let mapReviewQueue=[],mapReviewRom=null,lastMapPreviews={cell:null,warp:null,event:null};
-let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, toastTimer=null;
+let model=null, currentTab='home', page=0, selected=null, patchFile=null, paletteOffset=null, graphicsSource=null, tilePage=0, palette=null, graphicCandidates=[], scanToken=0, scanning=false, romImportInFlight=false, toastTimer=null;
 const PER_PAGE=128;
 const tiles=$('tile-canvas'),ctx=tiles.getContext('2d',{willReadFrequently:false});
 ctx.imageSmoothingEnabled=false;
@@ -10611,6 +10625,7 @@ window.__cubeAppBootStage='canvas';
 const controls=['rom-fingerprint','rom-fingerprint-check','hex-prev','hex-next','hex-jump','hex-find','hex-offset','hex-search','graphics-offset','palette-offset','graphics-show','graphics-decode','palette-show','palette-reset','graphics-scan','map-inspect','map-summary-scan','map-preview-cell','map-visual-compare','map-visual-compare-queue','map-layout-inspect','map-bank-inspect','map-atlas-inspect','map-atlas-probe','map-warp-inspect','map-connection-inspect','map-event-inspect','map-script-pointer-inspect','map-script-map-audit','map-script-operand-atlas-audit','map-blockset-inspect','map-pan-up','map-pan-down','map-pan-left','map-pan-right','save-rom','save-project','export-ips','export-bps','discard-button','edit-unlock'];
 const tabs={home:['YOUR WORKSPACE','ROM Workbench'],hex:['BINARY INSPECTOR','Hex editor'],anchors:['ROM SEMANTICS','Named data'],maps:['RAW MAP CELLS','Blockmap inspector'],graphics:['GBA GRAPHICS','Graphics explorer'],patches:['PATCH WORKFLOW','Patch tools'],changes:['REVIEW & EXPORT','Changes']};
 function toast(message,bad=false){const t=$('toast');t.textContent=message;t.classList.toggle('error',bad);t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),4300);}
+function setRomImportStatus(message,state=''){const status=$('rom-import-status');status.textContent=message;status.dataset.state=state;}
 function safeRun(fn){try{const result=fn();if(result?.catch) result.catch(err=>toast(err.message||String(err),true));}catch(err){toast(err.message||String(err),true);}}
 function confirmAction(title,description){return new Promise(resolve=>{const d=$('confirm-dialog');$('confirm-title').textContent=title;$('confirm-text').textContent=description;d.showModal();d.addEventListener('close',()=>resolve(d.returnValue==='yes'),{once:true});});}
 function ensureModel(){if(!model)throw Error('Open a GBA ROM first');return model;}
@@ -10724,12 +10739,28 @@ function updateIndicators(){
   drawMapBankRawPointerEvidence();
   drawMapBankRawWindowEvidence();
 }
-function installModel(name,bytes){cubeBatchEditors.ready(false);cubeBatchReadySnapshot=null;clearCubeRenderedMap('ROM replaced; render again.');clearCubeCatalog();clearMapChangeReview();clearMapAtlas('ROM replaced; declared atlas invalidated.');metadataImportSerial++;metadataFingerprints=[];importedHmaManifest=null;manifestImportSerial++;mapBankMetadataReport=null;mapBankRawPointerEvidence=null;mapBankRawWindowEvidence=null;mapBankDeclaredEvidence=null;mapBankTargetEvidence=null;mapBankCustomSummary=null;cubeMapEvidence=null;cubeWarpEvidence=null;cubeConnectionEvidence=null;clearRenderedMap('ROM replaced. Select vanilla header again.');$('map-grid').innerHTML='<div class="empty-state">No blockmap inspected.</div>';$('map-bank-status').textContent='ROM replaced. Re-enter independently verified vanilla bank location and counts.';clearWarpInspection('ROM replaced. Select a vanilla map header again.');clearConnectionInspection('ROM replaced. Select a vanilla map header again.');$('map-layout-status').textContent='ROM replaced. No vanilla-format layout inspected.';$('map-status').textContent='ROM replaced. Enter a verified offset and inspect again.';pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
+function installModel(name,bytes){cubeBatchEditors.ready(false);cubeBatchReadySnapshot=null;clearCubeRenderedMap('ROM replaced; render again.');clearCubeCatalog();clearMapChangeReview();clearMapAtlas('ROM replaced; declared atlas invalidated.');metadataImportSerial++;metadataFingerprints=[];importedHmaManifest=null;manifestImportSerial++;mapBankMetadataReport=null;mapBankRawPointerEvidence=null;mapBankRawWindowEvidence=null;mapBankDeclaredEvidence=null;mapBankTargetEvidence=null;mapBankCustomSummary=null;cubeMapEvidence=null;cubeWarpEvidence=null;cubeConnectionEvidence=null;clearRenderedMap('ROM replaced. Select vanilla header again.');$('map-grid').innerHTML='<div class="empty-state">No blockmap inspected.</div>';$('map-bank-status').textContent='ROM replaced. Re-enter independently verified vanilla bank location and counts.';clearWarpInspection('ROM replaced. Select a vanilla map header again.');clearConnectionInspection('ROM replaced. Select a vanilla map header again.');$('map-layout-status').textContent='ROM replaced. No vanilla-format layout inspected.';$('map-status').textContent='ROM replaced. Enter a verified offset and inspect again.';pcsReference=null;fingerprintAbort?.abort();fingerprintAbort=null;fingerprintResult=null;$('rom-fingerprint-status').textContent='Ready to compute a local SHA-256. Layout remains unverified.';$('rom-fingerprint-expected').value='';$('rom-fingerprint-compare-status').textContent='Paste a reference digest after hashing to compare exact bytes. No layout authentication.';pcsReferenceName='';$('pcs-reference-status').textContent='No optional PCS reference loaded.';metadata=[];metadataSources=[];metadataLayoutKind='unspecified';metadataOffsetPointers=[];metadataLists=[];metadataListConflicts=new Set();metadataMatchedWords=[];metadataWordConflicts=new Set();metadataWordSnapshot=null;metadataResolution=null;selectedAnchor=null;model=new RomModel(name,bytes);page=0;selected=null;patchFile=null;resetGraphicState();$('patch-filename').textContent='No patch selected';$('patch-picker').value='';$('edit-unlock').checked=false;$('hex-offset').value='000000';$('selected-offset').value='';$('selected-value').value='';updateIndicators();drawHex();drawAnchors();drawGraphics();drawChanges();setRomImportStatus(`Opened ${name} locally · ${formatSize(bytes.length)}. Browsing is read-only unless raw editing is explicitly unlocked; ROM layout and metadata are unverified.`,'ready');toast(`${name} opened locally · ${formatSize(bytes.length)}`);}
 $('rom-picker').addEventListener('change',async e=>{
   const file=e.target.files?.[0];e.target.value='';if(!file)return;
-  if(file.size<0xC0 || file.size>MAX_BYTES)return toast('ROM must be 192 bytes to 128 MiB',true);
-  if(model?.dirty && !(await confirmAction('Replace current ROM?','You have unsaved changes. Opening a different ROM will discard them.')))return;
-  try{const bytes=new Uint8Array(await file.arrayBuffer());installModel(file.name,bytes);}catch(err){toast(`Could not open ROM: ${err.message}`,true);}
+  if(romImportInFlight)return toast('A ROM is already being opened. Please wait.',true);
+  romImportInFlight=true;
+  setRomImportStatus(`Checking ${file.name} locally…`,'loading');
+  try{
+    if(file.size<0xC0 || file.size>MAX_BYTES)throw Error('ROM must be 192 bytes to 128 MiB');
+    if(model?.dirty && !(await confirmAction('Replace current ROM?','You have unsaved changes. Opening a different ROM will discard them.'))){
+      setRomImportStatus('Open cancelled. The current ROM and staged changes are unchanged.');
+      return;
+    }
+    setRomImportStatus(`Reading ${file.name} into local memory… Keep the app open.`,'loading');
+    const buffer=await file.arrayBuffer();
+    if(buffer.byteLength!==file.size)throw Error('File size changed while it was being read');
+    installModel(file.name,new Uint8Array(buffer));
+  }catch(err){
+    setRomImportStatus(`Import failed for ${file.name}: ${err.message}. Review the current session before continuing.`,'error');
+    toast(`Could not open ROM: ${err.message}`,true);
+  }finally{
+    romImportInFlight=false;
+  }
 });
 $('rom-fingerprint').addEventListener('click',async()=>{
   if(!model||fingerprintAbort)return;

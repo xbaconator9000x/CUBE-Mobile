@@ -39,11 +39,24 @@
 .semantic-warning{background:#4d302c;color:#ffe5dc;padding:12px;border-radius:10px;margin:10px 0}
 .semantic-bytes{font-family:ui-monospace,monospace;white-space:pre-wrap;word-break:break-all;font-size:12px;color:#bcd3ed;line-height:1.6;padding:12px;background:#0c172b;border-radius:12px}
 @media(max-width:850px){.semantic-grid{grid-template-columns:1fr}.anchor-list{max-height:42vh}.semantic-card{padding:15px}}
-/* Six tools, one fixed row on narrow Android screens. */
+/* Keep all seven sections visible in one fixed row on narrow Android screens. */
 @media(max-width:820px){
- .bottom-nav{grid-template-columns:repeat(6,minmax(0,1fr));height:68px;overflow:hidden}
- .mobile-tab{min-width:0;max-width:100%;font-size:9.5px;padding:3px 0;white-space:nowrap}
+ .bottom-nav{grid-template-columns:repeat(7,minmax(0,1fr));height:calc(67px + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom)}
+ .mobile-tab{min-width:0;max-width:100%;min-height:64px;font-size:clamp(8px,2.4vw,10px);padding:0 1px;white-space:nowrap}
  .mobile-tab span{font-size:21px}
+}
+.import-status{display:block;margin:10px 0 0;padding:10px 12px;border:1px solid #35445e;border-radius:10px;background:#111c30;color:#c5d0e3;font-size:12px}
+.import-status[data-state="loading"]{border-color:#655db4;color:#e3defe}
+.import-status[data-state="error"]{border-color:#84515a;color:#ffd2d4}
+.import-status[data-state="ready"]{border-color:#386857;color:#a8e8c8}
+@media(max-width:590px){
+ .primary-button,.secondary-button,.subtle-button{white-space:normal;overflow-wrap:anywhere}
+ .input-row{flex-wrap:wrap;min-width:0}
+ .input-row>*{min-width:0;max-width:100%}
+ .toolbar-card{grid-template-columns:minmax(0,1fr)}
+ .toolbar-card>*{min-width:0;max-width:100%}
+ .toolbar-card .input-row{flex-wrap:wrap;min-width:0}
+ .toolbar-card .subtle-button,.toolbar-card .secondary-button{white-space:normal;overflow-wrap:anywhere}
 }
 #anchor-group{width:100%;min-height:46px;border-radius:11px;padding:11px 13px;background:#0d1727;color:#f4f5fc;border:1px solid #35425a}
 
