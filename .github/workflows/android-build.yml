@@ -1,6 +1,17 @@
 name: Build Android debug APK
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - 'app/CUBHMA_Mobile_Lab_Offline.html'
+      - 'src/**'
+      - 'index.html'
+      - 'build-standalone.mjs'
+      - 'scripts/verify-android-*.mjs'
+      - 'tests/android-*.test.mjs'
+      - '.github/workflows/android-build.yml'
 
 permissions:
   contents: read
@@ -81,10 +92,20 @@ jobs:
           AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
           test -x "$AAPT"
           node scripts/verify-android-apk.mjs "$APK" "$AAPT"
+      - name: Record exact debug APK SHA-256 and PR commit provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=$(find android/app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -print -quit)
+          test -s "$APK"
+          sha256sum "$APK" | tee "$APK.sha256"
+          printf 'commit=%s\\nworkflow_run=%s\\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" | tee "$APK.build.txt"
       - uses: actions/upload-artifact@v4
         with:
           name: cube-mobile-debug-apk
           path: |
             android/app/build/outputs/apk/debug/*.apk
             android/app/build/outputs/apk/debug/*.apk.provenance.json
+            android/app/build/outputs/apk/debug/*.apk.sha256
+            android/app/build/outputs/apk/debug/*.apk.build.txt
           if-no-files-found: error

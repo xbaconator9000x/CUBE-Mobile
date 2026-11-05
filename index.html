@@ -26,6 +26,7 @@
   <div class="hero"><div class="hero-content"><div class="hero-kicker">YOUR ROM. YOUR DEVICE.</div><h2>A smarter way to<br><em>work on the go.</em></h2><p>Explore, inspect and safely edit GBA ROM data in your browser. No uploads. No installation required.</p><label for="rom-picker" class="primary-button">＋ Open a GBA ROM <span>›</span></label><div class="hero-note">Supports .gba files · up to 128 MiB</div></div><div class="hero-art" aria-hidden="true"><div class="art-frame"><div class="art-top"><span></span><span></span><span></span><b>ROM / INSPECTOR</b></div><div class="art-lines"><i>0001A0</i><strong>50 4F 4B 45 4D 4F 4E</strong><i>0001B0</i><strong>96 00 00 00 00 00 00</strong><i>0001C0</i><strong>FF FF <u>20 48</u> FF FF FF</strong></div><div class="art-bottom">DATA INTEGRITY <span>● PROTECTED</span></div></div></div></div>
   <div class="section-heading"><h3>Current session</h3><span id="session-state" class="muted">No ROM loaded</span></div>
   <div class="rom-panel" id="rom-panel"><div class="rom-placeholder"><div class="big-file-icon">◇</div><div><strong>No ROM loaded yet</strong><p>Choose a legally obtained GBA ROM to get started. Your file stays on this device.</p></div></div></div>
+  <output id="rom-import-status" class="import-status" role="status" aria-live="polite">Files are opened locally and never uploaded. Browsing starts read-only; ROM layout and metadata are not authenticated.</output>
   <div class="toolbar-card" aria-label="Local ROM identity">
     <div class="input-wrap"><label>Exact ROM identity (read-only)</label>
       <div class="input-row"><button type="button" class="subtle-button" id="rom-fingerprint" disabled>Compute SHA-256</button></div>
@@ -504,7 +505,7 @@
 </section>
 </main>
 </div>
-<nav class="bottom-nav" aria-label="Mobile navigation"><button class="mobile-tab active" data-tab="home"><span>▦</span>Home</button><button class="mobile-tab" data-tab="hex"><span>⌗</span>Hex</button><button class="mobile-tab" data-tab="anchors"><span>⌕</span>Data</button><button class="mobile-tab" data-tab="graphics"><span>◈</span>Graphics</button><button class="mobile-tab" data-tab="patches"><span>⇄</span>Patches</button><button class="mobile-tab" data-tab="changes"><span>≡</span>Changes</button></nav>
+<nav class="bottom-nav" aria-label="Mobile navigation"><button class="mobile-tab active" data-tab="home"><span>▦</span>Home</button><button class="mobile-tab" data-tab="hex"><span>⌗</span>Hex</button><button class="mobile-tab" data-tab="anchors"><span>⌕</span>Data</button><button class="mobile-tab" data-tab="maps"><span>▤</span>Maps</button><button class="mobile-tab" data-tab="graphics"><span>◈</span>Graphics</button><button class="mobile-tab" data-tab="patches"><span>⇄</span>Patches</button><button class="mobile-tab" data-tab="changes"><span>≡</span>Changes</button></nav>
 </div>
 <input hidden type="file" accept=".gba,.bin,.rom,application/octet-stream" id="rom-picker">
 <input hidden type="file" multiple accept=".toml,.txt,text/plain" id="metadata-picker">

@@ -112,6 +112,11 @@ public class SafRoundtripTest {
                     "!!home && !!home.getAttribute('aria-label') && " +
                     "!!picker && picker.type==='file' && " +
                     "!!document.querySelector('label[for=rom-picker]') && " +
+                    "!!document.getElementById('rom-import-status') && " +
+                    "document.getElementById('rom-import-status').getAttribute('aria-live')==='polite' && " +
+                    "['home','hex','anchors','maps','graphics','patches','changes'].every(function(name){" +
+                    "return !!document.querySelector('.mobile-tab[data-tab='+name+']') && " +
+                    "!!document.getElementById('view-'+name);}) && " +
                     "!!status && status.getAttribute('aria-live')==='polite';})()",
                     value -> { result.set(value); latch.countDown(); }));
                 if (latch.await(5, TimeUnit.SECONDS) &&
