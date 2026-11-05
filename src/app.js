@@ -137,6 +137,10 @@ function renderTab(name){
   qa('[data-tab]').forEach(el=>{
     el.classList.toggle('active',el.dataset.tab===name);
     if(el.classList.contains('tab'))el.setAttribute('aria-current',el.dataset.tab===name?'page':'false');
+    if(el.classList.contains('mobile-tab')){
+      if(el.dataset.tab===name)el.setAttribute('aria-current','page');
+      else el.removeAttribute('aria-current');
+    }
   });
   $('top-eyebrow').textContent=tabs[name][0];$('top-title').textContent=tabs[name][1];
   $('home-button').hidden=name==='home';
